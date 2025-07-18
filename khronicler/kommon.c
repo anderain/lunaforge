@@ -134,5 +134,7 @@ const char *_KOCODE_NAME[] = {
     "ASSIGN_VAR",
     "GOTO",
     "IFGOTO",
+    "PUSH_OFFSET",
+    "RETURN",
     "STOP"
 };

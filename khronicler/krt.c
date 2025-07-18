@@ -24,6 +24,13 @@ KbRuntimeValue* rtvalueCreateNumber(const KB_FLOAT num) {
     return v;
 }
 
+KbRuntimeValue* rtvalueCreateInteger(int intVal) {
+    KbRuntimeValue* v = (KbRuntimeValue *)malloc(sizeof(KbRuntimeValue));
+    v->type = RVT_INTEGER;
+    v->data.intVal = intVal;
+    return v;
+}
+
 KbRuntimeValue* rtvalueCreateString(const char* sz) {
     KbRuntimeValue* v = (KbRuntimeValue *)malloc(sizeof(KbRuntimeValue));
     v->type = RVT_STRING;
@@ -162,8 +169,8 @@ void formatExecError(const KbRuntimeError *errorRet, char *message, int messageL
         formatExecErrorAppend("Unknown opcode: ");
         formatExecErrorAppend(errorRet->message);
     }
-    else if (errorRet->type == KBRE_INVALID_IMAGE_INDEX) {
-        formatExecErrorAppend("Invalid image index: ");
+    else if (errorRet->type == KBRE_ILLEGAL_RETURN) {
+        formatExecErrorAppend("Invalid RETURN operation. ");
         formatExecErrorAppend(errorRet->message);
     }
     else {
@@ -470,6 +477,20 @@ int machineExec(KbMachine* machine, KbRuntimeError *errorRet) {
                     machine->cmdPtr = cmdBlockPtr + cmd->param.index;
                     continue;
                 }
+                break;
+            }
+            case KBO_PUSH_OFFSET: {
+                vlPushBack(machine->stack, rtvalueCreateInteger(machine->cmdPtr - cmdBlockPtr));
+                break;
+            }
+            case KBO_RETURN: {
+                KbRuntimeValue *rtOffset = (KbRuntimeValue *)vlPopBack(machine->stack);
+                int offset = 0;
+                if (rtOffset->type != RVT_INTEGER) {
+                    execReturnErrorWithInt(KBRE_ILLEGAL_RETURN, cmd->op);
+                }
+                offset = rtOffset->data.intVal + 1; /* 跳过后面的goto */
+                machine->cmdPtr = cmdBlockPtr + offset;
                 break;
             }
             case KBO_STOP: {

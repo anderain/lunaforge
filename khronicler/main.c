@@ -105,9 +105,10 @@ int buildFromKBasic(const char *fileName, const char * outputFileName) {
         }
     }
 
-    // second loop, compile commands
-    // after the second loop,
-    // the `ptr` in `param` of GOTO and IFGOTO is filled with the label pointer.
+    /*
+        第二遍循环，编译生成命令序列。
+        本次循环之后，生成的 GOTO 与 IFGOTO 命令的 `param`.`ptr` 存储的是 KbLabel 的指针
+     */
     contextCtrlResetCounter(context);
     for (textPtr = textBuf, lineCount = 1; *textPtr; lineCount++) {
         char line[1000];
@@ -124,8 +125,10 @@ int buildFromKBasic(const char *fileName, const char * outputFileName) {
         }
     }
 
-    // This call will update the `param` of
-    // GOTO and IFGOTO commands and add a last STOP command
+    /*
+        执行完成后 GOTO 与 IFGOTO 命令的 `param`.`index`
+        将会被替换为 opcode 的 offset
+     */
     kbCompileEnd(context);
 
 compileEnd:

@@ -90,6 +90,8 @@ typedef enum {
     KBO_ASSIGN_VAR,     // assign to variable
     KBO_GOTO,           // goto commands
     KBO_IFGOTO,
+    KBO_PUSH_OFFSET,    // push_offset + goto = gosub
+    KBO_RETURN,         // return
     KBO_STOP            // stop command
 } KB_OPCODE;
 

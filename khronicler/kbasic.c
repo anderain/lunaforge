@@ -20,6 +20,8 @@ typedef struct {
 #define KEYWORD_END     "end"
 #define KEYWORD_BREAK   "break"
 #define KEYWORD_GOSUB   "gosub"
+#define KEYWORD_RETURN  "return"
+#define KEYWORD_EXIT    "exit"
 
 static const KeywordDef KEYWORDS[] = {
     { KEYWORD_LET       },
@@ -32,6 +34,8 @@ static const KeywordDef KEYWORDS[] = {
     { KEYWORD_END       },
     { KEYWORD_BREAK     },
     { KEYWORD_GOSUB     },
+    { KEYWORD_RETURN    },
+    { KEYWORD_EXIT      },
     { NULL              }
 };
 
@@ -1062,6 +1066,24 @@ KbOpCommand* opCommandCreateStop() {
     return cmd;
 }
 
+KbOpCommand* opCommandCreatePushOffset() {
+    KbOpCommand* cmd = (KbOpCommand*)malloc(sizeof(KbOpCommand));
+
+    cmd->op = KBO_PUSH_OFFSET;
+    cmd->param.index = 0;
+
+    return cmd;
+}
+
+KbOpCommand* opCommandCreatePushReturn() {
+    KbOpCommand* cmd = (KbOpCommand*)malloc(sizeof(KbOpCommand));
+
+    cmd->op = KBO_RETURN;
+    cmd->param.index = 0;
+
+    return cmd;
+}
+
 KbOpCommand* opCommandCreateGoto(KbLabel *label) {
     KbOpCommand* cmd = (KbOpCommand*)malloc(sizeof(KbOpCommand));
 
@@ -1079,6 +1101,7 @@ KbOpCommand* opCommandCreateIfGoto(KbLabel *label) {
 
     return cmd;
 }
+
 
 int compileExprTree(KbContext *context, ExprNode *node, KbBuildError *errorRet) {
     int i;
@@ -1185,7 +1208,12 @@ void dbgPrintContextCommand(const KbOpCommand *cmd) {
         kFtoa((float)cmd->param.number, szNum, DEFAUL_FTOA_PRECISION);
         printf("%s", szNum);
     }
-    else if ((cmd->op >= KBO_OPR_NEG && cmd->op <= KBO_OPR_LTEQ) || cmd->op == KBO_POP || cmd->op == KBO_STOP) {
+    else if ((cmd->op >= KBO_OPR_NEG && cmd->op <= KBO_OPR_LTEQ)
+     || cmd->op == KBO_POP
+     || cmd->op == KBO_STOP
+     || cmd->op == KBO_PUSH_OFFSET
+     || cmd->op == KBO_RETURN
+    ) {
         // nothing here
     }
     else {
@@ -1695,6 +1723,52 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         /* 指令写入，跳转回循环结束 */
         label = contextCtrlGetLabel(context, pCsItem->iLabelEnd);
         vlPushBack(context->commandList, opCommandCreateGoto(label));
+    }
+    /* exit */
+    else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_EXIT, token->content)) {
+        /* 匹配行结束 */
+        token = nextToken(&analyzer);
+        if (token->type != TOKEN_END) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in exit statement");
+        }
+        vlPushBack(context->commandList, opCommandCreateStop());
+    }
+    /* gosub 语句 */
+    else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_GOSUB, token->content)) {
+        char        labelName[KB_TOKEN_LENGTH_MAX];
+        KbLabel*    label;
+
+        /* 匹配标签 */
+        token = nextToken(&analyzer);
+        if (token->type != TOKEN_ID) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, " missing label in gosub statement");
+        }
+
+        StringCopy(labelName, sizeof(labelName), token->content);
+
+        /* 匹配语句结束 */
+        token = nextToken(&analyzer);
+        if (token->type != TOKEN_END) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in gosub statement");
+        }
+
+        label = contextGetLabel(context, labelName);
+        if (!label) {
+            compileLineReturnWithError(KBE_UNDEFINED_LABEL, labelName);
+        }
+
+        vlPushBack(context->commandList, opCommandCreatePushOffset());
+        vlPushBack(context->commandList, opCommandCreateGoto(label));
+    }
+    /* return 语句 */
+    else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_RETURN, token->content)) {
+        /* 匹配语句结束 */
+        token = nextToken(&analyzer);
+        if (token->type != TOKEN_END) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in gosub statement");
+        }
+
+        vlPushBack(context->commandList, opCommandCreatePushReturn());
     }
     // let statement
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_LET, token->content)) {
