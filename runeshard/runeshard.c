@@ -446,13 +446,13 @@ char* convertFileNameToVariable(const char *fileName, char *varName) {
     int i;
     char* pName = varName;
 
-    /* find / or \ position */
+    /* 寻找 / 或者 \ */
     for (i = 0; i < fileNameLen; ++i) {
         if (fileName[i] == '/' || fileName[i] == '\\') {
             slashPos = i;
         }
     }
-    /* find . (dot) position */
+    /* 寻找 . */
     for (i = fileNameLen - 1; i >= 0; --i) {
         if (fileName[i] == '.') {
             dotPos = i;
