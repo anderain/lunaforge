@@ -1,0 +1,19 @@
+{
+  "name": "bonegaze",
+  "version": "1.0.0",
+  "main": "dist/main.js",
+  "scripts": {
+    "run": "ts-node src/main.ts",
+    "build": "tsc",
+    "package": "pkg . --out-path dist/executable --targets node18-win-x64",
+    "prepackage": "npm run build",
+    "test": "npm run run -- D:/gadget-dev/workspace/moon-example-project/moon.project.json"
+  },
+  "bin": "dist/main.js",
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "pkg": "^5.8.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
