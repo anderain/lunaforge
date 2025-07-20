@@ -1,0 +1,25 @@
+{
+  "name": "kbasic-support",
+  "displayName": "My Language Support",
+  "description": "Syntax highlighting for KBasic",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "kbasic",
+      "aliases": ["KBasic", "kbasic"],
+      "extensions": [".kbs"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "kbasic",
+      "scopeName": "source.kbasic",
+      "path": "./syntaxes/kbasic.tmLanguage.json"
+    }]
+  }
+}
