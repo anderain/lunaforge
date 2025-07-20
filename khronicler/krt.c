@@ -99,7 +99,7 @@ KbMachine* machineCreate(unsigned char * raw) {
     machine = (KbMachine *)malloc(sizeof(KbMachine));
 
     machine->raw        = raw;
-    machine->header     = (KBASIC_BINARY_HEADER *)raw;
+    machine->header     = (KbBinaryHeader *)raw;
     machine->stack      = vlNewList();
 
     // initialize var with number 0
@@ -170,7 +170,7 @@ void formatExecError(const KbRuntimeError *errorRet, char *message, int messageL
         formatExecErrorAppend(errorRet->message);
     }
     else if (errorRet->type == KBRE_ILLEGAL_RETURN) {
-        formatExecErrorAppend("Invalid RETURN operation. ");
+        formatExecErrorAppend("Invalid RETURN command. ");
         formatExecErrorAppend(errorRet->message);
     }
     else {
@@ -216,7 +216,25 @@ void dbgPrintContextCommand(const KbOpCommand *cmd);
 
 int machineExecCallBuiltInFunc (int funcId, KbMachine* machine, KbRuntimeError *errorRet, KbRuntimeValue ** operand);
 
-int machineExec(KbMachine* machine, KbRuntimeError *errorRet) {
+int machineGetLabelPos(KbMachine* machine, const char* labelName) {
+    int numLabel = machine->header->numLabel;
+    KbExportedLabel* pLabel = (KbExportedLabel *)(machine->raw + machine->header->labelBlockStart);
+    int i;
+    for (i = 0; i < numLabel; ++i) {
+        if (StringEqual(pLabel[i].labelName, labelName)) {
+            return pLabel[i].pos;
+        }
+    }
+    return -1;
+}
+
+int machineExecGoSub(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
+    /* Add PUSH_OFFSET command to end of cmd */
+    vlPushBack(machine->stack, rtvalueCreateInteger(machine->header->numCmd));
+    return machineExec(machine, startPos, errorRet);
+}
+
+int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
     KbOpCommand*    cmdBlockPtr = machineCmdStartPointer(machine);
     int             numCmd = machine->header->numCmd;
     KbRuntimeValue* operand[10];
@@ -226,11 +244,12 @@ int machineExec(KbMachine* machine, KbRuntimeError *errorRet) {
     errorRet->message[0] = '\0';
 
     machineCommandReset(machine);
+    machine->cmdPtr += startPos;
 
     while (machine->cmdPtr - cmdBlockPtr < numCmd) {
-        KbOpCommand * cmd = machine->cmdPtr;
-
-        // printf("%04d %s\n", machine->cmdPtr - cmdBlockPtr, _KOCODE_NAME[cmd->op]);
+        KbOpCommand* cmd = machine->cmdPtr;
+        
+        // printf("[%04d] ", machine->cmdPtr - cmdBlockPtr); dbgPrintContextCommand(cmd);
 
         switch(cmd->op) {
             case KBO_NUL: {
@@ -484,7 +503,11 @@ int machineExec(KbMachine* machine, KbRuntimeError *errorRet) {
                 break;
             }
             case KBO_RETURN: {
-                KbRuntimeValue *rtOffset = (KbRuntimeValue *)vlPopBack(machine->stack);
+                KbRuntimeValue *rtOffset;
+                if (machine->stack->size <= 0) {
+                    execReturnErrorWithInt(KBRE_ILLEGAL_RETURN, cmd->op);
+                }
+                rtOffset = (KbRuntimeValue *)vlPopBack(machine->stack);
                 int offset = 0;
                 if (rtOffset->type != RVT_INTEGER) {
                     execReturnErrorWithInt(KBRE_ILLEGAL_RETURN, cmd->op);

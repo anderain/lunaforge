@@ -22,6 +22,7 @@ typedef unsigned char KByte;
 #define KB_TOKEN_LENGTH_MAX             50
 #define KB_CONTEXT_VAR_MAX              32
 #define KB_CONTEXT_STRING_BUFFER_MAX    300
+#define KB_LABEL_MAX                    15
 
 // Node of List
 typedef struct tagVlistNode {
@@ -114,22 +115,31 @@ extern const char *_KOCODE_NAME[];
 #define HEADER_MAGIC_FLAG 0x424B
 
 typedef struct {
-    // file header
+    int     pos;
+    char    labelName[KB_LABEL_MAX + 1];
+} KbExportedLabel;
+
+typedef struct {
+    /* File header magick number */
     KDword headerMagic;
 
-    // number of variables
+    /* Number of variables */
     KDword numVariables;
 
-    // cmd block def
-    KDword cmdBlockStart;       // cmd start position
-    KDword numCmd;              // number of cmd
+    /* Exported labels*/
+    KDword labelBlockStart;     /* labels start position */
+    KDword numLabel;            /* number of labels */
 
-    // string block def
-    KDword stringBlockStart;    // string start position
-    KDword stringBlockLength;   // length of string block
-} KBASIC_BINARY_HEADER;
+    /* Blocks Commands */
+    KDword cmdBlockStart;       /* cmd start position */
+    KDword numCmd;              /* number of cmds */
 
-void dbgPrintHeader(KBASIC_BINARY_HEADER *);
+    /* Blocks of Strings */
+    KDword stringBlockStart;    /* string start position */
+    KDword stringBlockLength;   /* length of string block */
+} KbBinaryHeader;
+
+void dbgPrintHeader(KbBinaryHeader *);
 
 #define endianSwapDword(l) (unsigned int)((((l) & 0x000000ff) << 24) | (((l) & 0x0000ff00) << 8) | (((l) & 0xff000000) >> 24) | (((l) & 0x00ff0000) >> 8))
 

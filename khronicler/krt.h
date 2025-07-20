@@ -38,11 +38,11 @@ typedef struct {
     } data;
 } KbRuntimeValue;
 
-void rtvalueDestroy                (KbRuntimeValue* val);
-void rtvalueDestoryVoidPointer   (void* p);
+void rtvalueDestroy             (KbRuntimeValue* val);
+void rtvalueDestoryVoidPointer  (void* p);
 
 typedef struct {
-    KBASIC_BINARY_HEADER*   header; // pointer of raw
+    KbBinaryHeader*   header; // pointer of raw
     Vlist*                  stack;  // <KbRuntimeValue>
     KbOpCommand *           cmdPtr;
     unsigned char *         raw;
@@ -57,7 +57,9 @@ typedef struct {
 
 KbMachine*  machineCreate       (unsigned char * raw);
 void        machineCommandReset (KbMachine* machine);
-int         machineExec         (KbMachine* machine, KbRuntimeError *errorRet);
+int         machineGetLabelPos  (KbMachine* machine, const char* labelName);
+int         machineExec         (KbMachine* machine, int startPos, KbRuntimeError *errorRet);
+int         machineExecGoSub    (KbMachine* machine, int startPos, KbRuntimeError *errorRet);
 void        machineDestroy      (KbMachine* machine);
 int         machineVarAssignNum (KbMachine* machine, int varIndex, KB_FLOAT num);
 void        formatExecError     (const KbRuntimeError *errorRet, char *message, int messageLength);

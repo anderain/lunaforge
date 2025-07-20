@@ -882,11 +882,11 @@ int contextAppendText(KbContext *context, const char * string) {
     return oldBufferPtr - context->stringBuffer;
 }
 
-KbLabel* contextGetLabel(const KbContext *context, const char * labelNameToFind) {
+KbContextLabel* contextGetLabel(const KbContext *context, const char * labelNameToFind) {
     VlistNode *node;
 
     for (node = context->labelList->head; node != NULL; node = node->next) {
-        KbLabel* label = (KbLabel *)node->data;
+        KbContextLabel* label = (KbContextLabel *)node->data;
         if (StringEqual(label->name, labelNameToFind)) {
             return label;
         }
@@ -895,20 +895,19 @@ KbLabel* contextGetLabel(const KbContext *context, const char * labelNameToFind)
     return NULL;
 }
 
-int contextAddLabel(const KbContext *context, const char * labelNameToFind) {
-    KbLabel* label = NULL;
+int contextAddLabel(const KbContext *context, const char * labelName, KbLabelType labelType) {
+    KbContextLabel* label = NULL;
     
-    label = contextGetLabel(context, labelNameToFind);
-
-    // already exist
+    label = contextGetLabel(context, labelName);
     if (label) {
         return 0;
     }
 
-    label = (KbLabel *)malloc(sizeof(KbLabel) + strlen(labelNameToFind) + 1);
+    label = (KbContextLabel *)malloc(sizeof(KbContextLabel) + strlen(labelName) + 1);
 
+    label->type = labelType;
     label->pos = 0;
-    StringCopy(label->name, KB_TOKEN_LENGTH_MAX, labelNameToFind);
+    StringCopy(label->name, KB_TOKEN_LENGTH_MAX, labelName);
 
     vlPushBack(context->labelList, label);
 
@@ -942,10 +941,10 @@ void contextCtrlAddLabel(KbContext* context, int labelIndex) {
     }
     sprintf(szLabelBuf, CTRL_LABEL_FORMAT, labelIndex);
     
-    contextAddLabel(context, szLabelBuf);
+    contextAddLabel(context, szLabelBuf, KBL_CTRL);
 }
 
-KbLabel* contextCtrlGetLabel(KbContext* context, int labelIndex) {
+KbContextLabel* contextCtrlGetLabel(KbContext* context, int labelIndex) {
     char szLabelBuf[100];
 
     if (labelIndex < 0) {
@@ -1084,7 +1083,7 @@ KbOpCommand* opCommandCreatePushReturn() {
     return cmd;
 }
 
-KbOpCommand* opCommandCreateGoto(KbLabel *label) {
+KbOpCommand* opCommandCreateGoto(KbContextLabel *label) {
     KbOpCommand* cmd = (KbOpCommand*)malloc(sizeof(KbOpCommand));
 
     cmd->op = KBO_GOTO;
@@ -1093,7 +1092,7 @@ KbOpCommand* opCommandCreateGoto(KbLabel *label) {
     return cmd;
 }
 
-KbOpCommand* opCommandCreateIfGoto(KbLabel *label) {
+KbOpCommand* opCommandCreateIfGoto(KbContextLabel *label) {
     KbOpCommand* cmd = (KbOpCommand*)malloc(sizeof(KbOpCommand));
 
     cmd->op = KBO_IFGOTO;
@@ -1217,7 +1216,7 @@ void dbgPrintContextCommand(const KbOpCommand *cmd) {
         // nothing here
     }
     else {
-        printf("ERROR");
+        printf("INVALID CMD [%x]", cmd->op);
     }
 
     printf("\n");
@@ -1247,11 +1246,12 @@ void dbgPrintContextListText(const KbContext *context) {
 }
 
 void dbgPrintContextListLabel(const KbContext *context) {
-    VlistNode *node = context->labelList->head;
+    static const char * LABEL_TYPE_NAME[] = { "USER", "EXPT", "CTRL" };
 
+    VlistNode *node = context->labelList->head;
     while (node != NULL) {
-        KbLabel* label = (KbLabel *)node->data;
-        printf("%-15s: %03d\n", label->name, label->pos);
+        KbContextLabel* label = (KbContextLabel *)node->data;
+        printf("%-15s: [%4s] %03d\n", label->name, LABEL_TYPE_NAME[label->type], label->pos);
         node = node->next;
     }
 }
@@ -1433,20 +1433,40 @@ int kbScanControlStructureAndLabel(const char* line, KbContext *context, KbBuild
     /* 用户手动写的 label */
     else if (token->type == TOKEN_LABEL) {
         char labelName[KB_TOKEN_LENGTH_MAX];
-
+        KbLabelType labelType = KBL_USER;
+        int isSyntaxError = 0;
+    
         token = nextToken(&analyzer);
         if (token->type != TOKEN_ID) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", invalid label");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", invalid label.");
         }
 
         StringCopy(labelName, sizeof(labelName), token->content);
 
         token = nextToken(&analyzer);
-        if (token->type != TOKEN_END) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in label command");
+        if (token->type == TOKEN_END) {
+            labelType = KBL_USER;
+        }
+        else if (token->type == TOKEN_ID && StringEqual(token->content, "export")) {
+            token = nextToken(&analyzer);
+            labelType = KBL_EXPORT;
+            if (token->type != TOKEN_END) {
+                isSyntaxError = 1;
+            }
+        }
+        else {
+            isSyntaxError = 1;
         }
 
-        ret = contextAddLabel(context, labelName);
+        if (isSyntaxError) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in label command.");
+        }
+
+        if (strlen(labelName) > KB_LABEL_MAX) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", label name too long.");
+        }
+
+        ret = contextAddLabel(context, labelName, labelType);
         if (!ret) {
             compileLineReturnWithError(KBE_DUPLICATED_LABEL, labelName);
         }
@@ -1490,7 +1510,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         token = nextToken(&analyzer);
         /* if goto 模式*/
         if (token->type == TOKEN_KEY && StringEqual(KEYWORD_GOTO, token->content)) {
-            KbLabel *label;
+            KbContextLabel *label;
         
             /* 跳转标签 */
             token = nextToken(&analyzer);
@@ -1530,7 +1550,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         /* if then 模式 */
         else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_THEN, token->content)) {
             KbCtrlStructItem* pCsItem;
-            KbLabel* label;
+            KbContextLabel* label;
         
             /* 确认本行结束 */
             token = nextToken(&analyzer);
@@ -1564,8 +1584,8 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
     }
     /* elseif 语句 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_ELSEIF, token->content)) {
-        KbLabel* label;
-        KbLabel* prevLabel;
+        KbContextLabel* label;
+        KbContextLabel* prevLabel;
         KbCtrlStructItem* pCsItem;
         KbCtrlStructItem* pPrevCsItem;
     
@@ -1606,7 +1626,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
     }
     /* else 语句 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_ELSE, token->content)) {
-        KbLabel* prevLabel;
+        KbContextLabel* prevLabel;
         KbCtrlStructItem* pPrevCsItem;
     
         /* 寻找最近的 if */
@@ -1629,8 +1649,8 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
     }
     /* while 语句 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_WHILE, token->content)) {
-        KbLabel* labelEnd;
-        KbLabel* labelStart;
+        KbContextLabel* labelEnd;
+        KbContextLabel* labelStart;
         KbCtrlStructItem* pCsItem;
     
         pCsItem = contextCtrlPush(context, KBCS_WHILE);
@@ -1658,7 +1678,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
     }
     /* end 语句 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_END, token->content)) {
-        KbLabel* label;
+        KbContextLabel* label;
         KbCtrlStructItem* pPrevCsItem;
         int popTarget = KBCS_NONE;
 
@@ -1712,7 +1732,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         /* 从栈顶向下寻找循环语句 */
         VlistNode*          node = context->ctrlStruct.stack->tail;
         KbCtrlStructItem*   pCsItem;
-        KbLabel*            label;
+        KbContextLabel*     label;
         while (node) {
             pCsItem = (KbCtrlStructItem *)(node->data);
             if (pCsItem->csType == KBCS_WHILE) {
@@ -1735,8 +1755,8 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
     }
     /* gosub 语句 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_GOSUB, token->content)) {
-        char        labelName[KB_TOKEN_LENGTH_MAX];
-        KbLabel*    label;
+        char            labelName[KB_TOKEN_LENGTH_MAX];
+        KbContextLabel* label;
 
         /* 匹配标签 */
         token = nextToken(&analyzer);
@@ -1823,8 +1843,8 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
     }
     // goto command
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_GOTO, token->content)) {
-        char        labelName[KB_TOKEN_LENGTH_MAX];
-        KbLabel*    label;
+        char            labelName[KB_TOKEN_LENGTH_MAX];
+        KbContextLabel* label;
 
         // match label
         token = nextToken(&analyzer);
@@ -1850,8 +1870,8 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
     }
     // label mark, update position
     else if (token->type == TOKEN_LABEL) {
-        const char *labelName;
-        KbLabel *label;
+        const char*     labelName;
+        KbContextLabel* label;
 
         token = nextToken(&analyzer);
         if (token->type != TOKEN_ID) {
@@ -1903,7 +1923,7 @@ int kbCompileEnd(KbContext *context) {
         KbOpCommand *cmd = (KbOpCommand *)node->data;
         
         if (cmd->op == KBO_IFGOTO || cmd->op == KBO_GOTO) {
-            KbLabel *label = (KbLabel *)cmd->param.ptr;
+            KbContextLabel *label = (KbContextLabel *)cmd->param.ptr;
             cmd->param.index = label->pos;
         }
     }
@@ -1920,64 +1940,104 @@ int kbSerialize(
 ) {
     unsigned char * entireRaw;
     int             byteLengthHeader;
+    int             numLabel;
+    int             byteLengthLabel;
     int             byteLengthCmd;
     int             numCmd;
     int             byteLengthString;
     int             byteLengthEntire;
     int             i;
-    //
-    KBASIC_BINARY_HEADER*   pHeader;
-    KbOpCommand *           pCmd;
-    char *                  pString;
-    //
-    VlistNode*       node;
 
-    // ---------- layout ----------
-    //
-    //          * header *
-    //
-    // ----------------------------
-    //
-    //           * cmd *
-    //
-    // ----------------------------
-    //
-    //          * string *
-    //
-    // ----------------------------
+    KbBinaryHeader*   pHeader;
+    KbExportedLabel*        pLabel;
+    KbOpCommand*            pCmd;
+    char *                  pString;
+    VlistNode*              node;
+
+    /*
+    ---------- layout ----------
+    |                          |
+    |        * header *        |
+    |                          |
+    ----------------------------   <--- labelBlockStart
+    |                          |
+    |        * label *         |
+    |                          |
+    ----------------------------   <--- cmdBlockStart
+    |                          |
+    |         * cmd *
+    |                          |
+    ----------------------------   <--- stringBlockStart
+    |                          |
+    |        * string *        |
+    |                          |
+    ----------------------------
+    */
+
+    // count exported label
+    numLabel = 0;
+    for (node = context->labelList->head; node; node = node->next) {
+        KbContextLabel* contextLabel = (KbContextLabel *)node->data;
+        if (contextLabel->type != KBL_EXPORT) {
+            continue;
+        }
+        numLabel++;
+    }
 
     // calculate length
 
-    byteLengthHeader    = sizeof(KBASIC_BINARY_HEADER);
+    byteLengthHeader    = sizeof(KbBinaryHeader);
+    byteLengthLabel     = sizeof(KbExportedLabel) * numLabel;
     numCmd              = context->commandList->size;
     byteLengthCmd       = sizeof(KbOpCommand) * numCmd;
     byteLengthString    = context->stringBufferPtr - context->stringBuffer;
     byteLengthEntire    = byteLengthHeader
+                        + byteLengthLabel
                         + byteLengthCmd
                         + byteLengthString;
 
     // allocate space and write header
     entireRaw = (unsigned char *)malloc(byteLengthEntire);
 
-    pHeader                     = (KBASIC_BINARY_HEADER *)entireRaw;
+    pHeader                     = (KbBinaryHeader *)entireRaw;
     pHeader->headerMagic        = HEADER_MAGIC_FLAG;
     pHeader->numVariables       = context->numVar;
-    pHeader->cmdBlockStart      = 0 + byteLengthHeader;
+    pHeader->numLabel           = numLabel;
+    pHeader->labelBlockStart    = 0 + byteLengthHeader;
+    pHeader->cmdBlockStart      = pHeader->labelBlockStart + byteLengthLabel;
     pHeader->numCmd             = numCmd;
     pHeader->stringBlockStart   = pHeader->cmdBlockStart + byteLengthCmd;
     pHeader->stringBlockLength  = byteLengthString;
 
     // set pointers for writting
-    pCmd       = (KbOpCommand *)(entireRaw + pHeader->cmdBlockStart);
-    pString    = (char *)(entireRaw + pHeader->stringBlockStart);
+    pLabel  = (KbExportedLabel *)(entireRaw + pHeader->labelBlockStart);
+    pCmd    = (KbOpCommand *)(entireRaw + pHeader->cmdBlockStart);
+    pString = (char *)(entireRaw + pHeader->stringBlockStart);
 
-    // dump command
+    /* dump label */
+    printf("label %d byteLengthLabel = %d  %d\n", pHeader->labelBlockStart, byteLengthLabel,sizeof(KbExportedLabel));
+    for (
+        node = context->labelList->head;
+        node != NULL;
+        node = node->next
+    ) {
+        KbContextLabel* contextLabel = (KbContextLabel *)node->data;
+        if (contextLabel->type != KBL_EXPORT) {
+            continue;
+        }
+        memset(pLabel, 0, sizeof(*pLabel));
+        StringCopy(pLabel->labelName, KB_LABEL_MAX + 1, contextLabel->name);
+        pLabel->pos = contextLabel->pos;
+        pLabel++;
+    }
+
+    /* dump commands */
     node = context->commandList->head;
     for (i = 0; node != NULL; ++i, node = node->next) {
         memcpy(pCmd + i, node->data, sizeof(KbOpCommand));
     }
 
-    // dump string block
+    /* dump string block */
     memset(pString, 0, byteLengthString);
     memcpy(pString, context->stringBuffer, byteLengthString);
 
@@ -1987,9 +2047,11 @@ int kbSerialize(
     return 1;
 }
 
-void dbgPrintHeader(KBASIC_BINARY_HEADER* h) {
+void dbgPrintHeader(KbBinaryHeader* h) {
     printf("header              = 0x%x\n", h->headerMagic);
     printf("variable num        = %d\n", h->numVariables);
+    printf("label block start   = %d\n", h->labelBlockStart);
+    printf("label num           = %d\n", h->numLabel);
     printf("cmd block start     = %d\n", h->cmdBlockStart);
     printf("cmd num             = %d\n", h->numCmd);
     printf("string block start  = %d\n", h->stringBlockStart);

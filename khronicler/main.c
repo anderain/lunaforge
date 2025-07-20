@@ -107,7 +107,7 @@ int buildFromKBasic(const char *fileName, const char * outputFileName) {
 
     /*
         第二遍循环，编译生成命令序列。
-        本次循环之后，生成的 GOTO 与 IFGOTO 命令的 `param`.`ptr` 存储的是 KbLabel 的指针
+        本次循环之后，生成的 GOTO 与 IFGOTO 命令的 `param`.`ptr` 存储的是 KbContextLabel 的指针
      */
     contextCtrlResetCounter(context);
     for (textPtr = textBuf, lineCount = 1; *textPtr; lineCount++) {
@@ -166,7 +166,7 @@ compileEnd:
         }
         else if (builderConfig.isDebug) {
             printf("Output file header:\n");
-            dbgPrintHeader((KBASIC_BINARY_HEADER *)resultRaw);
+            dbgPrintHeader((KbBinaryHeader *)resultRaw);
         }
         free(resultRaw);
     } else {
@@ -208,6 +208,7 @@ int debugBinary(const char* binFileName) {
     KbMachine*      app;
     const char*     filename = binFileName;
     unsigned char*  raw;
+    int             labelPos;
 
     raw = readBinaryFile(filename);
     app = machineCreate(raw);
@@ -221,7 +222,15 @@ int debugBinary(const char* binFileName) {
         dbgPrintHeader(app->header);
     }
 
-    ret = machineExec(app, &errorRet);
+    ret = machineExec(app, 0, &errorRet);
+    if (!ret) {
+        char error_message[200];
+        formatExecError(&errorRet, error_message, sizeof(error_message));
+        printf("Runtime Error: %s\n%s\n", filename, error_message);
+    }
+
+    labelPos = machineGetLabelPos(app, "helloWorld");
+    ret = machineExecGoSub(app, labelPos, &errorRet);
     if (!ret) {
         char error_message[200];
         formatExecError(&errorRet, error_message, sizeof(error_message));

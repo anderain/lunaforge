@@ -22,10 +22,17 @@ typedef struct {
     char message[200];
 } KbBuildError;
 
+typedef enum {
+    KBL_USER = 0,
+    KBL_EXPORT,
+    KBL_CTRL
+} KbLabelType;
+
 typedef struct {
-    KDword  pos;
-    char    name[0];
-} KbLabel;
+    KbLabelType type;
+    KDword      pos;
+    char        name[0];
+} KbContextLabel;
 
 typedef enum {
     KBCS_NONE       = 0,
@@ -47,7 +54,7 @@ typedef struct {
     char        stringBuffer[KB_CONTEXT_STRING_BUFFER_MAX];
     char*       stringBufferPtr;
     Vlist*      commandList;/* <KbOpCommand> */ 
-    Vlist*      labelList;  /* <KbLabel> */
+    Vlist*      labelList;  /* <KbContextLabel> */
     struct {
         int     labelCounter;
         Vlist*  stack;      /* <KbCtrlStructItem> */
