@@ -1,0 +1,6 @@
+.vscode/
+*.o
+*.exe
+person_schema.h
+test/*.o
+test/*.exe

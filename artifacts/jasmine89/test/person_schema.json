@@ -1,0 +1,43 @@
+{
+  "ruleName": "PersonSchema",
+  "root": {
+    "type": "object",
+    "properties": [
+      { "name": "id", "schema": { "type": "number" } },
+      { "name": "firstName", "schema": { "type": "string" } },
+      { "name": "lastName", "schema": { "type": "string" } },
+      { "name": "email", "schema": { "type": "string" } },
+      { "name": "active", "schema": { "type": "boolean" } },
+      { "name": "website", "schema": { "type": "string", "isOptional": true } },
+      {
+        "name": "tags",
+        "schema": {
+          "type": "array",
+          "childType": "string"
+        }
+      },
+      {
+        "name": "details",
+        "schema": {
+          "type": "object",
+          "properties": [
+            { "name": "age", "schema": { "type": "number" } },
+            { "name": "city", "schema": { "type": "string" } },
+            { "name": "country", "schema": { "type": "string" } },
+            { "name": "phoneNumber", "schema": { "type": "string" } },
+            { "name": "startDate", "schema": { "type": "string" } },
+            { "name": "endDate", "schema": { "type": "string" } },
+            {
+              "name": "owner",
+              "schema": {
+                "type": "object",
+                "isOptional": true,
+                "properties": []
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
