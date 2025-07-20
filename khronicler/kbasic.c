@@ -13,7 +13,6 @@ typedef struct {
 #define KEYWORD_LET     "let"
 #define KEYWORD_GOTO    "goto"
 #define KEYWORD_IF      "if"
-#define KEYWORD_THEN    "then"
 #define KEYWORD_ELSEIF  "elseif"
 #define KEYWORD_ELSE    "else"
 #define KEYWORD_WHILE   "while"
@@ -27,7 +26,6 @@ static const KeywordDef KEYWORDS[] = {
     { KEYWORD_LET       },
     { KEYWORD_GOTO      },
     { KEYWORD_IF        },
-    { KEYWORD_THEN      },
     { KEYWORD_ELSEIF    },
     { KEYWORD_ELSE      },
     { KEYWORD_WHILE     },
@@ -751,6 +749,9 @@ int kbFormatBuildError(const KbBuildError *errorVal, char *strBuffer, int strLen
         kbFormatErrorAppend(errorVal->message);
         kbFormatErrorAppend("\"");
     }
+    else if (errorVal->errorType == KBE_INCOMPLETE_CTRL_STRUCT) {
+        kbFormatErrorAppend("Incomplete control structure, missing 'end'.");
+    }
     else if (errorVal->errorType == KBE_OTHER) {
         kbFormatErrorAppend(errorVal->message);
     }
@@ -1302,11 +1303,35 @@ int kbScanControlStructureAndLabel(const char* line, KbContext *context, KbBuild
     
     /* if 语句 */
     if (token->type == TOKEN_KEY && StringEqual(KEYWORD_IF, token->content)) {
-        /* 检查是不是 if ... then 格式 */
-        if (!StringEndWith(line, KEYWORD_THEN)) {
+        /* 匹配表达式 */
+        ret = matchExpr(&analyzer);
+        if (!ret) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", invalid express in if statement");
+        }
+        /* 下一个 token，结束或者 goto */
+        token = nextToken(&analyzer);
+        /* token 是 goto，if ... goto 格式 */
+        if (token->type == TOKEN_KEY && StringEqual(KEYWORD_GOTO, token->content)) {
+            /* 匹配标签 */
+            token = nextToken(&analyzer);
+            if (token->type != TOKEN_ID) {
+                compileLineReturnWithError(KBE_SYNTAX_ERROR, ", missing label in if ... goto statement");
+            }
+            /* 匹配行结束 */
+            token = nextToken(&analyzer);
+            if (token->type != TOKEN_END) {
+                compileLineReturnWithError(KBE_SYNTAX_ERROR, " in if statement");
+            }
             return 1;
         }
-        contextCtrlPush(context, KBCS_IF_THEN);
+        /* token 是本行结束，if / else 模式 */
+        else if (token->type == TOKEN_END) {
+            contextCtrlPush(context, KBCS_IF_THEN);
+        }
+        else {
+            puts(token->content);
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in if statement");
+        }
     }
     /* elseif 语句 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_ELSEIF, token->content)) {
@@ -1495,20 +1520,21 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         // nothing to do
     }
     /* if 语句 */
-    else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_IF, token->content)) {
-        char            labelName[KB_TOKEN_LENGTH_MAX];
-        const char *    exprStartEptr;
-
-        /* 保存表达式的位置 */
-        exprStartEptr = analyzer.eptr;
-
-        ret = matchExpr(&analyzer);
+    else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_IF, token->content)) {        
+        /* 编译表达式 */
+        exprRoot = buildExprTree(&analyzer);
+        sortExpr(&exprRoot);
+        ret = compileExprTree(context, exprRoot, errorRet);
         if (!ret) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", invalid express in if statement");
+            compileLineReturn(0);
         }
-        
+
+        enDestroy(exprRoot);
+
+        /* 下一个 token，结束或者 goto */
         token = nextToken(&analyzer);
-        /* if goto 模式*/
+        printf("next token = %s\n", token->content);
+        /* if ... goto 模式*/
         if (token->type == TOKEN_KEY && StringEqual(KEYWORD_GOTO, token->content)) {
             KbContextLabel *label;
         
@@ -1518,57 +1544,18 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
                 compileLineReturnWithError(KBE_SYNTAX_ERROR, " missing label in if statement");
             }
 
-            StringCopy(labelName, sizeof(labelName), token->content);
-
-            /* 确认本行结束 */
-            token = nextToken(&analyzer);
-            if (token->type != TOKEN_END) {
-                compileLineReturnWithError(KBE_SYNTAX_ERROR, " in if statement");
-            }
-
-            /* 重设位置，构建表达式 */
-            analyzer.eptr = exprStartEptr;
-            exprRoot = buildExprTree(&analyzer);
-            sortExpr(&exprRoot);
-            
-            /* 编译表达式 */
-            ret = compileExprTree(context, exprRoot, errorRet);
-            if (!ret) {
-                compileLineReturn(0);
-            }
-
-            enDestroy(exprRoot);
-
             /* 找到条件不满足时跳转的标签 */
-            label = contextGetLabel(context, labelName);
+            label = contextGetLabel(context, token->content);
             if (!label) {
-                compileLineReturnWithError(KBE_UNDEFINED_LABEL, labelName);
+                compileLineReturnWithError(KBE_UNDEFINED_LABEL, token->content);
             }
 
             vlPushBack(context->commandList, opCommandCreateIfGoto(label));
         }
-        /* if then 模式 */
-        else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_THEN, token->content)) {
+        /* if / else 模式 */
+        else if (token->type == TOKEN_END) {
             KbCtrlStructItem* pCsItem;
             KbContextLabel* label;
-        
-            /* 确认本行结束 */
-            token = nextToken(&analyzer);
-            if (token->type != TOKEN_END) {
-                compileLineReturnWithError(KBE_SYNTAX_ERROR, " in if statement");
-            }
-
-            /* 重设位置，构建表达式 */
-            analyzer.eptr = exprStartEptr;
-            exprRoot = buildExprTree(&analyzer);
-            sortExpr(&exprRoot);
-            
-            /* 编译表达式 */
-            ret = compileExprTree(context, exprRoot, errorRet);
-            if (!ret) {
-                compileLineReturn(0);
-            }
-            enDestroy(exprRoot);
 
             /* iLabelNext: 条件不满足的时候，跳去下一条 else if / else */
             pCsItem = contextCtrlPush(context, KBCS_IF_THEN);
@@ -1576,10 +1563,6 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
 
             vlPushBack(context->commandList, opCommandCreateOperator(OPR_NOT));
             vlPushBack(context->commandList, opCommandCreateIfGoto(label));
-        }
-        /* 错误 */
-        else {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, " missing 'goto' or 'then' in if statement");
         }
     }
     /* elseif 语句 */

@@ -96,6 +96,7 @@ int buildFromKBasic(const char *fileName, const char * outputFileName) {
 
         /* 获取行的内容，并且移除尾部的空白和注释 */
         textPtr += getLineTrimRemarks(textPtr, line);
+
         /* 扫描一行 */
         ret = kbScanControlStructureAndLabel(line, context, &errorRet);
 
@@ -103,6 +104,16 @@ int buildFromKBasic(const char *fileName, const char * outputFileName) {
             isSuccess = 0;
             goto compileEnd;
         }
+    }
+    /*
+        检查是不是有没结束的控制结构
+     */
+    if (context->ctrlStruct.stack->size > 0) {
+        errorRet.errorPos = 0;
+        errorRet.errorType = KBE_INCOMPLETE_CTRL_STRUCT;
+        errorRet.message[0] = '\0';
+        isSuccess = 0;
+        goto compileEnd;
     }
 
     /*
@@ -115,7 +126,7 @@ int buildFromKBasic(const char *fileName, const char * outputFileName) {
         
         /* 获取行的内容，并且移除尾部的空白和注释 */
         textPtr += getLineTrimRemarks(textPtr, line);
-    
+
         /* 编译一行 */
         ret = kbCompileLine(line, context, &errorRet);
 
@@ -230,12 +241,17 @@ int debugBinary(const char* binFileName) {
     }
 
     labelPos = machineGetLabelPos(app, "helloWorld");
-    ret = machineExecGoSub(app, labelPos, &errorRet);
-    if (!ret) {
-        char error_message[200];
-        formatExecError(&errorRet, error_message, sizeof(error_message));
-        printf("Runtime Error: %s\n%s\n", filename, error_message);
+    if (labelPos < 0) {
+        printf("error, label not found\n");
+    } else {
+        ret = machineExecGoSub(app, labelPos, &errorRet);
+        if (!ret) {
+            char error_message[200];
+            formatExecError(&errorRet, error_message, sizeof(error_message));
+            printf("Runtime Error: %s\n%s\n", filename, error_message);
+        }
     }
+
 
     machineDestroy(app);
     free(raw);
