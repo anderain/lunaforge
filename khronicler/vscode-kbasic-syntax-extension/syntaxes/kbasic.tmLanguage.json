@@ -13,6 +13,10 @@
     {
       "name": "constant.numeric.kbasic",
       "match": "\\b\\d+\\b"
+    },
+    {
+      "name": "comment.line.kbasic",
+      "match": "#.*$"
     }
   ],
   "repository": {}
