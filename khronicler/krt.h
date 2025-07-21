@@ -42,11 +42,11 @@ void rtvalueDestroy             (KbRuntimeValue* val);
 void rtvalueDestoryVoidPointer  (void* p);
 
 typedef struct {
-    KbBinaryHeader*   header; // pointer of raw
-    Vlist*                  stack;  // <KbRuntimeValue>
-    KbOpCommand *           cmdPtr;
-    unsigned char *         raw;
-    KbRuntimeValue **       variables;
+    KbBinaryHeader*     header;
+    Vlist*              stack;  /* <KbRuntimeValue> */
+    KbOpCommand *       cmdPtr;
+    unsigned char *     raw;
+    KbRuntimeValue**    variables;
 } KbMachine;
 
 typedef struct {

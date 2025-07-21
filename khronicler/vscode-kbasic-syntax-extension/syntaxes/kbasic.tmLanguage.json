@@ -4,7 +4,7 @@
   "patterns": [
     {
       "name": "keyword.control.kbasic",
-      "match": "\\b(let|goto|if|elseif|else|while|end|break|gosub|return|exit|export)\\b"
+      "match": "\\b(dim|goto|if|elseif|else|while|end|break|gosub|return|exit|export)\\b"
     },
     {
       "name": "string.quoted.double.kbasic",

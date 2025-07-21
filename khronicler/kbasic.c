@@ -10,7 +10,7 @@ typedef struct {
     const char *word;
 } KeywordDef;
 
-#define KEYWORD_LET     "let"
+#define KEYWORD_DIM     "dim"
 #define KEYWORD_GOTO    "goto"
 #define KEYWORD_IF      "if"
 #define KEYWORD_ELSEIF  "elseif"
@@ -23,7 +23,7 @@ typedef struct {
 #define KEYWORD_EXIT    "exit"
 
 static const KeywordDef KEYWORDS[] = {
-    { KEYWORD_LET       },
+    { KEYWORD_DIM       },
     { KEYWORD_GOTO      },
     { KEYWORD_IF        },
     { KEYWORD_ELSEIF    },
@@ -1773,57 +1773,6 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
 
         vlPushBack(context->commandList, opCommandCreatePushReturn());
     }
-    // let statement
-    else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_LET, token->content)) {
-        char        varName[KB_TOKEN_LENGTH_MAX];
-        const char* exprStartEptr;
-        int         varIndex;
-
-        // get name of variable
-        token = nextToken(&analyzer);
-        if (token->type != TOKEN_ID) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in let statement, missing variable");
-        }
-        StringCopy(varName, sizeof(varName), token->content);
-
-        // match '='
-        token = nextToken(&analyzer);
-        if (!(token->type == TOKEN_OPR && StringEqual("=", token->content))) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in let statement, require '='");
-        }
-
-        varIndex = contextGetVariableIndex(context, varName);
-        // create var
-        if (varIndex < 0) {
-            varIndex = contextSetVariable(context, varName);
-            if (varIndex < 0) {
-                compileLineReturnWithError(KBE_TOO_MANY_VAR, varName);
-            }
-        }
-
-        // remain part is expr
-        exprStartEptr = analyzer.eptr;
-
-        if (!checkExpr(&analyzer, errorRet)) {
-            compileLineReturn(0);
-        }
-
-        analyzer.eptr = exprStartEptr;
-        exprRoot = buildExprTree(&analyzer);
-        sortExpr(&exprRoot);
-        // printf("let: '%s' = ", varName); travelExpr(exprRoot, 0);
-        
-        // compile expr
-        ret = compileExprTree(context, exprRoot, errorRet);
-        if (!ret) {
-            compileLineReturn(0);
-        }
-
-        enDestroy(exprRoot);
-
-        // add assign command
-        vlPushBack(context->commandList, opCommandCreateAssignVar(varIndex));
-    }
     // goto command
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_GOTO, token->content)) {
         char            labelName[KB_TOKEN_LENGTH_MAX];
@@ -1872,29 +1821,134 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
 
         label->pos = context->commandList->size;
     }
-    else {
-        rewindToken(&analyzer);
+    /* dim 变量声明 */
+    else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_DIM, token->content)) {
+        char        varName[KB_TOKEN_LENGTH_MAX];
+        const char* exprStartEptr;
+        int         varIndex;
 
+        /* 匹配是变量名 */
+        token = nextToken(&analyzer);
+        if (token->type != TOKEN_ID) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in let statement, missing variable");
+        }
+        StringCopy(varName, sizeof(varName), token->content);
+
+                
+        /* 获取变量 index */
+        varIndex = contextGetVariableIndex(context, varName);
+        if (varIndex < 0) {
+            varIndex = contextSetVariable(context, varName);
+            /* 不存在的话创建新变量 */
+            if (varIndex < 0) {
+                compileLineReturnWithError(KBE_TOO_MANY_VAR, varName);
+            }
+        }
+
+        /* 匹配行结束或者= */
+        token = nextToken(&analyzer);
+        /* 赋值 = */
+        if (token->type == TOKEN_OPR && StringEqual("=", token->content)) {
+            /* 保存表达式位置 */
+            exprStartEptr = analyzer.eptr;
+            if (!checkExpr(&analyzer, errorRet)) {
+                compileLineReturn(0);
+            }
+            /* 编译表达式 */
+            analyzer.eptr = exprStartEptr;
+            exprRoot = buildExprTree(&analyzer);
+            sortExpr(&exprRoot);
+            ret = compileExprTree(context, exprRoot, errorRet);
+            if (!ret) {
+                compileLineReturn(0);
+            }
+            enDestroy(exprRoot);
+            /* 添加赋值命令 */
+            vlPushBack(context->commandList, opCommandCreateAssignVar(varIndex));
+        }
+        /* 直接结束 */
+        else if (token->type == TOKEN_END) {
+            /* 什么也不做 */
+        }
+        /* 其他情况是错误*/
+        else {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in let statement");
+        }
+    }
+    /* 可能是赋值 */
+    else if (token->type == TOKEN_ID) {
+        char        varName[KB_TOKEN_LENGTH_MAX];
+        const char* exprStartEptr;
+        int         varIndex;
+
+        StringCopy(varName, sizeof(varName), token->content);
+
+        /* 匹配 '=' */ 
+        token = nextToken(&analyzer);
+        if (token->type == TOKEN_OPR && StringEqual("=", token->content)) {
+            varIndex = contextGetVariableIndex(context, varName);
+            if (varIndex < 0) {
+                errorRet->errorPos = 0;
+                errorRet->errorType = KBE_UNDEFINED_IDENTIFIER;
+                StringCopy(errorRet->message, KB_ERROR_MESSAGE_MAX, varName);
+                return 0;
+            }
+            /* 保存表达式位置 */
+            exprStartEptr = analyzer.eptr;
+            /* 检查表达式合法性 */
+            if (!checkExpr(&analyzer, errorRet)) {
+                compileLineReturn(0);
+            }
+            /* 编译表达式 */
+            analyzer.eptr = exprStartEptr;
+            exprRoot = buildExprTree(&analyzer);
+            sortExpr(&exprRoot);
+            ret = compileExprTree(context, exprRoot, errorRet);
+            if (!ret) {
+                compileLineReturn(0);
+            }
+            enDestroy(exprRoot);
+            /* 添加赋值命令 */
+            vlPushBack(context->commandList, opCommandCreateAssignVar(varIndex));
+        }
+        else {
+            /* 其他情况，此行是表达式 */
+            rewindToken(&analyzer);
+            /* 检查表达式合法性 */
+            if (!checkExpr(&analyzer, errorRet)) {
+                compileLineReturn(0);
+            }
+            /* 编译表达式 */
+            exprRoot = buildExprTree(&analyzer);
+            sortExpr(&exprRoot);
+            ret = compileExprTree(context, exprRoot, errorRet);
+            if (!ret) {
+                compileLineReturn(0);
+            }
+            enDestroy(exprRoot);
+            /* pop 未使用的值 */
+            vlPushBack(context->commandList, opCommandCreatePop());
+        }
+    }
+    else {
+        /* 其他情况，此行是表达式 */
+        rewindToken(&analyzer);
+        /* 检查表达式合法性 */
         if (!checkExpr(&analyzer, errorRet)) {
             compileLineReturn(0);
         }
-
+        /* 编译表达式 */
         exprRoot = buildExprTree(&analyzer);
         sortExpr(&exprRoot);
-        // printf("expr:"); travelExpr(exprRoot, 0);
-        
-        // compile expr
         ret = compileExprTree(context, exprRoot, errorRet);
         if (!ret) {
             compileLineReturn(0);
         }
-
         enDestroy(exprRoot);
-
-        // pop no use value
+        /* pop 未使用的值 */
         vlPushBack(context->commandList, opCommandCreatePop());
     }
-
+    
     compileLineReturn(1);
 }
 
