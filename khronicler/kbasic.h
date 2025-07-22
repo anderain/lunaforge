@@ -67,13 +67,13 @@ void        contextDestroy          (KbContext *context);
 int         contextSetVariable      (KbContext *context, const char * varName);
 void        contextCtrlResetCounter (KbContext* context);
 
-int kbFormatBuildError(const KbBuildError *errorVal, char *strBuffer, int strLengthMax);
+int         kbFormatBuildError(const KbBuildError *errorVal, char *strBuffer, int strLengthMax);
 
-KbContext*  kbCompileStart                  ();
-int         kbScanControlStructureAndLabel  (const char* line, KbContext *context, KbBuildError *errorRet);
-int         kbCompileLine                   (const char* lineContent, KbContext *context, KbBuildError *pErrorRet);
-int         kbCompileEnd                    (KbContext* context);
-int         kbSerialize                     (const KbContext* context, unsigned char** pRaw, int* pByteLength);
+KbContext*  kbCompileStart          ();
+int         kbScanLineSyntax        (const char* line, KbContext *context, KbBuildError *errorRet);
+int         kbCompileLine           (const char* lineContent, KbContext *context, KbBuildError *pErrorRet);
+int         kbCompileEnd            (KbContext* context);
+int         kbSerialize             (const KbContext* context, unsigned char** pRaw, int* pByteLength);
 
 void dbgPrintContextCommandList (const KbContext *context);
 void dbgPrintContextVariables   (const KbContext *context);

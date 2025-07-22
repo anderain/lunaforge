@@ -18,9 +18,9 @@ typedef struct {
 #define KEYWORD_WHILE   "while"
 #define KEYWORD_END     "end"
 #define KEYWORD_BREAK   "break"
-#define KEYWORD_GOSUB   "gosub"
 #define KEYWORD_RETURN  "return"
 #define KEYWORD_EXIT    "exit"
+#define KEYWORD_FUNC    "func"
 
 static const KeywordDef KEYWORDS[] = {
     { KEYWORD_DIM       },
@@ -31,9 +31,9 @@ static const KeywordDef KEYWORDS[] = {
     { KEYWORD_WHILE     },
     { KEYWORD_END       },
     { KEYWORD_BREAK     },
-    { KEYWORD_GOSUB     },
     { KEYWORD_RETURN    },
     { KEYWORD_EXIT      },
+    { KEYWORD_FUNC      },
     { NULL              }
 };
 
@@ -486,7 +486,7 @@ void displaySyntaxError(Analyzer *_self) {
 
 int checkExpr(Analyzer *_self, KbBuildError *errorRet) {
     int result = matchExpr(_self);
-    // syntax error
+    /* 表达式里有语法错误 */
     if (!result) {
         // return error
         // displaySyntaxError(_self);
@@ -499,20 +499,6 @@ int checkExpr(Analyzer *_self, KbBuildError *errorRet) {
         }
         return 0;
     }
-    else {
-        // checkout not end
-        Token *token = nextToken(_self);
-        if (token->type != TOKEN_END) {
-            // return error
-            // displaySyntaxError(_self);
-            if (errorRet) {
-                errorRet->errorType = KBE_SYNTAX_ERROR;
-                errorRet->errorPos = _self->eptr - _self->expr;
-            }
-            return 0;
-        }
-    }
-    resetToken(_self);
     return 1;
 }
 
@@ -1075,7 +1061,7 @@ KbOpCommand* opCommandCreatePushOffset() {
     return cmd;
 }
 
-KbOpCommand* opCommandCreatePushReturn() {
+KbOpCommand* opCommandCreateReturn() {
     KbOpCommand* cmd = (KbOpCommand*)malloc(sizeof(KbOpCommand));
 
     cmd->op = KBO_RETURN;
@@ -1286,7 +1272,7 @@ KbContext* kbCompileStart(const char * line) {
     return context;
 }
 
-int kbScanControlStructureAndLabel(const char* line, KbContext *context, KbBuildError *errorRet) {
+int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRet) {
     Analyzer    analyzer;
     Token*      token;
     int         ret;
@@ -1300,9 +1286,12 @@ int kbScanControlStructureAndLabel(const char* line, KbContext *context, KbBuild
 
     /* 尝试读取第一个 token */
     token = nextToken(&analyzer);
-    
+    /* 空行 */
+    if (token->type == TOKEN_END) {
+        /* 什么也不做 */
+    }
     /* if 语句 */
-    if (token->type == TOKEN_KEY && StringEqual(KEYWORD_IF, token->content)) {
+    else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_IF, token->content)) {
         /* 匹配表达式 */
         ret = matchExpr(&analyzer);
         if (!ret) {
@@ -1329,7 +1318,6 @@ int kbScanControlStructureAndLabel(const char* line, KbContext *context, KbBuild
             contextCtrlPush(context, KBCS_IF_THEN);
         }
         else {
-            puts(token->content);
             compileLineReturnWithError(KBE_SYNTAX_ERROR, " in if statement");
         }
     }
@@ -1454,8 +1442,42 @@ int kbScanControlStructureAndLabel(const char* line, KbContext *context, KbBuild
                 compileLineReturnWithError(KBE_SYNTAX_ERROR, ", invalid `end while`, no matching while statement found.");
             }
         }
-    } 
-    /* 用户手动写的 label */
+    }
+    /* exit 语句 */
+    else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_EXIT, token->content)) {
+        /* 匹配行结束 */
+        token = nextToken(&analyzer);
+        if (token->type != TOKEN_END) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in exit statement");
+        }
+    }
+    /* return 语句 */
+    else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_RETURN, token->content)) {
+        /* 匹配表达式 */
+        ret = matchExpr(&analyzer);
+        if (!ret) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", invalid express in return statement");
+        }
+        /* 匹配行结束 */
+        token = nextToken(&analyzer);
+        if (token->type != TOKEN_END) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in return statement");
+        }
+    }
+    /* goto 语句 */
+    else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_GOTO, token->content)) {
+        /* 匹配标签 */
+        token = nextToken(&analyzer);
+        if (token->type != TOKEN_ID) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, " missing label in goto statement");
+        }
+        /* 匹配行结束 */
+        token = nextToken(&analyzer);
+        if (token->type != TOKEN_END) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in goto statement");
+        }
+    }
+    /* 用户自己写的 label */
     else if (token->type == TOKEN_LABEL) {
         char labelName[KB_TOKEN_LENGTH_MAX];
         KbLabelType labelType = KBL_USER;
@@ -1496,7 +1518,72 @@ int kbScanControlStructureAndLabel(const char* line, KbContext *context, KbBuild
             compileLineReturnWithError(KBE_DUPLICATED_LABEL, labelName);
         }
     }
-
+    /* dim 变量声明 */
+    else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_DIM, token->content)) {
+        /* 匹配是变量名 */
+        token = nextToken(&analyzer);
+        if (token->type != TOKEN_ID) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in dim statement, missing variable");
+        }
+        /* 匹配行结束或者= */
+        token = nextToken(&analyzer);
+        /* 等号，带赋值的dim */
+        if (token->type == TOKEN_OPR && StringEqual("=", token->content)) {
+            /* 保存表达式位置 */
+            if (!checkExpr(&analyzer, errorRet)) {
+                compileLineReturn(0);
+            }
+            /* 匹配行结束 */
+            token = nextToken(&analyzer);
+            if (token->type != TOKEN_END) {
+                compileLineReturnWithError(KBE_SYNTAX_ERROR, " in dim statement.");
+            }
+        }
+        /* 直接结束 */
+        else if (token->type == TOKEN_END) {
+            /* 什么也不做 */
+        }
+        /* 其他情况是错误*/
+        else {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in dim statement");
+        }
+    }
+    /* 可能是赋值 */
+    else if (token->type == TOKEN_ID) {
+        /* 匹配 '=' */ 
+        token = nextToken(&analyzer);
+        if (token->type == TOKEN_OPR && StringEqual("=", token->content)) {
+            /* 检查表达式合法性 */
+            if (!checkExpr(&analyzer, errorRet)) {
+                compileLineReturn(0);
+            }
+        }
+        /* 其他情况，此行是表达式 */
+        else {
+            if (!checkExpr(&analyzer, errorRet)) {
+                compileLineReturn(0);
+            }
+        }
+        /* 匹配行结束 */
+        token = nextToken(&analyzer);
+        if (token->type != TOKEN_END) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in assignment statement.");
+        }
+    }
+    /* 其他情况，此行是表达式 */
+    else {
+        /* 解析器回到开始位置 */
+        rewindToken(&analyzer);
+        /* 检查表达式合法性 */
+        if (!checkExpr(&analyzer, errorRet)) {
+            compileLineReturn(0);
+        }
+        /* 匹配行结束 */
+        token = nextToken(&analyzer);
+        if (token->type != TOKEN_END) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in express.");
+        }
+    }
     return 1;
 }
 
@@ -1515,9 +1602,9 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
     // try first token
     token = nextToken(&analyzer);
 
-    // empty
+    /* 空行 */
     if (token->type == TOKEN_END) {
-        // nothing to do
+        /* 什么也不做 */
     }
     /* if 语句 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_IF, token->content)) {        
@@ -1528,39 +1615,34 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         if (!ret) {
             compileLineReturn(0);
         }
-
         enDestroy(exprRoot);
-
         /* 下一个 token，结束或者 goto */
         token = nextToken(&analyzer);
-        printf("next token = %s\n", token->content);
         /* if ... goto 模式*/
         if (token->type == TOKEN_KEY && StringEqual(KEYWORD_GOTO, token->content)) {
             KbContextLabel *label;
-        
             /* 跳转标签 */
             token = nextToken(&analyzer);
             if (token->type != TOKEN_ID) {
                 compileLineReturnWithError(KBE_SYNTAX_ERROR, " missing label in if statement");
             }
-
-            /* 找到条件不满足时跳转的标签 */
+            /* 找到标签定义 */
             label = contextGetLabel(context, token->content);
             if (!label) {
+                /* 错误：goto用到了没定义过的标签 */
                 compileLineReturnWithError(KBE_UNDEFINED_LABEL, token->content);
             }
-
+            /* 生成 cmd */
             vlPushBack(context->commandList, opCommandCreateIfGoto(label));
         }
         /* if / else 模式 */
         else if (token->type == TOKEN_END) {
             KbCtrlStructItem* pCsItem;
             KbContextLabel* label;
-
             /* iLabelNext: 条件不满足的时候，跳去下一条 else if / else */
             pCsItem = contextCtrlPush(context, KBCS_IF_THEN);
             label = contextCtrlGetLabel(context, pCsItem->iLabelNext);
-
+            /* 生成 cmd */
             vlPushBack(context->commandList, opCommandCreateOperator(OPR_NOT));
             vlPushBack(context->commandList, opCommandCreateIfGoto(label));
         }
@@ -1603,7 +1685,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         pCsItem = contextCtrlPush(context, KBCS_ELSE_IF);
         label = contextCtrlGetLabel(context, pCsItem->iLabelNext);
 
-        /* 指令写入 */
+        /* 生成cmd */
         vlPushBack(context->commandList, opCommandCreateOperator(OPR_NOT));
         vlPushBack(context->commandList, opCommandCreateIfGoto(label));
     }
@@ -1621,6 +1703,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         }
         /* 条件满足的时候执行完毕跳转到 end if */
         prevLabel = contextCtrlGetLabel(context, pPrevCsItem->iLabelEnd);
+        /* 生成cmd */
         vlPushBack(context->commandList, opCommandCreateGoto(prevLabel));
 
         /* 更新上一条 */
@@ -1635,36 +1718,46 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         KbContextLabel* labelEnd;
         KbContextLabel* labelStart;
         KbCtrlStructItem* pCsItem;
-    
         pCsItem = contextCtrlPush(context, KBCS_WHILE);
         /* 循环开头的标签，更新位置 */
         labelStart = contextCtrlGetLabel(context, pCsItem->iLabelNext);
         labelStart->pos = context->commandList->size;
-
+        /* 编译表达式 */
         exprRoot = buildExprTree(&analyzer);
         sortExpr(&exprRoot);
-        
-        /* 编译表达式 */
         ret = compileExprTree(context, exprRoot, errorRet);
         if (!ret) {
             compileLineReturn(0);
         }
-
         enDestroy(exprRoot);
-    
         /* 不满足的时候跳转标签 */
         labelEnd = contextCtrlGetLabel(context, pCsItem->iLabelEnd);
-    
-        /* 指令写入 */
+        /* 生成cmd */
         vlPushBack(context->commandList, opCommandCreateOperator(OPR_NOT));
         vlPushBack(context->commandList, opCommandCreateIfGoto(labelEnd));
+    }
+    /* break 语句 */
+    else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_BREAK, token->content)) {
+        /* 从栈顶向下寻找循环语句 */
+        VlistNode*          node = context->ctrlStruct.stack->tail;
+        KbCtrlStructItem*   pCsItem;
+        KbContextLabel*     label;
+        while (node) {
+            pCsItem = (KbCtrlStructItem *)(node->data);
+            if (pCsItem->csType == KBCS_WHILE) {
+                break;
+            }
+            node = node->prev;
+        }
+        /* 生成cmd，跳转回循环结束 */
+        label = contextCtrlGetLabel(context, pCsItem->iLabelEnd);
+        vlPushBack(context->commandList, opCommandCreateGoto(label));
     }
     /* end 语句 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_END, token->content)) {
         KbContextLabel* label;
         KbCtrlStructItem* pPrevCsItem;
         int popTarget = KBCS_NONE;
-
         /* 获取 end 之后的 token，可以是 if / while */
         token = nextToken(&analyzer);
         if (token->type == TOKEN_KEY && StringEqual(KEYWORD_IF, token->content)) {
@@ -1673,7 +1766,6 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_WHILE, token->content)) {
             popTarget = KBCS_WHILE;
         }
-        
         /* 弹出最近 if / elseif / else 语句块 */
         if (popTarget == KBCS_IF_THEN) {
             /* 不断弹出直到弹出if */
@@ -1700,7 +1792,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         else if (popTarget == KBCS_WHILE) {
             /* 从堆栈中拿出来上一个项目 */
             pPrevCsItem = contextCtrlPeek(context);
-            /* 指令写入，跳转回循环开头 */
+            /* 生成cmd，跳转回循环开头 */
             label = contextCtrlGetLabel(context, pPrevCsItem->iLabelNext);
             vlPushBack(context->commandList, opCommandCreateGoto(label));
             /* 更新上一个项目的跳转地址 */
@@ -1710,131 +1802,42 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
             csItemRelease(vlPopBack(context->ctrlStruct.stack));
         }
     }
-    /* break 语句 */
-    else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_BREAK, token->content)) {
-        /* 从栈顶向下寻找循环语句 */
-        VlistNode*          node = context->ctrlStruct.stack->tail;
-        KbCtrlStructItem*   pCsItem;
-        KbContextLabel*     label;
-        while (node) {
-            pCsItem = (KbCtrlStructItem *)(node->data);
-            if (pCsItem->csType == KBCS_WHILE) {
-                break;
-            }
-            node = node->prev;
-        }
-        /* 指令写入，跳转回循环结束 */
-        label = contextCtrlGetLabel(context, pCsItem->iLabelEnd);
-        vlPushBack(context->commandList, opCommandCreateGoto(label));
-    }
-    /* exit */
+    /* exit 语句 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_EXIT, token->content)) {
-        /* 匹配行结束 */
-        token = nextToken(&analyzer);
-        if (token->type != TOKEN_END) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in exit statement");
-        }
         vlPushBack(context->commandList, opCommandCreateStop());
-    }
-    /* gosub 语句 */
-    else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_GOSUB, token->content)) {
-        char            labelName[KB_TOKEN_LENGTH_MAX];
-        KbContextLabel* label;
-
-        /* 匹配标签 */
-        token = nextToken(&analyzer);
-        if (token->type != TOKEN_ID) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, " missing label in gosub statement");
-        }
-
-        StringCopy(labelName, sizeof(labelName), token->content);
-
-        /* 匹配语句结束 */
-        token = nextToken(&analyzer);
-        if (token->type != TOKEN_END) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in gosub statement");
-        }
-
-        label = contextGetLabel(context, labelName);
-        if (!label) {
-            compileLineReturnWithError(KBE_UNDEFINED_LABEL, labelName);
-        }
-
-        vlPushBack(context->commandList, opCommandCreatePushOffset());
-        vlPushBack(context->commandList, opCommandCreateGoto(label));
     }
     /* return 语句 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_RETURN, token->content)) {
-        /* 匹配语句结束 */
-        token = nextToken(&analyzer);
-        if (token->type != TOKEN_END) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in gosub statement");
-        }
-
-        vlPushBack(context->commandList, opCommandCreatePushReturn());
+        vlPushBack(context->commandList, opCommandCreateReturn());
     }
-    // goto command
+    /* goto 语句 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_GOTO, token->content)) {
-        char            labelName[KB_TOKEN_LENGTH_MAX];
         KbContextLabel* label;
-
-        // match label
+        /* 获取标签 */
         token = nextToken(&analyzer);
-        if (token->type != TOKEN_ID) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, " missing label in goto statement");
-        }
-
-        StringCopy(labelName, sizeof(labelName), token->content);
-
-        // match end
-        token = nextToken(&analyzer);
-        if (token->type != TOKEN_END) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in goto statement");
-        }
-
-        // find label
-        label = contextGetLabel(context, labelName);
+        label = contextGetLabel(context, token->content);
         if (!label) {
-            compileLineReturnWithError(KBE_UNDEFINED_LABEL, labelName);
+            /* 错误，引用了未定义的标签 */
+            compileLineReturnWithError(KBE_UNDEFINED_LABEL, token->content);
         }
-
         vlPushBack(context->commandList, opCommandCreateGoto(label));
     }
-    // label mark, update position
+    /* 用户自己写的 label */
     else if (token->type == TOKEN_LABEL) {
-        const char*     labelName;
         KbContextLabel* label;
-
+        /* 获取标签名 */
         token = nextToken(&analyzer);
-        if (token->type != TOKEN_ID) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", invalid label");
-        }
-
-        labelName = token->content;
-
-        // update position of label
-        label = contextGetLabel(context, labelName);
-
-        if (!label) {
-            compileLineReturnWithError(KBE_UNDEFINED_LABEL, labelName);
-        }
-
+        label = contextGetLabel(context, token->content);
+        /* 更新标签在字cmd的位置（当前长度） */
         label->pos = context->commandList->size;
     }
     /* dim 变量声明 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_DIM, token->content)) {
-        char        varName[KB_TOKEN_LENGTH_MAX];
-        const char* exprStartEptr;
-        int         varIndex;
+        char    varName[KB_TOKEN_LENGTH_MAX];
+        int     varIndex;
 
-        /* 匹配是变量名 */
-        token = nextToken(&analyzer);
-        if (token->type != TOKEN_ID) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in let statement, missing variable");
-        }
+        /* 获取变量名 */
         StringCopy(varName, sizeof(varName), token->content);
-
-                
         /* 获取变量 index */
         varIndex = contextGetVariableIndex(context, varName);
         if (varIndex < 0) {
@@ -1849,13 +1852,6 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         token = nextToken(&analyzer);
         /* 赋值 = */
         if (token->type == TOKEN_OPR && StringEqual("=", token->content)) {
-            /* 保存表达式位置 */
-            exprStartEptr = analyzer.eptr;
-            if (!checkExpr(&analyzer, errorRet)) {
-                compileLineReturn(0);
-            }
-            /* 编译表达式 */
-            analyzer.eptr = exprStartEptr;
             exprRoot = buildExprTree(&analyzer);
             sortExpr(&exprRoot);
             ret = compileExprTree(context, exprRoot, errorRet);
@@ -1863,29 +1859,26 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
                 compileLineReturn(0);
             }
             enDestroy(exprRoot);
-            /* 添加赋值命令 */
+            /* 生成cmd，赋值 */
             vlPushBack(context->commandList, opCommandCreateAssignVar(varIndex));
         }
         /* 直接结束 */
         else if (token->type == TOKEN_END) {
             /* 什么也不做 */
         }
-        /* 其他情况是错误*/
-        else {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in let statement");
-        }
     }
     /* 可能是赋值 */
     else if (token->type == TOKEN_ID) {
-        char        varName[KB_TOKEN_LENGTH_MAX];
-        const char* exprStartEptr;
-        int         varIndex;
+        char    varName[KB_TOKEN_LENGTH_MAX];
+        int     varIndex;
 
         StringCopy(varName, sizeof(varName), token->content);
 
-        /* 匹配 '=' */ 
+        /* 尝试下一个 token */
         token = nextToken(&analyzer);
+        /* 匹配 '=' */ 
         if (token->type == TOKEN_OPR && StringEqual("=", token->content)) {
+            /* 检查变量是否已经定义 */
             varIndex = contextGetVariableIndex(context, varName);
             if (varIndex < 0) {
                 errorRet->errorPos = 0;
@@ -1893,14 +1886,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
                 StringCopy(errorRet->message, KB_ERROR_MESSAGE_MAX, varName);
                 return 0;
             }
-            /* 保存表达式位置 */
-            exprStartEptr = analyzer.eptr;
-            /* 检查表达式合法性 */
-            if (!checkExpr(&analyzer, errorRet)) {
-                compileLineReturn(0);
-            }
             /* 编译表达式 */
-            analyzer.eptr = exprStartEptr;
             exprRoot = buildExprTree(&analyzer);
             sortExpr(&exprRoot);
             ret = compileExprTree(context, exprRoot, errorRet);
@@ -1908,16 +1894,13 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
                 compileLineReturn(0);
             }
             enDestroy(exprRoot);
-            /* 添加赋值命令 */
+            /* 生成cmd，赋值 */
             vlPushBack(context->commandList, opCommandCreateAssignVar(varIndex));
         }
+        /* 其他情况，此行是表达式 */
         else {
-            /* 其他情况，此行是表达式 */
+            /* 解析器回到开始位置 */
             rewindToken(&analyzer);
-            /* 检查表达式合法性 */
-            if (!checkExpr(&analyzer, errorRet)) {
-                compileLineReturn(0);
-            }
             /* 编译表达式 */
             exprRoot = buildExprTree(&analyzer);
             sortExpr(&exprRoot);
@@ -1930,13 +1913,10 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
             vlPushBack(context->commandList, opCommandCreatePop());
         }
     }
+    /* 其他情况，此行是表达式 */
     else {
-        /* 其他情况，此行是表达式 */
+        /* 解析器回到开始位置 */
         rewindToken(&analyzer);
-        /* 检查表达式合法性 */
-        if (!checkExpr(&analyzer, errorRet)) {
-            compileLineReturn(0);
-        }
         /* 编译表达式 */
         exprRoot = buildExprTree(&analyzer);
         sortExpr(&exprRoot);
