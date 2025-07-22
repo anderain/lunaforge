@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "k_utils.h"
+#include "kommon.h"
 
 int StringCopy(char *dest, int max, const char *src) {
     int i;
@@ -234,4 +235,28 @@ char* kItoa(int num, char* str, int base) {
     kItoaReverse(str, i);
  
     return str;
+}
+
+int getLineTrimRemarks(const char* textPtr, char* line) {
+    char *linePtr = line;
+    const char *originalTextPtr = textPtr;
+
+    // get line from file buffer
+    do {
+        *linePtr++ = *textPtr++;
+    } while(*textPtr != '\n' && *textPtr != '\0');
+
+    *linePtr = '\0';
+
+    // remove remarks
+    for (linePtr = line; *linePtr && *linePtr != '#'; ++linePtr) NULL;
+    *linePtr = '\0';
+
+    // trim ending spaces
+    for (--linePtr; linePtr >= line && isSpace(*linePtr); --linePtr) {
+        *linePtr = '\0';
+    }
+
+    // return how many char read
+    return textPtr - originalTextPtr;
 }

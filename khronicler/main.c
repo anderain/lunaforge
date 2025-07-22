@@ -42,29 +42,6 @@ int writeCompiledFile(const char *fileName, const void * data, int length) {
     return 1;
 }
 
-int getLineTrimRemarks(const char* textPtr, char* line) {
-    char *linePtr = line;
-    const char *originalTextPtr = textPtr;
-
-    // get line from file buffer
-    do {
-        *linePtr++ = *textPtr++;
-    } while(*textPtr != '\n' && *textPtr != '\0');
-
-    *linePtr = '\0';
-
-    // remove remarks
-    for (linePtr = line; *linePtr && *linePtr != '#'; ++linePtr) NULL;
-    *linePtr = '\0';
-
-    // trim ending spaces
-    for (--linePtr; linePtr >= line && isSpace(*linePtr); --linePtr) {
-        *linePtr = '\0';
-    }
-
-    // return how many char read
-    return textPtr - originalTextPtr;
-}
 
 int buildFromKBasic(const char *fileName, const char * outputFileName) {
     KbBuildError    errorRet;
@@ -118,9 +95,9 @@ int buildFromKBasic(const char *fileName, const char * outputFileName) {
         goto compileEnd;
     }
     /* 检查是不是有没结束的控制结构 */
-    if (context->ctrlStruct.stack->size > 0) {
+    if (context->ctrlFlow.stack->size > 0) {
         errorRet.errorPos = 0;
-        errorRet.errorType = KBE_INCOMPLETE_CTRL_STRUCT;
+        errorRet.errorType = KBE_INCOMPLETE_CTRL_FLOW;
         errorRet.message[0] = '\0';
         isSuccess = 0;
         goto compileEnd;
@@ -232,6 +209,8 @@ int debugBinary(const char* binFileName) {
     KbMachine*      app;
     const char*     filename = binFileName;
     unsigned char*  raw;
+    int             funcIndex;
+    const char*     targetFuncName = "exportedAdd";
 
     raw = readBinaryFile(filename);
     app = machineCreate(raw);
@@ -251,105 +230,36 @@ int debugBinary(const char* binFileName) {
         formatExecError(&errorRet, error_message, sizeof(error_message));
         printf("Runtime Error: %s\n%s\n", filename, error_message);
     }
-
     printf("Call stack = %d, Value stack = %d\n", app->callEnvStack->size, app->stack->size);
 
+    funcIndex = machineGetUserFuncIndex(app, targetFuncName);
+    if (funcIndex < 0) {
+        printf("Target function '%s' not found!\n", targetFuncName);
+    }
+    else {
+        KbRuntimeValue* retValue;
+        machineMovePushValue(app, rtvalueCreateNumber(1));
+        machineMovePushValue(app, rtvalueCreateNumber(2));
+        ret = machineExecCallUserFuncByIndex(app, funcIndex, &errorRet);
+        if (!ret) {
+            char error_message[200];
+            formatExecError(&errorRet, error_message, sizeof(error_message));
+            printf("Runtime Error: %s\n%s\n", filename, error_message);
+        }
+        else {
+            retValue = machinePopUserFuncRetValue(app);
+            printf("Call stack = %d, Value stack = %d, retValue(%d) = %f\n", app->callEnvStack->size, app->stack->size, retValue->type, retValue->data.num);
+            rtvalueDestroy(retValue);
+        }
+        
+    }
     machineDestroy(app);
     free(raw);
     return 0;
 }
 
-typedef struct {
-    int hasError;
-    char* name;
-    char* source;
-} SyntaxTestCase;
-
-SyntaxTestCase SyntaxTestCases[] = {
-    { 1, "if_missing_expression",           "if " },
-    { 1, "if_redundant_statement",          "if 1 + 1 2" },
-    { 1, "if_goto_missing_label",           "if 1 > 1 goto" },
-    { 1, "elseif_missing_expression",       "if 0\nelseif" },
-    { 1, "elseif_redundant_statement",      "if 0\nelseif 0 goto" },
-    { 1, "elseif_not_after_if",             "elseif 1 > 1" },
-    { 1, "else_redundant_statement",        "else 1" },
-    { 1, "else_not_after_if",               "else" },
-    { 1, "while_missing_expression",        "while" },
-    { 1, "while_redundant",                 "while 1 > 1 2" },
-    { 1, "break_redundant",                 "break 1" },
-    { 1, "break_not_in_loop",               "break" },
-    { 1, "end_invalid_context",             "end goto" },
-    { 1, "endif_not_after_if",              "while 1\nend if" },
-    { 1, "endwhile_not_after_while",        "if 0 > 1\nend while" },
-    { 1, "exit_non_empty",                  "exit 12" },
-    { 1, "return_missing_expression",       "return" },
-    { 1, "return_redundant",                "return 1 123" },
-    { 1, "goto_missing_label",              "goto" },
-    { 1, "goto_redundant",                  "goto labelName 123" },
-    { 1, "label_missing_content",           ":123" },
-    { 1, "label_redundant",                 ":labelName 123" },
-    { 1, "label_name_too_long",             ":l234567890123456" },
-    { 1, "dim_missing_variable",            "dim 2" },
-    { 1, "dim_missing_expression",          "dim a =" },
-    { 1, "dim_redundant_case1",             "dim a = 1 2" },
-    { 1, "dim_redundant_case2",             "dim a 2" },
-    { 1, "assignment_missing_expression",   "a = " },
-    { 1, "assignment_redundant",            "a = 1 2" },
-    { 1, "expression_redundant",            "1 2"   },
-    { 0, "all_correct",                     "dim a = 1\nwhile a < 100\n  if a < 10\n    p(\"loop \" + a)\n  else\n    break\n  end if\n  a = a + 1\nend while\np(\"loop exit\")" },
-    { 0, NULL, NULL }
-};
-
-void TestAllSyntaxError() {
-    KbBuildError    errorRet;
-    KbContext*      context;
-    int             ret;
-    char            *textBuf;
-    char            *textPtr;
-    int             lineCount;
-    char            buf[100];
-    int             i;
-    const char*     divider = "------------------";
-    int             numPassCount = 0;
-
-    for (i = 0; SyntaxTestCases[i].name; i++) {
-        int             isSuccess = 0;
-        SyntaxTestCase* pCase = SyntaxTestCases + i;
-        textBuf = pCase->source;
-        context = kbCompileStart();
-        contextCtrlResetCounter(context);    
-        for (textPtr = textBuf, lineCount = 1; *textPtr; lineCount++) {
-            char line[1000];
-            textPtr += getLineTrimRemarks(textPtr, line);
-            ret = kbScanLineSyntax(line, context, &errorRet);
-            if (!ret) {
-                goto compileEnd;
-            }
-        }
-        if (context->ctrlStruct.stack->size > 0) {
-            errorRet.errorPos = 0;
-            errorRet.errorType = KBE_INCOMPLETE_CTRL_STRUCT;
-            errorRet.message[0] = '\0';
-            goto compileEnd;
-        }
-        isSuccess = 1;
-compileEnd:
-        if (pCase->hasError ^ isSuccess) {
-            numPassCount++;
-        }
-        kbFormatBuildError(&errorRet, buf, sizeof(buf));
-        printf("Case %d - %s\n", i + 1, pCase->name);
-        printf("Source Code: \n%s\n", pCase->source);
-        printf("Result: [%d] %s\n", lineCount, buf);
-        puts(divider);
-        contextDestroy(context);
-    }
-    printf("Syntax test completed, %d/%d passed.\n", numPassCount, i);
-}
-
 int main(int argc, char** argv) {
     int ret = 0;
-    // TestAllSyntaxError();
     ret = buildFromKBasic("test.kbs", "test.bin")  && debugBinary("test.bin");
     return ret;
 }

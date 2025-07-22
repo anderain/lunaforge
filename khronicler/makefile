@@ -1,26 +1,34 @@
-CC = gcc
-CFLAGS = -c -Wall
-LDFLAGS =
-EXE = khronicler.exe
+CC          = gcc
+C_FLAGS     = -c -Wall
+LD_FLAGS 	=
+CORE_OBJS   = k_utils.o kbasic.o kommon.o krt.o
+MAIN_EXE	= khronicler.exe
+TEST_EXE    = khronicler_test.exe
 
-all: k_utils.o kbasic.o kommon.o krt.o main.o
-	$(CC) $(LDFLAGS) k_utils.o kbasic.o kommon.o krt.o main.o -o $(EXE)
+all: $(CORE_OBJS) main.o
+	$(CC) $(LD_FLAGS) $(CORE_OBJS) main.o -o $(MAIN_EXE)
 
-k_utils.o: k_utils.c k_utils.h
-	$(CC) $(CFLAGS) k_utils.c
+test: $(CORE_OBJS) test.o
+	$(CC) $(LD_FLAGS) $(CORE_OBJS) test.o -o $(TEST_EXE)
 
-kbasic.o: kbasic.c kbasic.h k_utils.h
-	$(CC) $(CFLAGS) kbasic.c
+k_utils.o: k_utils.c k_utils.h kommon.h
+	$(CC) $(C_FLAGS) k_utils.c
+
+kbasic.o: kbasic.c kbasic.h k_utils.h kommon.h
+	$(CC) $(C_FLAGS) kbasic.c
 
 kommon.o: kommon.c kommon.h
-	$(CC) $(CFLAGS) kommon.c
+	$(CC) $(C_FLAGS) kommon.c
 
-krt.o: krt.c krt.h k_utils.h
-	$(CC) $(CFLAGS) krt.c
+krt.o: krt.c krt.h k_utils.h kommon.h
+	$(CC) $(C_FLAGS) krt.c
 
-main.o: main.c kbasic.h k_utils.h krt.h
-	$(CC) $(CFLAGS) main.c
+main.o: main.c kbasic.h k_utils.h krt.h kommon.h
+	$(CC) $(C_FLAGS) main.c
+
+test.o: test.c kbasic.h k_utils.h krt.h kommon.h
+	$(CC) $(C_FLAGS) test.c
 
 .PHONY: clean
 clean:
-	rm *.o $(EXE)
+	rm *.o $(MAIN_EXE) $(TEST_EXE)

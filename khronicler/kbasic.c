@@ -747,8 +747,8 @@ int kbFormatBuildError(const KbBuildError *errorVal, char *strBuffer, int strLen
         kbFormatErrorAppend(errorVal->message);
         kbFormatErrorAppend("\"");
         break;
-    case KBE_INCOMPLETE_CTRL_STRUCT:
-        kbFormatErrorAppend("Incomplete control structure, missing 'end'.");
+    case KBE_INCOMPLETE_CTRL_FLOW:
+        kbFormatErrorAppend("Incomplete control flow, missing 'end'.");
         break;
     case KBE_INCOMPLETE_FUNC:
         kbFormatErrorAppend("Incomplete function.");
@@ -813,15 +813,15 @@ void sortExpr(ExprNode ** enPtr) {
     } while (changeFlag);
 }
 
-KbCtrlStructItem* csItemNew(int csType) {
-    KbCtrlStructItem* pCsItem = (KbCtrlStructItem *)malloc(sizeof(KbCtrlStructItem));
-    pCsItem->csType = csType;
-    pCsItem->iLabelEnd = -1;
-    pCsItem->iLabelNext = -1;
-    return pCsItem;
+KbCtrlFlowItem* csItemNew(int csType) {
+    KbCtrlFlowItem* pCfItem = (KbCtrlFlowItem *)malloc(sizeof(KbCtrlFlowItem));
+    pCfItem->csType = csType;
+    pCfItem->iLabelEnd = -1;
+    pCfItem->iLabelNext = -1;
+    return pCfItem;
 }
 
-#define csItemRelease(pCsItem) free(pCsItem)
+#define csItemRelease(pCfItem) free(pCfItem)
 
 KbContext* contextCreate() {
     KbContext* context = (KbContext *)malloc(sizeof(KbContext));
@@ -834,8 +834,8 @@ KbContext* contextCreate() {
     context->labelList = vlNewList();
     context->userFuncList = vlNewList();
 
-    context->ctrlStruct.labelCounter = 0;
-    context->ctrlStruct.stack = NULL;
+    context->ctrlFlow.labelCounter = 0;
+    context->ctrlFlow.stack = NULL;
 
     context->pCurrentFunc = NULL;
     context->funcLabelCounter = 0;
@@ -851,8 +851,8 @@ void contextDestroy (KbContext *context) {
     vlDestroy(context->commandList, opCommandRelease);
     vlDestroy(context->labelList, free);
     vlDestroy(context->userFuncList, free);
-    if (context->ctrlStruct.stack) {
-        vlDestroy(context->ctrlStruct.stack, free);
+    if (context->ctrlFlow.stack) {
+        vlDestroy(context->ctrlFlow.stack, free);
     }
 
     free(context);
@@ -947,21 +947,21 @@ KbContextLabel* contextAddLabel(const KbContext *context, const char * labelName
     return label;
 }
 
-KbCtrlStructItem* contextCtrlPeek(const KbContext *context) {
-    const VlistNode* tail = context->ctrlStruct.stack->tail;
+KbCtrlFlowItem* contextCtrlPeek(const KbContext *context) {
+    const VlistNode* tail = context->ctrlFlow.stack->tail;
     if (tail == NULL) {
         return NULL;
     }
-    return (KbCtrlStructItem *)(tail->data);
+    return (KbCtrlFlowItem *)(tail->data);
 }
 
 int contextCtrlPeekType(const KbContext *context) {
-    KbCtrlStructItem* pCsItem;
-    pCsItem = contextCtrlPeek(context);
-    if (!pCsItem) {
+    KbCtrlFlowItem* pCfItem;
+    pCfItem = contextCtrlPeek(context);
+    if (!pCfItem) {
         return KBCS_NONE;
     }
-    return pCsItem->csType;
+    return pCfItem->csType;
 }
 
 KbContextLabel* contextCtrlAddLabel(KbContext* context, int labelIndex) {
@@ -1005,41 +1005,41 @@ KbContextLabel* contextFuncGetLabel(const KbContext* context, int labelIndex) {
 }
 
 void contextCtrlResetCounter(KbContext* context) {
-    context->ctrlStruct.labelCounter = 0;
-    if (context->ctrlStruct.stack) {
-        vlDestroy(context->ctrlStruct.stack, free);
+    context->ctrlFlow.labelCounter = 0;
+    if (context->ctrlFlow.stack) {
+        vlDestroy(context->ctrlFlow.stack, free);
     }
-    context->ctrlStruct.stack = vlNewList();
+    context->ctrlFlow.stack = vlNewList();
 }
 
-KbCtrlStructItem* contextCtrlPush(KbContext* context, int csType) {
-    KbCtrlStructItem* pCsItem = csItemNew(csType);
+KbCtrlFlowItem* contextCtrlPush(KbContext* context, int csType) {
+    KbCtrlFlowItem* pCfItem = csItemNew(csType);
     switch (csType) {
     case KBCS_IF_THEN:
-        pCsItem->iLabelNext = context->ctrlStruct.labelCounter++;
-        pCsItem->iLabelEnd = context->ctrlStruct.labelCounter++;
+        pCfItem->iLabelNext = context->ctrlFlow.labelCounter++;
+        pCfItem->iLabelEnd = context->ctrlFlow.labelCounter++;
         break;
     case KBCS_ELSE_IF:
-        pCsItem->iLabelNext = context->ctrlStruct.labelCounter++;
-        pCsItem->iLabelEnd = -1;
+        pCfItem->iLabelNext = context->ctrlFlow.labelCounter++;
+        pCfItem->iLabelEnd = -1;
         break;
     case KBCS_ELSE:
-        pCsItem->iLabelNext = -1;
-        pCsItem->iLabelEnd = -1;
+        pCfItem->iLabelNext = -1;
+        pCfItem->iLabelEnd = -1;
         break;
     case KBCS_WHILE:
-        pCsItem->iLabelNext = context->ctrlStruct.labelCounter++;
-        pCsItem->iLabelEnd = context->ctrlStruct.labelCounter++;
+        pCfItem->iLabelNext = context->ctrlFlow.labelCounter++;
+        pCfItem->iLabelEnd = context->ctrlFlow.labelCounter++;
         break;
     default:
-        pCsItem->iLabelNext = -1;
-        pCsItem->iLabelEnd = -1;
+        pCfItem->iLabelNext = -1;
+        pCfItem->iLabelEnd = -1;
     }
-    vlPushBack(context->ctrlStruct.stack, pCsItem);
-    contextCtrlAddLabel(context, pCsItem->iLabelNext);
-    contextCtrlAddLabel(context, pCsItem->iLabelEnd);
+    vlPushBack(context->ctrlFlow.stack, pCfItem);
+    contextCtrlAddLabel(context, pCfItem->iLabelNext);
+    contextCtrlAddLabel(context, pCfItem->iLabelEnd);
     
-    return pCsItem;
+    return pCfItem;
 }
 
 KbUserFunc* contextFuncAdd(KbContext* context, const char* funcName, int numArg) {
@@ -1446,7 +1446,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
     if (token->type == TOKEN_END) {
         /* 什么也不做 */
     }
-    /* 函数定义 */
+    /* func 函数定义 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_FUNC, token->content)) {
         KbUserFunc* pUserFunc = NULL;
     
@@ -1455,8 +1455,8 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
             compileLineReturnWithError(KBE_SYNTAX_ERROR, ", nested function not allowed.");
         }
         /* 当前控制结构还没结束 */
-        if (context->ctrlStruct.stack->size > 0) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", cannot define function in control structure.");
+        if (context->ctrlFlow.stack->size > 0) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", cannot define function in control flow.");
         }
         /* 匹配函数名称 */
         token = nextToken(&analyzer);
@@ -1497,6 +1497,10 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
                     if (varIndex < 0) {
                         compileLineReturnWithError(KBE_TOO_MANY_VAR, varName);
                     }
+                }
+                /* 变量已经存在了，报错 */
+                else {
+                    compileLineReturnWithError(KBE_DUPLICATED_VAR, varName);
                 }
                 /* 尝试下一个token */
                 token = nextToken(&analyzer);
@@ -1600,12 +1604,12 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         }
         /* 从栈顶向下寻找循环语句 */
         else {
-            VlistNode* node = context->ctrlStruct.stack->tail;
+            VlistNode* node = context->ctrlFlow.stack->tail;
             int found = 0;
             while (node) {
-                const KbCtrlStructItem* pCsItem;
-                pCsItem = (KbCtrlStructItem *)(node->data);
-                if (pCsItem->csType == KBCS_WHILE) {
+                const KbCtrlFlowItem* pCfItem;
+                pCfItem = (KbCtrlFlowItem *)(node->data);
+                if (pCfItem->csType == KBCS_WHILE) {
                     found = 1;
                     break;
                 }
@@ -1652,11 +1656,11 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
                 int peakCsType = contextCtrlPeekType(context);
                 /* 先弹出 else / else if */
                 if (peakCsType == KBCS_ELSE || peakCsType == KBCS_ELSE_IF) {
-                    csItemRelease(vlPopBack(context->ctrlStruct.stack));
+                    csItemRelease(vlPopBack(context->ctrlFlow.stack));
                 }
                 /* 弹出 if，结束 */
                 else if (peakCsType == KBCS_IF_THEN) {
-                    csItemRelease(vlPopBack(context->ctrlStruct.stack));
+                    csItemRelease(vlPopBack(context->ctrlFlow.stack));
                     break;
                 }
                 /* 其他的均为错误 */
@@ -1669,7 +1673,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         else if (popTarget == KBCS_WHILE) {
             int peakCsType = contextCtrlPeekType(context);
             if (peakCsType == KBCS_WHILE) {
-                csItemRelease(vlPopBack(context->ctrlStruct.stack));
+                csItemRelease(vlPopBack(context->ctrlFlow.stack));
             }
             /* 其他的均为错误 */
             else {
@@ -1875,11 +1879,11 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         }
         /* if / else 模式 */
         else if (token->type == TOKEN_END) {
-            KbCtrlStructItem* pCsItem;
+            KbCtrlFlowItem* pCfItem;
             KbContextLabel* label;
             /* iLabelNext: 条件不满足的时候，跳去下一条 else if / else */
-            pCsItem = contextCtrlPush(context, KBCS_IF_THEN);
-            label = contextCtrlGetLabel(context, pCsItem->iLabelNext);
+            pCfItem = contextCtrlPush(context, KBCS_IF_THEN);
+            label = contextCtrlGetLabel(context, pCfItem->iLabelNext);
             /* 生成 cmd */
             vlPushBack(context->commandList, opCommandCreateOperator(OPR_NOT));
             vlPushBack(context->commandList, opCommandCreateIfGoto(label));
@@ -1889,13 +1893,13 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_ELSEIF, token->content)) {
         KbContextLabel* label;
         KbContextLabel* prevLabel;
-        KbCtrlStructItem* pCsItem;
-        KbCtrlStructItem* pPrevCsItem;
+        KbCtrlFlowItem* pCfItem;
+        KbCtrlFlowItem* pPrevCsItem;
     
         /* 寻找最近的 if */
-        VlistNode *stackNode = context->ctrlStruct.stack->tail;
+        VlistNode *stackNode = context->ctrlFlow.stack->tail;
         while (stackNode) {
-            pPrevCsItem = (KbCtrlStructItem *)stackNode->data;
+            pPrevCsItem = (KbCtrlFlowItem *)stackNode->data;
             if (pPrevCsItem->csType == KBCS_IF_THEN) break;
             stackNode = stackNode->prev;
         }
@@ -1920,8 +1924,8 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         enDestroy(exprRoot);
 
         /* 找到条件不满足时跳转的标签 */
-        pCsItem = contextCtrlPush(context, KBCS_ELSE_IF);
-        label = contextCtrlGetLabel(context, pCsItem->iLabelNext);
+        pCfItem = contextCtrlPush(context, KBCS_ELSE_IF);
+        label = contextCtrlGetLabel(context, pCfItem->iLabelNext);
 
         /* 生成cmd */
         vlPushBack(context->commandList, opCommandCreateOperator(OPR_NOT));
@@ -1930,12 +1934,12 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
     /* else 语句 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_ELSE, token->content)) {
         KbContextLabel* prevLabel;
-        KbCtrlStructItem* pPrevCsItem;
+        KbCtrlFlowItem* pPrevCsItem;
     
         /* 寻找最近的 if */
-        VlistNode *stackNode = context->ctrlStruct.stack->tail;
+        VlistNode *stackNode = context->ctrlFlow.stack->tail;
         while (stackNode) {
-            pPrevCsItem = (KbCtrlStructItem *)stackNode->data;
+            pPrevCsItem = (KbCtrlFlowItem *)stackNode->data;
             if (pPrevCsItem->csType == KBCS_IF_THEN) break;
             stackNode = stackNode->prev;
         }
@@ -1955,10 +1959,10 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_WHILE, token->content)) {
         KbContextLabel* labelEnd;
         KbContextLabel* labelStart;
-        KbCtrlStructItem* pCsItem;
-        pCsItem = contextCtrlPush(context, KBCS_WHILE);
+        KbCtrlFlowItem* pCfItem;
+        pCfItem = contextCtrlPush(context, KBCS_WHILE);
         /* 循环开头的标签，更新位置 */
-        labelStart = contextCtrlGetLabel(context, pCsItem->iLabelNext);
+        labelStart = contextCtrlGetLabel(context, pCfItem->iLabelNext);
         labelStart->pos = context->commandList->size;
         /* 编译表达式 */
         exprRoot = buildExprTree(&analyzer);
@@ -1969,7 +1973,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         }
         enDestroy(exprRoot);
         /* 不满足的时候跳转标签 */
-        labelEnd = contextCtrlGetLabel(context, pCsItem->iLabelEnd);
+        labelEnd = contextCtrlGetLabel(context, pCfItem->iLabelEnd);
         /* 生成cmd */
         vlPushBack(context->commandList, opCommandCreateOperator(OPR_NOT));
         vlPushBack(context->commandList, opCommandCreateIfGoto(labelEnd));
@@ -1977,24 +1981,24 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
     /* break 语句 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_BREAK, token->content)) {
         /* 从栈顶向下寻找循环语句 */
-        VlistNode*          node = context->ctrlStruct.stack->tail;
-        KbCtrlStructItem*   pCsItem;
+        VlistNode*          node = context->ctrlFlow.stack->tail;
+        KbCtrlFlowItem*   pCfItem;
         KbContextLabel*     label;
         while (node) {
-            pCsItem = (KbCtrlStructItem *)(node->data);
-            if (pCsItem->csType == KBCS_WHILE) {
+            pCfItem = (KbCtrlFlowItem *)(node->data);
+            if (pCfItem->csType == KBCS_WHILE) {
                 break;
             }
             node = node->prev;
         }
         /* 生成cmd，跳转回循环结束 */
-        label = contextCtrlGetLabel(context, pCsItem->iLabelEnd);
+        label = contextCtrlGetLabel(context, pCfItem->iLabelEnd);
         vlPushBack(context->commandList, opCommandCreateGoto(label));
     }
     /* end 语句 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_END, token->content)) {
         KbContextLabel* label;
-        KbCtrlStructItem* pPrevCsItem;
+        KbCtrlFlowItem* pPrevCsItem;
         int popTarget = KBCS_NONE;
         int popFunc = 0;
         /* 获取 end 之后的 token，可以是 if / while */
@@ -2041,7 +2045,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
                         label->pos = context->commandList->size;
                     }
                 }
-                csItemRelease(vlPopBack(context->ctrlStruct.stack));
+                csItemRelease(vlPopBack(context->ctrlFlow.stack));
                 if (csType == KBCS_IF_THEN) {
                     break;
                 }
@@ -2058,7 +2062,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
             label = contextCtrlGetLabel(context, pPrevCsItem->iLabelEnd);
             label->pos = context->commandList->size;
             /* 弹出 while */
-            csItemRelease(vlPopBack(context->ctrlStruct.stack));
+            csItemRelease(vlPopBack(context->ctrlFlow.stack));
         }
     }
     /* exit 语句 */
@@ -2166,15 +2170,26 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
     else if (token->type == TOKEN_ID) {
         char    varName[KB_TOKEN_LENGTH_MAX];
         int     varIndex;
-
+        int     isFuncScope = context->pCurrentFunc != NULL;
+        int     isLocalVar = 0;
+    
         StringCopy(varName, sizeof(varName), token->content);
 
         /* 尝试下一个 token */
         token = nextToken(&analyzer);
         /* 匹配 '=' */ 
         if (token->type == TOKEN_OPR && StringEqual("=", token->content)) {
-            /* 检查变量是否已经定义 */
-            varIndex = contextGetVariableIndex(context, varName);
+            /* 当前在函数内，先尝试在函数内寻找 */
+            if (isFuncScope) {
+                varIndex = contextGetLocalVariableIndex(context, varName);
+                if (varIndex >= 0) {
+                    isLocalVar = 1;
+                }
+            }
+            /* 如果没找到，或者在全局，再在全局寻找 */
+            if (varIndex < 0) {
+                varIndex = contextGetVariableIndex(context, varName);
+            }
             if (varIndex < 0) {
                 errorRet->errorPos = 0;
                 errorRet->errorType = KBE_UNDEFINED_IDENTIFIER;
@@ -2190,7 +2205,12 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
             }
             enDestroy(exprRoot);
             /* 生成cmd，赋值 */
-            vlPushBack(context->commandList, opCommandCreateAssignVar(varIndex));
+            if (isLocalVar) {
+                vlPushBack(context->commandList, opCommandCreateAssignLocal(varIndex));
+            }
+            else {
+                vlPushBack(context->commandList, opCommandCreateAssignVar(varIndex));
+            }
         }
         /* 其他情况，此行是表达式 */
         else {
@@ -2267,7 +2287,7 @@ int kbSerialize(
     VlistNode*          node;
 
     /*
-    ---------- layout ----------
+    ---------- layout ----------   <--- 0
     |                          |
     |        * header *        |
     |                          |
@@ -2349,7 +2369,7 @@ int kbSerialize(
     return 1;
 }
 
-void dbgPrintHeader(KbBinaryHeader* h) {
+void dbgPrintHeader(const KbBinaryHeader* h) {
     printf("header              = 0x%x\n",  h->headerMagic);
     printf("variable num        = %d\n",    h->numVariables);
     printf("func block start    = %d\n",    h->funcBlockStart);

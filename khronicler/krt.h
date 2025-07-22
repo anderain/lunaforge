@@ -37,8 +37,10 @@ typedef struct {
     } data;
 } KbRuntimeValue;
 
-void rtvalueDestroy             (KbRuntimeValue* val);
-void rtvalueDestoryVoidPointer  (void* p);
+KbRuntimeValue* rtvalueCreateNumber         (const KB_FLOAT num);
+KbRuntimeValue* rtvalueCreateString         (const char* sz);
+void            rtvalueDestroy              (KbRuntimeValue* val);
+void            rtvalueDestoryVoidPointer   (void* p);
 
 typedef struct {
     int                 prevCmdPos;
@@ -47,13 +49,13 @@ typedef struct {
 } KbCallEnv;
 
 typedef struct {
-    KbBinaryHeader*     header;
-    Vlist*              stack;          /* <KbRuntimeValue> */
-    KbOpCommand *       cmdPtr;
-    unsigned char*      raw;
-    KbRuntimeValue**    variables;
-    Vlist*              callEnvStack;   /* <KbCallEnv> */
-    KbExportedFunction* pExportedFunc;
+    const KbBinaryHeader*   header;
+    Vlist*                  stack;          /* <KbRuntimeValue> */
+    KbOpCommand *           cmdPtr;
+    const unsigned char*    raw;
+    KbRuntimeValue**        variables;
+    Vlist*                  callEnvStack;   /* <KbCallEnv> */
+    KbExportedFunction*     pExportedFunc;
 } KbMachine;
 
 typedef struct {
@@ -62,12 +64,16 @@ typedef struct {
     char    message[KB_ERROR_MESSAGE_MAX];
 } KbRuntimeError;
 
-KbMachine*  machineCreate       (unsigned char * raw);
-void        machineCommandReset (KbMachine* machine);
-int         machineGetLabelPos  (KbMachine* machine, const char* labelName);
-int         machineExec         (KbMachine* machine, int startPos, KbRuntimeError *errorRet);
-void        machineDestroy      (KbMachine* machine);
-int         machineVarAssignNum (KbMachine* machine, int varIndex, KB_FLOAT num);
-void        formatExecError     (const KbRuntimeError *errorRet, char *message, int messageLength);
+KbMachine*  machineCreate                   (const unsigned char * raw);
+void        machineCommandReset             (KbMachine* machine);
+int         machineGetLabelPos              (KbMachine* machine, const char* labelName);
+int         machineExec                     (KbMachine* machine, int startPos, KbRuntimeError *errorRet);
+void        machineDestroy                  (KbMachine* machine);
+int         machineVarAssignNum             (KbMachine* machine, int varIndex, KB_FLOAT num);
+void        machineMovePushValue            (KbMachine* machine, KbRuntimeValue* pRtValue);
+int         machineGetUserFuncIndex         (KbMachine* machine, const char* funcName);
+int         machineExecCallUserFuncByIndex  (KbMachine* machine, int funcIndex, KbRuntimeError *errorRet);
+#define     machinePopUserFuncRetValue(app) ((KbRuntimeValue *)vlPopBack((app)->stack))
+void        formatExecError                 (const KbRuntimeError *errorRet, char *message, int messageLength);
 
 #endif

@@ -18,7 +18,7 @@ typedef enum {
     KBE_DUPLICATED_LABEL,
     KBE_DUPLICATED_VAR,
     KBE_UNDEFINED_LABEL,
-    KBE_INCOMPLETE_CTRL_STRUCT,
+    KBE_INCOMPLETE_CTRL_FLOW,
     KBE_INCOMPLETE_FUNC,
     KBE_OTHER
 } KB_BUILD_ERROR;
@@ -52,7 +52,7 @@ typedef struct {
     int csType;
     int iLabelNext;
     int iLabelEnd;
-} KbCtrlStructItem;
+} KbCtrlFlowItem;
 
 typedef struct {
     char    funcName[KN_ID_LEN_MAX + 1];
@@ -73,8 +73,8 @@ typedef struct {
     Vlist*      userFuncList;   /* <KbUserFunc> */
     struct {
         int     labelCounter;
-        Vlist*  stack;          /* <KbCtrlStructItem> */
-    } ctrlStruct;
+        Vlist*  stack;          /* <KbCtrlFlowItem> */
+    } ctrlFlow;
     int         funcLabelCounter;
     KbUserFunc* pCurrentFunc;
 } KbContext;
@@ -84,18 +84,18 @@ void        contextDestroy          (KbContext *context);
 int         contextSetVariable      (KbContext *context, const char * varName);
 void        contextCtrlResetCounter (KbContext* context);
 
-int         kbFormatBuildError(const KbBuildError *errorVal, char *strBuffer, int strLengthMax);
-
+int         kbFormatBuildError      (const KbBuildError *errorVal, char *strBuffer, int strLengthMax);
 KbContext*  kbCompileStart          ();
 int         kbScanLineSyntax        (const char* line, KbContext *context, KbBuildError *errorRet);
 int         kbCompileLine           (const char* lineContent, KbContext *context, KbBuildError *pErrorRet);
 int         kbCompileEnd            (KbContext* context);
 int         kbSerialize             (const KbContext* context, unsigned char** pRaw, int* pByteLength);
 
-void dbgPrintContextCommandList (const KbContext *context);
-void dbgPrintContextVariables   (const KbContext *context);
-void dbgPrintContextListText    (const KbContext *context);
-void dbgPrintContextListLabel   (const KbContext *context);
-void dbgPrintContextListFunction(const KbContext *context);
+void dbgPrintContextCommandList     (const KbContext *context);
+void dbgPrintContextVariables       (const KbContext *context);
+void dbgPrintContextListText        (const KbContext *context);
+void dbgPrintContextListLabel       (const KbContext *context);
+void dbgPrintContextListFunction    (const KbContext *context);
+void dbgPrintHeader                 (const KbBinaryHeader *);
 
 #endif

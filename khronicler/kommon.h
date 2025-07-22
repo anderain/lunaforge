@@ -16,6 +16,7 @@
 
 typedef unsigned int KDword;
 typedef unsigned char KByte;
+typedef unsigned short KWord;
 
 #define KB_FLOAT                        float
 #define KB_ERROR_MESSAGE_MAX            200
@@ -54,11 +55,11 @@ typedef Vlist VQueue;
 // Command
 
 typedef struct {
-    unsigned int op;
+    KDword op;
     union {
-        KB_FLOAT        number;
-        unsigned int    index;
-        void *          ptr;
+        KB_FLOAT    number;
+        KDword      index;
+        void*       ptr;
     } param;
 } KbOpCommand;
 
@@ -142,8 +143,6 @@ typedef struct {
     KDword stringBlockStart;    /* string start position */
     KDword stringBlockLength;   /* length of string block */
 } KbBinaryHeader;
-
-void dbgPrintHeader(KbBinaryHeader *);
 
 #define endianSwapDword(l) (unsigned int)((((l) & 0x000000ff) << 24) | (((l) & 0x0000ff00) << 8) | (((l) & 0xff000000) >> 24) | (((l) & 0x00ff0000) >> 8))
 

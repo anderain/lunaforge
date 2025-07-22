@@ -105,11 +105,15 @@ void callEnvDestroy(KbCallEnv * pEnv) {
     free(pEnv);
 }
 
+void callEnvDestroyVoidPtr(void* pEnv) {
+    callEnvDestroy(pEnv);
+}
+
 void machineCommandReset(KbMachine* machine) {
     machine->cmdPtr = (KbOpCommand *)(machine->raw + machine->header->cmdBlockStart);
 }
 
-KbMachine* machineCreate(unsigned char * raw) {
+KbMachine* machineCreate(const unsigned char * raw) {
     KbMachine* machine;
     int numVar, i;
 
@@ -139,6 +143,7 @@ void machineDestroy(KbMachine* machine) {
     }
     free(machine->variables);
     vlDestroy(machine->stack, rtvalueDestoryVoidPointer);
+    vlDestroy(machine->callEnvStack, callEnvDestroyVoidPtr);
     free(machine);
 }
 
@@ -246,7 +251,34 @@ void dbgPrintContextCommand(const KbOpCommand *cmd);
         );                                                          \
     } NULL
 
-int machineExecCallBuiltInFunc (int funcId, KbMachine* machine, KbRuntimeError *errorRet, KbRuntimeValue ** operand);
+int machineExecCallBuiltInFunc(int funcId, KbMachine* machine, KbRuntimeError *errorRet, KbRuntimeValue ** operand);
+
+int machineGetUserFuncIndex(KbMachine* machine, const char* funcName) {
+    int i = 0;
+    for (i = 0; i < machine->header->numFunc; ++i) {
+        const KbExportedFunction* pExpFunc = machine->pExportedFunc + i;
+        if (StringEqual(pExpFunc->funcName, funcName)) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+void machineMovePushValue(KbMachine* machine, KbRuntimeValue* pRtValue) {
+    vlPushBack(machine->stack, pRtValue);
+}
+
+int machineExecCallUserFuncByIndex(KbMachine* machine, int funcIndex, KbRuntimeError *errorRet) {
+    int currentPos = machine->header->numCmd;
+    int i;
+    KbExportedFunction* pExpFunc = machineGetFunctionByIndex(machine, funcIndex);
+    KbCallEnv *pEnv = callEnvCreate(currentPos, pExpFunc);
+    for (i = 0; i < pEnv->numArg; ++i) {
+        pEnv->variables[pEnv->numArg - 1 - i] = (KbRuntimeValue *)vlPopBack(machine->stack);
+    }
+    vlPushBack(machine->callEnvStack, pEnv);
+    return machineExec(machine, pExpFunc->pos, errorRet);
+}
 
 int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
     KbOpCommand*    cmdBlockPtr = machineCmdStartPointer(machine);
