@@ -24,13 +24,6 @@ KbRuntimeValue* rtvalueCreateNumber(const KB_FLOAT num) {
     return v;
 }
 
-KbRuntimeValue* rtvalueCreateInteger(int intVal) {
-    KbRuntimeValue* v = (KbRuntimeValue *)malloc(sizeof(KbRuntimeValue));
-    v->type = RVT_INTEGER;
-    v->data.intVal = intVal;
-    return v;
-}
-
 KbRuntimeValue* rtvalueCreateString(const char* sz) {
     KbRuntimeValue* v = (KbRuntimeValue *)malloc(sizeof(KbRuntimeValue));
     v->type = RVT_STRING;
@@ -88,6 +81,30 @@ void rtvalueDestoryVoidPointer(void* p) {
     rtvalueDestroy((KbRuntimeValue *)p);
 }
 
+KbCallEnv* callEnvCreate(int prevCmdPos, KbExportedFunction* pExportedFunc) {
+    KbCallEnv* pEnv = (KbCallEnv *)malloc(sizeof(KbCallEnv));
+    int i;
+    pEnv->numArg = pExportedFunc->numArg;
+    pEnv->numVar = pExportedFunc->numVar;
+    pEnv->prevCmdPos = prevCmdPos;
+    /* 前numArg个变量从栈上取得，不需要初始化 */
+    pEnv->variables  = (KbRuntimeValue **)malloc(sizeof(KbRuntimeValue *) * pEnv->numVar);
+    /* 其他的初始化为0 */
+    for (i = pEnv->numArg; i < pEnv->numVar; ++i) {
+        pEnv->variables[i] = rtvalueCreateNumber(0);
+    }
+    return pEnv;
+}
+
+void callEnvDestroy(KbCallEnv * pEnv) {
+    int numVar = pEnv->numVar, i;
+    for (i = 0; i < numVar; ++i) {
+        rtvalueDestroy(pEnv->variables[i]);
+    }
+    free(pEnv->variables);
+    free(pEnv);
+}
+
 void machineCommandReset(KbMachine* machine) {
     machine->cmdPtr = (KbOpCommand *)(machine->raw + machine->header->cmdBlockStart);
 }
@@ -98,9 +115,11 @@ KbMachine* machineCreate(unsigned char * raw) {
 
     machine = (KbMachine *)malloc(sizeof(KbMachine));
 
-    machine->raw        = raw;
-    machine->header     = (KbBinaryHeader *)raw;
-    machine->stack      = vlNewList();
+    machine->raw            = raw;
+    machine->header         = (KbBinaryHeader *)raw;
+    machine->pExportedFunc  = (KbExportedFunction *)(raw + machine->header->funcBlockStart);
+    machine->stack          = vlNewList();
+    machine->callEnvStack   = vlNewList();
 
     // initialize var with number 0
     numVar = machine->header->numVariables;
@@ -143,6 +162,13 @@ int machineVarAssignNum(KbMachine* machine, int varIndex, KB_FLOAT num) {
     return 1;
 }
 
+KbExportedFunction* machineGetFunctionByIndex(KbMachine* machine, int userFuncIndex) {
+    if (userFuncIndex < 0 || userFuncIndex >= machine->header->numFunc) {
+        return NULL;
+    }
+    return machine->pExportedFunc + userFuncIndex;
+}
+
 extern const char *_KOCODE_NAME[];
 
 #define formatExecErrorAppend(newPart) (p += StringCopy(p, sizeof(buf) - (p - buf), newPart))
@@ -151,33 +177,39 @@ void formatExecError(const KbRuntimeError *errorRet, char *message, int messageL
     char buf[KB_ERROR_MESSAGE_MAX];
     char *p = buf;
 
-    if (errorRet->type == KBRE_OPERAND_TYPE_MISMATCH) {
+    switch(errorRet->type) {
+    case KBRE_OPERAND_TYPE_MISMATCH:
         formatExecErrorAppend("Type mismatch error occurred. The operand was a '");
         formatExecErrorAppend(errorRet->message);
         formatExecErrorAppend("' when performing ");
         formatExecErrorAppend(_KOCODE_NAME[errorRet->cmdOp]);
-    }
-    else if (errorRet->type == KBRE_STACK_OVERFLOW) {
+        break;
+    case KBRE_STACK_OVERFLOW:
         formatExecErrorAppend("Stack overflow occurred. PTR = ");
         formatExecErrorAppend(errorRet->message);
-    }
-    else if (errorRet->type == KBRE_UNKNOWN_BUILT_IN_FUNC) {
+        break;
+    case KBRE_UNKNOWN_BUILT_IN_FUNC:
         formatExecErrorAppend("Unknown built function: ");
         formatExecErrorAppend(errorRet->message);
-    }
-    else if (errorRet->type == KBRE_UNKNOWN_CMD) {
+        break;
+    case KBRE_UNKNOWN_CMD:
         formatExecErrorAppend("Unknown opcode: ");
         formatExecErrorAppend(errorRet->message);
-    }
-    else if (errorRet->type == KBRE_ILLEGAL_RETURN) {
+        break;
+    case KBRE_ILLEGAL_RETURN:
         formatExecErrorAppend("Invalid RETURN command. ");
         formatExecErrorAppend(errorRet->message);
-    }
-    else {
+        break;
+    case KBRE_NOT_IN_USER_FUNC:
+        formatExecErrorAppend("Cannot execute this command out of function.");
+        formatExecErrorAppend(errorRet->message);
+        break;
+    default:
         formatExecErrorAppend("Other problems occurred during runtime. ");
         if (!StringEqual(errorRet->message, "")) {
              formatExecErrorAppend(errorRet->message);
         }
+        break;
     }
 
     StringCopy(message, messageLength, buf);
@@ -216,24 +248,6 @@ void dbgPrintContextCommand(const KbOpCommand *cmd);
 
 int machineExecCallBuiltInFunc (int funcId, KbMachine* machine, KbRuntimeError *errorRet, KbRuntimeValue ** operand);
 
-int machineGetLabelPos(KbMachine* machine, const char* labelName) {
-    int numLabel = machine->header->numLabel;
-    KbExportedLabel* pLabel = (KbExportedLabel *)(machine->raw + machine->header->labelBlockStart);
-    int i;
-    for (i = 0; i < numLabel; ++i) {
-        if (StringEqual(pLabel[i].labelName, labelName)) {
-            return pLabel[i].pos;
-        }
-    }
-    return -1;
-}
-
-int machineExecGoSub(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
-    /* Add PUSH_OFFSET command to end of cmd */
-    vlPushBack(machine->stack, rtvalueCreateInteger(machine->header->numCmd));
-    return machineExec(machine, startPos, errorRet);
-}
-
 int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
     KbOpCommand*    cmdBlockPtr = machineCmdStartPointer(machine);
     int             numCmd = machine->header->numCmd;
@@ -249,7 +263,7 @@ int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
     while (machine->cmdPtr - cmdBlockPtr < numCmd) {
         KbOpCommand* cmd = machine->cmdPtr;
         
-        // printf("[%04d] ", machine->cmdPtr - cmdBlockPtr); dbgPrintContextCommand(cmd);
+        // printf("        [%04d] ", machine->cmdPtr - cmdBlockPtr); dbgPrintContextCommand(cmd);
 
         switch(cmd->op) {
             case KBO_NUL: {
@@ -257,6 +271,17 @@ int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
             }
             case KBO_PUSH_VAR: {
                 KbRuntimeValue *varValue = machine->variables[cmd->param.index];
+                vlPushBack(machine->stack, rtvalueDuplicate(varValue));
+	            break;
+            }
+            case KBO_PUSH_LOCAL: {
+                KbRuntimeValue* varValue;
+                KbCallEnv* pCallEnv;
+                if (machine->callEnvStack->size <= 0) {
+                    execReturnErrorWithInt(KBRE_NOT_IN_USER_FUNC, cmd->op);
+                }
+                pCallEnv = (KbCallEnv *)machine->callEnvStack->tail->data;
+                varValue = pCallEnv->variables[cmd->param.index];
                 vlPushBack(machine->stack, rtvalueDuplicate(varValue));
 	            break;
             }
@@ -471,11 +496,35 @@ int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
                 }
 	            break;
             }
+            case KBO_CALL_USER: {
+                int i;
+                int currentPos = machine->cmdPtr - cmdBlockPtr;
+                KbExportedFunction* pExpFunc = machineGetFunctionByIndex(machine, cmd->param.index);
+                KbCallEnv *pEnv = callEnvCreate(currentPos, pExpFunc);
+                for (i = 0; i < pEnv->numArg; ++i) {
+                    pEnv->variables[pEnv->numArg - 1 - i] = (KbRuntimeValue *)vlPopBack(machine->stack);
+                }
+                vlPushBack(machine->callEnvStack, pEnv);
+                machine->cmdPtr = cmdBlockPtr + pExpFunc->pos;
+                continue;
+            }
             case KBO_ASSIGN_VAR: {
                 KbRuntimeValue *varValue = machine->variables[cmd->param.index];
                 KbRuntimeValue *popped = (KbRuntimeValue *)vlPopBack(machine->stack);
                 rtvalueDestroy(varValue);
                 machine->variables[cmd->param.index] = popped;
+	            break;
+            }
+            case KBO_ASSIGN_LOCAL: {
+                KbCallEnv* pCallEnv;
+                if (machine->callEnvStack->size <= 0) {
+                    execReturnErrorWithInt(KBRE_NOT_IN_USER_FUNC, cmd->op);
+                }
+                pCallEnv = (KbCallEnv *)machine->callEnvStack->tail->data;
+                KbRuntimeValue *varValue = pCallEnv->variables[cmd->param.index];
+                KbRuntimeValue *popped = (KbRuntimeValue *)vlPopBack(machine->stack);
+                rtvalueDestroy(varValue);
+                pCallEnv->variables[cmd->param.index] = popped;
 	            break;
             }
             case KBO_GOTO: {
@@ -498,23 +547,15 @@ int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
                 }
                 break;
             }
-            case KBO_PUSH_OFFSET: {
-                vlPushBack(machine->stack, rtvalueCreateInteger(machine->cmdPtr - cmdBlockPtr));
-                break;
-            }
             case KBO_RETURN: {
-                KbRuntimeValue *rtOffset;
-                if (machine->stack->size <= 0) {
-                    execReturnErrorWithInt(KBRE_ILLEGAL_RETURN, cmd->op);
+                KbCallEnv* pCallEnv;
+                if (machine->callEnvStack->size <= 0) {
+                    execReturnErrorWithInt(KBRE_NOT_IN_USER_FUNC, cmd->op);
                 }
-                rtOffset = (KbRuntimeValue *)vlPopBack(machine->stack);
-                int offset = 0;
-                if (rtOffset->type != RVT_INTEGER) {
-                    execReturnErrorWithInt(KBRE_ILLEGAL_RETURN, cmd->op);
-                }
-                offset = rtOffset->data.intVal + 1; /* 跳过后面的goto */
-                machine->cmdPtr = cmdBlockPtr + offset;
-                break;
+                pCallEnv = (KbCallEnv *)vlPopBack(machine->callEnvStack);
+                machine->cmdPtr = cmdBlockPtr + pCallEnv->prevCmdPos + 1;
+                callEnvDestroy(pCallEnv);
+                continue;
             }
             case KBO_STOP: {
 	            goto stopExec;

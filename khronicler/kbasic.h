@@ -3,6 +3,9 @@
 
 #include "kommon.h"
 
+#define CTRL_LABEL_FORMAT "!_CS%03d_"
+#define FUNC_LABEL_FORMAT "!_FC%03d_"
+
 typedef enum {
     KBE_NO_ERROR = 0,
     KBE_SYNTAX_ERROR,
@@ -11,9 +14,12 @@ typedef enum {
     KBE_INVALID_NUM_ARGS,
     KBE_STRING_NO_SPACE,
     KBE_TOO_MANY_VAR,
+    KBE_ID_TOO_LONG,
     KBE_DUPLICATED_LABEL,
+    KBE_DUPLICATED_VAR,
     KBE_UNDEFINED_LABEL,
     KBE_INCOMPLETE_CTRL_STRUCT,
+    KBE_INCOMPLETE_FUNC,
     KBE_OTHER
 } KB_BUILD_ERROR;
 
@@ -25,8 +31,7 @@ typedef struct {
 
 typedef enum {
     KBL_USER = 0,
-    KBL_EXPORT,
-    KBL_CTRL
+    KBL_CTRL,
 } KbLabelType;
 
 typedef struct {
@@ -50,16 +55,28 @@ typedef struct {
 } KbCtrlStructItem;
 
 typedef struct {
-    char        varList[KB_CONTEXT_VAR_MAX][KB_TOKEN_LENGTH_MAX];
+    char    funcName[KN_ID_LEN_MAX + 1];
+    int     numArg;
+    int     numVar;
+    char    varList[KB_CONTEXT_VAR_MAX][KN_ID_LEN_MAX + 1];
+    int     iLblFuncBegin;
+    int     iLblFuncEnd;
+} KbUserFunc;
+
+typedef struct {
+    char        varList[KB_CONTEXT_VAR_MAX][KN_ID_LEN_MAX + 1];
     int         numVar;
     char        stringBuffer[KB_CONTEXT_STRING_BUFFER_MAX];
     char*       stringBufferPtr;
-    Vlist*      commandList;/* <KbOpCommand> */ 
-    Vlist*      labelList;  /* <KbContextLabel> */
+    Vlist*      commandList;    /* <KbOpCommand> */ 
+    Vlist*      labelList;      /* <KbContextLabel> */
+    Vlist*      userFuncList;   /* <KbUserFunc> */
     struct {
         int     labelCounter;
-        Vlist*  stack;      /* <KbCtrlStructItem> */
+        Vlist*  stack;          /* <KbCtrlStructItem> */
     } ctrlStruct;
+    int         funcLabelCounter;
+    KbUserFunc* pCurrentFunc;
 } KbContext;
 
 KbContext*  contextCreate           ();
@@ -79,5 +96,6 @@ void dbgPrintContextCommandList (const KbContext *context);
 void dbgPrintContextVariables   (const KbContext *context);
 void dbgPrintContextListText    (const KbContext *context);
 void dbgPrintContextListLabel   (const KbContext *context);
+void dbgPrintContextListFunction(const KbContext *context);
 
 #endif

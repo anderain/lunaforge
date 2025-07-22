@@ -19,14 +19,14 @@ typedef enum {
     KBRE_STACK_OVERFLOW,
     KBRE_ILLEGAL_RETURN,
     KBRE_UNKNOWN_BUILT_IN_FUNC,
-    KBRE_UNKNOWN_CMD
+    KBRE_UNKNOWN_CMD,
+    KBRE_NOT_IN_USER_FUNC,
 } KB_RT_ERROR_TYPE;
 
 typedef enum {
     RVT_NIL = 0,
     RVT_NUMBER,
-    RVT_STRING,
-    RVT_INTEGER
+    RVT_STRING
 } KB_RT_VALUE_TYPE;
 
 typedef struct {
@@ -34,7 +34,6 @@ typedef struct {
     union {
         char *sz;
         KB_FLOAT num;
-        int intVal;
     } data;
 } KbRuntimeValue;
 
@@ -42,11 +41,19 @@ void rtvalueDestroy             (KbRuntimeValue* val);
 void rtvalueDestoryVoidPointer  (void* p);
 
 typedef struct {
-    KbBinaryHeader*     header;
-    Vlist*              stack;  /* <KbRuntimeValue> */
-    KbOpCommand *       cmdPtr;
-    unsigned char *     raw;
+    int                 prevCmdPos;
+    int                 numVar, numArg;
     KbRuntimeValue**    variables;
+} KbCallEnv;
+
+typedef struct {
+    KbBinaryHeader*     header;
+    Vlist*              stack;          /* <KbRuntimeValue> */
+    KbOpCommand *       cmdPtr;
+    unsigned char*      raw;
+    KbRuntimeValue**    variables;
+    Vlist*              callEnvStack;   /* <KbCallEnv> */
+    KbExportedFunction* pExportedFunc;
 } KbMachine;
 
 typedef struct {
@@ -59,7 +66,6 @@ KbMachine*  machineCreate       (unsigned char * raw);
 void        machineCommandReset (KbMachine* machine);
 int         machineGetLabelPos  (KbMachine* machine, const char* labelName);
 int         machineExec         (KbMachine* machine, int startPos, KbRuntimeError *errorRet);
-int         machineExecGoSub    (KbMachine* machine, int startPos, KbRuntimeError *errorRet);
 void        machineDestroy      (KbMachine* machine);
 int         machineVarAssignNum (KbMachine* machine, int varIndex, KB_FLOAT num);
 void        formatExecError     (const KbRuntimeError *errorRet, char *message, int messageLength);

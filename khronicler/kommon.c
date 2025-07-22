@@ -110,6 +110,7 @@ void vlDestroy(Vlist* _self, void (* releaseData)(void *)) {
 const char *_KOCODE_NAME[] = {
     "NUL",
     "PUSH_VAR",
+    "PUSH_LOCAL",
     "PUSH_NUM",
     "PUSH_STR",
     "POP",
@@ -131,10 +132,11 @@ const char *_KOCODE_NAME[] = {
     "GTEQ",
     "LTEQ",
     "CALL_BUILT_IN",
+    "CALL_USER",
     "ASSIGN_VAR",
+    "ASSIGN_LOCAL",
     "GOTO",
     "IFGOTO",
-    "PUSH_OFFSET",
     "RETURN",
     "STOP"
 };

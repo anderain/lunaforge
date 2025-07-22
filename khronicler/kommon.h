@@ -21,8 +21,8 @@ typedef unsigned char KByte;
 #define KB_ERROR_MESSAGE_MAX            200
 #define KB_TOKEN_LENGTH_MAX             50
 #define KB_CONTEXT_VAR_MAX              32
-#define KB_CONTEXT_STRING_BUFFER_MAX    300
-#define KB_LABEL_MAX                    15
+#define KB_CONTEXT_STRING_BUFFER_MAX    1000
+#define KN_ID_LEN_MAX                   15
 
 // Node of List
 typedef struct tagVlistNode {
@@ -67,6 +67,7 @@ typedef struct {
 typedef enum {
     KBO_NUL = 0,
     KBO_PUSH_VAR,       // push / pop actions
+    KBO_PUSH_LOCAL,     //
     KBO_PUSH_NUM,
     KBO_PUSH_STR,
     KBO_POP,
@@ -88,10 +89,11 @@ typedef enum {
     KBO_OPR_GTEQ,
     KBO_OPR_LTEQ,
     KBO_CALL_BUILT_IN,  // call built-in function
+    KBO_CALL_USER,      //
     KBO_ASSIGN_VAR,     // assign to variable
+    KBO_ASSIGN_LOCAL,   // assign to local variable
     KBO_GOTO,           // goto commands
     KBO_IFGOTO,
-    KBO_PUSH_OFFSET,    // push_offset + goto = gosub
     KBO_RETURN,         // return
     KBO_STOP            // stop command
 } KB_OPCODE;
@@ -116,8 +118,10 @@ extern const char *_KOCODE_NAME[];
 
 typedef struct {
     int     pos;
-    char    labelName[KB_LABEL_MAX + 1];
-} KbExportedLabel;
+    int     numArg;
+    int     numVar;
+    char    funcName[KN_ID_LEN_MAX + 1];
+} KbExportedFunction;
 
 typedef struct {
     /* File header magick number */
@@ -126,9 +130,9 @@ typedef struct {
     /* Number of variables */
     KDword numVariables;
 
-    /* Exported labels*/
-    KDword labelBlockStart;     /* labels start position */
-    KDword numLabel;            /* number of labels */
+    /* Exported function */
+    KDword funcBlockStart;     /* function start position */
+    KDword numFunc;            /* number of functions */
 
     /* Blocks Commands */
     KDword cmdBlockStart;       /* cmd start position */

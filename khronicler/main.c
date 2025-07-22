@@ -107,13 +107,17 @@ int buildFromKBasic(const char *fileName, const char * outputFileName) {
             goto compileEnd;
         }
     }
+    --lineCount;
 
-    isSuccess = 0;
-    goto compileEnd;
-
-    /*
-        检查是不是有没结束的控制结构
-     */
+    /* 检查是不是有没结束的函数定义 */
+    if (context->pCurrentFunc != NULL) {
+        errorRet.errorPos = 0;
+        errorRet.errorType = KBE_INCOMPLETE_FUNC;
+        errorRet.message[0] = '\0';
+        isSuccess = 0;
+        goto compileEnd;
+    }
+    /* 检查是不是有没结束的控制结构 */
     if (context->ctrlStruct.stack->size > 0) {
         errorRet.errorPos = 0;
         errorRet.errorType = KBE_INCOMPLETE_CTRL_STRUCT;
@@ -159,6 +163,9 @@ compileEnd:
             puts("-------- VARIABLE --------");
             dbgPrintContextVariables(context);
 
+            puts("-------- FUNCTIONS --------");
+            dbgPrintContextListFunction(context);
+        
             puts("-------- LABELS --------");
             dbgPrintContextListLabel(context);
 
@@ -225,7 +232,6 @@ int debugBinary(const char* binFileName) {
     KbMachine*      app;
     const char*     filename = binFileName;
     unsigned char*  raw;
-    int             labelPos;
 
     raw = readBinaryFile(filename);
     app = machineCreate(raw);
@@ -246,18 +252,7 @@ int debugBinary(const char* binFileName) {
         printf("Runtime Error: %s\n%s\n", filename, error_message);
     }
 
-    labelPos = machineGetLabelPos(app, "helloWorld");
-    if (labelPos < 0) {
-        printf("error, label not found\n");
-    } else {
-        ret = machineExecGoSub(app, labelPos, &errorRet);
-        if (!ret) {
-            char error_message[200];
-            formatExecError(&errorRet, error_message, sizeof(error_message));
-            printf("Runtime Error: %s\n%s\n", filename, error_message);
-        }
-    }
-
+    printf("Call stack = %d, Value stack = %d\n", app->callEnvStack->size, app->stack->size);
 
     machineDestroy(app);
     free(raw);
@@ -353,7 +348,8 @@ compileEnd:
 }
 
 int main(int argc, char** argv) {
-    TestAllSyntaxError();
-    // buildFromKBasic("syntax_error_cases.kbs", "test.bin"); // && debugBinary("test.bin");
-    return 0;
+    int ret = 0;
+    // TestAllSyntaxError();
+    ret = buildFromKBasic("test.kbs", "test.bin")  && debugBinary("test.bin");
+    return ret;
 }

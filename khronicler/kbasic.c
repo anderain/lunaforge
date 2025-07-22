@@ -40,7 +40,7 @@ static const KeywordDef KEYWORDS[] = {
 // function: defined num of parameters
 typedef struct {
     const char* funcName;
-    int         numArgs;
+    int         numArg;
     int         funcId;
 } FunctionDef;
 
@@ -692,10 +692,11 @@ int kbFormatBuildError(const KbBuildError *errorVal, char *strBuffer, int strLen
         return 0;
     }
     
-    if (errorVal->errorType == KBE_NO_ERROR) {
+    switch (errorVal->errorType) {
+    case KBE_NO_ERROR: 
         StringCopy(strBuffer, strLengthMax, "No error");
-    }
-    else if (errorVal->errorType == KBE_SYNTAX_ERROR) {
+        break;
+    case KBE_SYNTAX_ERROR: {
         char buf[100];
         sprintf(buf, "(%d) ", errorVal->errorPos);
         kbFormatErrorAppend(buf);
@@ -703,43 +704,58 @@ int kbFormatBuildError(const KbBuildError *errorVal, char *strBuffer, int strLen
         if (!StringEqual("", errorVal->message)) {
             kbFormatErrorAppend(errorVal->message);
         }
+        break;
     }
-    else if (errorVal->errorType == KBE_UNDEFINED_IDENTIFIER) {
+    case KBE_UNDEFINED_IDENTIFIER: 
         kbFormatErrorAppend("Undefined Identifier: ");
         kbFormatErrorAppend(errorVal->message);
-    }
-    else if (errorVal->errorType == KBE_UNDEFINED_FUNC) {
+        break;
+    case KBE_UNDEFINED_FUNC:
         kbFormatErrorAppend("Undefined Function: ");
         kbFormatErrorAppend(errorVal->message);
-    }
-    else if (errorVal->errorType == KBE_INVALID_NUM_ARGS) {
-        kbFormatErrorAppend("Wrong number of arguments of function \"");
+        break;
+    case KBE_INVALID_NUM_ARGS:
+        kbFormatErrorAppend("Wrong number of arguments to function \"");
         kbFormatErrorAppend(errorVal->message);
         kbFormatErrorAppend("\"");
-    }
-    else if (errorVal->errorType == KBE_STRING_NO_SPACE) {
+        break;
+    case KBE_STRING_NO_SPACE:
         kbFormatErrorAppend("No enough space for string");
-    }
-    else if (errorVal->errorType == KBE_TOO_MANY_VAR) {
+        break;
+    case KBE_TOO_MANY_VAR:
         kbFormatErrorAppend("Too many variables. Failed to declare \"");
         kbFormatErrorAppend(errorVal->message);
         kbFormatErrorAppend("\"");
-    }
-    else if (errorVal->errorType == KBE_DUPLICATED_LABEL) {
+        break;
+    case KBE_ID_TOO_LONG:
+        kbFormatErrorAppend("Identifier too long \"");
+        kbFormatErrorAppend(errorVal->message);
+        kbFormatErrorAppend("\"");
+        break;
+    case KBE_DUPLICATED_LABEL:
         kbFormatErrorAppend("Duplicated label: \"");
         kbFormatErrorAppend(errorVal->message);
         kbFormatErrorAppend("\"");
-    }
-    else if (errorVal->errorType == KBE_UNDEFINED_LABEL) {
+        break;
+    case KBE_DUPLICATED_VAR:
+        kbFormatErrorAppend("Duplicated variable: \"");
+        kbFormatErrorAppend(errorVal->message);
+        kbFormatErrorAppend("\"");
+        break;
+    case KBE_UNDEFINED_LABEL:
         kbFormatErrorAppend("Undefined label: \"");
         kbFormatErrorAppend(errorVal->message);
         kbFormatErrorAppend("\"");
-    }
-    else if (errorVal->errorType == KBE_INCOMPLETE_CTRL_STRUCT) {
+        break;
+    case KBE_INCOMPLETE_CTRL_STRUCT:
         kbFormatErrorAppend("Incomplete control structure, missing 'end'.");
-    }
-    else if (errorVal->errorType == KBE_OTHER) {
+        break;
+    case KBE_INCOMPLETE_FUNC:
+        kbFormatErrorAppend("Incomplete function.");
+        break;
+    case KBE_OTHER:
         kbFormatErrorAppend(errorVal->message);
+        break;
     }
 
     return 1;
@@ -816,9 +832,13 @@ KbContext* contextCreate() {
 
     context->commandList = vlNewList();
     context->labelList = vlNewList();
+    context->userFuncList = vlNewList();
 
     context->ctrlStruct.labelCounter = 0;
     context->ctrlStruct.stack = NULL;
+
+    context->pCurrentFunc = NULL;
+    context->funcLabelCounter = 0;
 
     return context;
 }
@@ -827,8 +847,10 @@ void contextDestroy (KbContext *context) {
     if (!context) {
         return;
     }
+    context->pCurrentFunc = NULL;
     vlDestroy(context->commandList, opCommandRelease);
     vlDestroy(context->labelList, free);
+    vlDestroy(context->userFuncList, free);
     if (context->ctrlStruct.stack) {
         vlDestroy(context->ctrlStruct.stack, free);
     }
@@ -841,7 +863,7 @@ int contextSetVariable(KbContext *context, const char * varName) {
         return -1;
     }
 
-    StringCopy(context->varList[context->numVar], KB_CONTEXT_STRING_BUFFER_MAX, varName);
+    StringCopy(context->varList[context->numVar], sizeof(context->varList[0]), varName);
 
     return context->numVar++;
 }
@@ -857,7 +879,31 @@ int contextGetVariableIndex (const KbContext *context, const char * varToFind) {
     return -1;
 }
 
-int contextAppendText(KbContext *context, const char * string) {
+int contextSetLocalVariable(KbContext *context, const char * varName) {
+    KbUserFunc* pUserFunc = context->pCurrentFunc;
+
+    if (pUserFunc->numVar >= KB_CONTEXT_VAR_MAX) {
+        return -1;
+    }
+
+    StringCopy(pUserFunc->varList[pUserFunc->numVar], sizeof(pUserFunc->varList[0]), varName);
+
+    return pUserFunc->numVar++;
+}
+
+int contextGetLocalVariableIndex (const KbContext *context, const char * varToFind) {
+    KbUserFunc* pUserFunc = context->pCurrentFunc;
+    int i;
+    for (i = 0; i < pUserFunc->numVar; ++i) {
+        const char *varName = pUserFunc->varList[i];
+        if (StringEqual(varName, varToFind)) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+int contextAppendText(KbContext* context, const char* string) {
     char *oldBufferPtr = context->stringBufferPtr;
 
     if (context->stringBufferPtr - context->stringBuffer + strlen(string) > KB_CONTEXT_STRING_BUFFER_MAX) {
@@ -882,7 +928,7 @@ KbContextLabel* contextGetLabel(const KbContext *context, const char * labelName
     return NULL;
 }
 
-int contextAddLabel(const KbContext *context, const char * labelName, KbLabelType labelType) {
+KbContextLabel* contextAddLabel(const KbContext *context, const char * labelName, KbLabelType labelType) {
     KbContextLabel* label = NULL;
     
     label = contextGetLabel(context, labelName);
@@ -898,7 +944,7 @@ int contextAddLabel(const KbContext *context, const char * labelName, KbLabelTyp
 
     vlPushBack(context->labelList, label);
 
-    return 1;
+    return label;
 }
 
 KbCtrlStructItem* contextCtrlPeek(const KbContext *context) {
@@ -918,20 +964,7 @@ int contextCtrlPeekType(const KbContext *context) {
     return pCsItem->csType;
 }
 
-#define CTRL_LABEL_FORMAT "!_CS%03d_"
-
-void contextCtrlAddLabel(KbContext* context, int labelIndex) {
-    char szLabelBuf[100];
-
-    if (labelIndex < 0) {
-        return;
-    }
-    sprintf(szLabelBuf, CTRL_LABEL_FORMAT, labelIndex);
-    
-    contextAddLabel(context, szLabelBuf, KBL_CTRL);
-}
-
-KbContextLabel* contextCtrlGetLabel(KbContext* context, int labelIndex) {
+KbContextLabel* contextCtrlAddLabel(KbContext* context, int labelIndex) {
     char szLabelBuf[100];
 
     if (labelIndex < 0) {
@@ -939,6 +972,35 @@ KbContextLabel* contextCtrlGetLabel(KbContext* context, int labelIndex) {
     }
     sprintf(szLabelBuf, CTRL_LABEL_FORMAT, labelIndex);
     
+    return contextAddLabel(context, szLabelBuf, KBL_CTRL);
+}
+
+KbContextLabel* contextFuncAddLabel(KbContext* context, int labelIndex) {
+    char szLabelBuf[100];
+
+    if (labelIndex < 0) {
+        return NULL;
+    }
+    sprintf(szLabelBuf, FUNC_LABEL_FORMAT, labelIndex);
+    
+    return contextAddLabel(context, szLabelBuf, KBL_CTRL);
+}
+
+KbContextLabel* contextCtrlGetLabel(const KbContext* context, int labelIndex) {
+    char szLabelBuf[100];
+    if (labelIndex < 0) {
+        return NULL;
+    }
+    sprintf(szLabelBuf, CTRL_LABEL_FORMAT, labelIndex);
+    return contextGetLabel(context, szLabelBuf);
+}
+
+KbContextLabel* contextFuncGetLabel(const KbContext* context, int labelIndex) {
+    char szLabelBuf[100];
+    if (labelIndex < 0) {
+        return NULL;
+    }
+    sprintf(szLabelBuf, FUNC_LABEL_FORMAT, labelIndex);
     return contextGetLabel(context, szLabelBuf);
 }
 
@@ -980,6 +1042,39 @@ KbCtrlStructItem* contextCtrlPush(KbContext* context, int csType) {
     return pCsItem;
 }
 
+KbUserFunc* contextFuncAdd(KbContext* context, const char* funcName, int numArg) {
+    KbUserFunc* pUserFunc = (KbUserFunc *)malloc(sizeof(KbUserFunc));
+
+    StringCopy(pUserFunc->funcName, KN_ID_LEN_MAX + 1, funcName);
+    pUserFunc->numArg = numArg;
+    pUserFunc->numVar = 0;
+    pUserFunc->iLblFuncBegin = context->funcLabelCounter++;
+    pUserFunc->iLblFuncEnd = context->funcLabelCounter++;
+    vlPushBack(context->userFuncList, pUserFunc);
+
+    contextFuncAddLabel(context, pUserFunc->iLblFuncBegin);
+    contextFuncAddLabel(context, pUserFunc->iLblFuncEnd);
+
+    return pUserFunc;
+}
+
+KbUserFunc* contextFuncFind(KbContext* context, const char* funcName, int* pIndex) {
+    VlistNode* node;
+    int i = 0;
+    for (
+        node = context->userFuncList->head;
+        node != NULL;
+        node = node->next, ++i
+    ) {
+        KbUserFunc* pUserFunc = (KbUserFunc *)node->data;
+        if (StringEqual(funcName, pUserFunc->funcName)) {
+            if (pIndex != NULL) *pIndex = i;
+            return pUserFunc;
+        }
+    }
+    return NULL;
+}
+
 KbOpCommand* opCommandCreateBuiltInFunction(int funcId) {
     KbOpCommand* cmd = (KbOpCommand*)malloc(sizeof(KbOpCommand));
 
@@ -989,10 +1084,28 @@ KbOpCommand* opCommandCreateBuiltInFunction(int funcId) {
     return cmd;
 }
 
+KbOpCommand* opCommandCreateUserFunction(int funcIndex) {
+    KbOpCommand* cmd = (KbOpCommand*)malloc(sizeof(KbOpCommand));
+
+    cmd->op = KBO_CALL_USER;
+    cmd->param.index = funcIndex;
+
+    return cmd;
+}
+
 KbOpCommand* opCommandCreatePushVar(int varIndex) {
     KbOpCommand* cmd = (KbOpCommand*)malloc(sizeof(KbOpCommand));
 
     cmd->op = KBO_PUSH_VAR;
+    cmd->param.index = varIndex;
+
+    return cmd;
+}
+
+KbOpCommand* opCommandCreatePushLocal(int varIndex) {
+    KbOpCommand* cmd = (KbOpCommand*)malloc(sizeof(KbOpCommand));
+
+    cmd->op = KBO_PUSH_LOCAL;
     cmd->param.index = varIndex;
 
     return cmd;
@@ -1034,6 +1147,15 @@ KbOpCommand* opCommandCreateAssignVar(int varIndex) {
     return cmd;
 }
 
+KbOpCommand* opCommandCreateAssignLocal(int varIndex) {
+    KbOpCommand* cmd = (KbOpCommand*)malloc(sizeof(KbOpCommand));
+
+    cmd->op = KBO_ASSIGN_LOCAL;
+    cmd->param.index = varIndex;
+
+    return cmd;
+}
+
 KbOpCommand* opCommandCreateOperator(OperatorType oprType) {
     KbOpCommand* cmd = (KbOpCommand*)malloc(sizeof(KbOpCommand));
 
@@ -1047,15 +1169,6 @@ KbOpCommand* opCommandCreateStop() {
     KbOpCommand* cmd = (KbOpCommand*)malloc(sizeof(KbOpCommand));
 
     cmd->op = KBO_STOP;
-    cmd->param.index = 0;
-
-    return cmd;
-}
-
-KbOpCommand* opCommandCreatePushOffset() {
-    KbOpCommand* cmd = (KbOpCommand*)malloc(sizeof(KbOpCommand));
-
-    cmd->op = KBO_PUSH_OFFSET;
     cmd->param.index = 0;
 
     return cmd;
@@ -1102,32 +1215,47 @@ int compileExprTree(KbContext *context, ExprNode *node, KbBuildError *errorRet) 
     if (node->type == TOKEN_FNC) {
         const FunctionDef*  targetFunc = NULL;
         int                 funcDefLength = sizeof(FUNCTION_LIST) / sizeof(FUNCTION_LIST[0]);
-        
-        for (i = 0; i < funcDefLength; ++i) {
-            const FunctionDef *func = FUNCTION_LIST + i;
-            if (StringEqual(func->funcName, node->content)) {
-                targetFunc = func;
-                break;
+        char*               funcName = node->content;
+        int                 iUserFuncIndex = -1;
+        KbUserFunc*         pFunc = NULL;
+    
+        /* 检查是不是用户定义的函数 */
+        pFunc = contextFuncFind(context, funcName, &iUserFuncIndex);
+        /* 是用户定义的函数 */
+        if (pFunc) {
+            if (pFunc->numArg != node->numChild) {
+                errorRet->errorPos = 0;
+                errorRet->errorType = KBE_INVALID_NUM_ARGS;
+                StringCopy(errorRet->message, KB_ERROR_MESSAGE_MAX, funcName);
+                return 0;
             }
+            vlPushBack(context->commandList, opCommandCreateUserFunction(iUserFuncIndex));
         }
-
-        // undefined function
-        if (targetFunc == NULL) {
-            errorRet->errorPos = 0;
-            errorRet->errorType = KBE_UNDEFINED_FUNC;
-            StringCopy(errorRet->message, KB_ERROR_MESSAGE_MAX, node->content);
-            return 0;
+        /* 尝试寻找内建函数 */
+        else {
+            for (i = 0; i < funcDefLength; ++i) {
+                const FunctionDef *func = FUNCTION_LIST + i;
+                if (StringEqual(func->funcName, funcName)) {
+                    targetFunc = func;
+                    break;
+                }
+            }
+            /* 找不到 */
+            if (targetFunc == NULL) {
+                errorRet->errorPos = 0;
+                errorRet->errorType = KBE_UNDEFINED_FUNC;
+                StringCopy(errorRet->message, KB_ERROR_MESSAGE_MAX, funcName);
+                return 0;
+            }
+            /* 参数数量不正确 */
+            if (targetFunc->numArg != node->numChild) {
+                errorRet->errorPos = 0;
+                errorRet->errorType = KBE_INVALID_NUM_ARGS;
+                StringCopy(errorRet->message, KB_ERROR_MESSAGE_MAX, funcName);
+                return 0;
+            }
+            vlPushBack(context->commandList, opCommandCreateBuiltInFunction(targetFunc->funcId));
         }
-
-        // invalid number of parameters
-        if (targetFunc->numArgs != node->numChild) {
-            errorRet->errorPos = 0;
-            errorRet->errorType = KBE_INVALID_NUM_ARGS;
-            StringCopy(errorRet->message, KB_ERROR_MESSAGE_MAX, node->content);
-            return 0;
-        }
-
-        vlPushBack(context->commandList, opCommandCreateBuiltInFunction(targetFunc->funcId));
     }
     // operator
     else if (node->type == TOKEN_OPR) {
@@ -1135,17 +1263,34 @@ int compileExprTree(KbContext *context, ExprNode *node, KbBuildError *errorRet) 
     }
     // variable
     else if (node->type == TOKEN_ID) {
-        int varIndex = contextGetVariableIndex(context, node->content);
-
-        // undefined variable
+        int varIndex = -1;
+        int isFuncScope = context->pCurrentFunc != NULL;
+        int isLocalVar = 0;
+        char* varName = node->content;
+        /* 当前在函数内，先尝试在函数内寻找 */
+        if (isFuncScope) {
+            varIndex = contextGetLocalVariableIndex(context, varName);
+            if (varIndex >= 0) {
+                isLocalVar = 1;
+            }
+        }
+        /* 如果没找到，或者在全局，再在全局寻找 */
+        if (varIndex < 0) {
+            varIndex = contextGetVariableIndex(context, varName);
+        }
+        /* 变量未定义 */
         if (varIndex < 0) {
             errorRet->errorPos = 0;
             errorRet->errorType = KBE_UNDEFINED_IDENTIFIER;
-            StringCopy(errorRet->message, KB_ERROR_MESSAGE_MAX, node->content);
+            StringCopy(errorRet->message, KB_ERROR_MESSAGE_MAX, varName);
             return 0;
         }
-
-        vlPushBack(context->commandList, opCommandCreatePushVar(varIndex));
+        if (isLocalVar) {
+            vlPushBack(context->commandList, opCommandCreatePushLocal(varIndex));
+        }
+        else {
+            vlPushBack(context->commandList, opCommandCreatePushVar(varIndex));
+        }
     }
     // string
     else if (node->type == TOKEN_STR) {
@@ -1182,9 +1327,12 @@ void dbgPrintContextCommand(const KbOpCommand *cmd) {
     printf("%-15s ", _KOCODE_NAME[cmd->op]);
 
     if (cmd->op == KBO_PUSH_VAR
+     || cmd->op == KBO_PUSH_LOCAL
      || cmd->op == KBO_PUSH_STR
      || cmd->op == KBO_CALL_BUILT_IN
+     || cmd->op == KBO_CALL_USER
      || cmd->op == KBO_ASSIGN_VAR
+     || cmd->op == KBO_ASSIGN_LOCAL
      || cmd->op == KBO_GOTO
      || cmd->op == KBO_IFGOTO) {
         printf("%d", cmd->param.index);
@@ -1197,7 +1345,6 @@ void dbgPrintContextCommand(const KbOpCommand *cmd) {
     else if ((cmd->op >= KBO_OPR_NEG && cmd->op <= KBO_OPR_LTEQ)
      || cmd->op == KBO_POP
      || cmd->op == KBO_STOP
-     || cmd->op == KBO_PUSH_OFFSET
      || cmd->op == KBO_RETURN
     ) {
         // nothing here
@@ -1233,12 +1380,21 @@ void dbgPrintContextListText(const KbContext *context) {
 }
 
 void dbgPrintContextListLabel(const KbContext *context) {
-    static const char * LABEL_TYPE_NAME[] = { "USER", "EXPT", "CTRL" };
+    static const char * LABEL_TYPE_NAME[] = { "USER", "CTRL" };
 
     VlistNode *node = context->labelList->head;
     while (node != NULL) {
         KbContextLabel* label = (KbContextLabel *)node->data;
         printf("%-15s: [%4s] %03d\n", label->name, LABEL_TYPE_NAME[label->type], label->pos);
+        node = node->next;
+    }
+}
+
+void dbgPrintContextListFunction(const KbContext *context) {
+    const VlistNode *node = context->userFuncList->head;
+    while (node != NULL) {
+        const KbUserFunc* pFunc = (KbUserFunc *)node->data;
+        printf("%15s: args=%03d, vars=%03d\n", pFunc->funcName, pFunc->numArg, pFunc->numVar);
         node = node->next;
     }
 }
@@ -1289,6 +1445,73 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
     /* 空行 */
     if (token->type == TOKEN_END) {
         /* 什么也不做 */
+    }
+    /* 函数定义 */
+    else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_FUNC, token->content)) {
+        KbUserFunc* pUserFunc = NULL;
+    
+        /* 当前函数定义还没结束 */
+        if (context->pCurrentFunc != NULL) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", nested function not allowed.");
+        }
+        /* 当前控制结构还没结束 */
+        if (context->ctrlStruct.stack->size > 0) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", cannot define function in control structure.");
+        }
+        /* 匹配函数名称 */
+        token = nextToken(&analyzer);
+        if (token->type != TOKEN_FNC) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, " missing function name");
+        }
+        /* 检查函数名称长度 */
+        if (strlen(token->content) > KN_ID_LEN_MAX) {
+            compileLineReturnWithError(KBE_ID_TOO_LONG, token->content);
+        }
+        /* 在上下文中创建函数 */
+        pUserFunc = contextFuncAdd(context, token->content, 0);
+        context->pCurrentFunc = pUserFunc;
+        /* 尝试下一个token */
+        token = nextToken(&analyzer);
+        /* 右括号结束 */
+        if (token->type == TOKEN_BKT && token->content[0] == ')') {
+            /* 无参数 */
+        }
+        /* 匹配参数列表*/
+        else {
+            int     varIndex = -1;
+            char*   varName = NULL;
+            /* token回退 */
+            rewindToken(&analyzer);
+            while (1) {
+                /* 参数名字 */
+                token = nextToken(&analyzer);
+                if (token->type != TOKEN_ID) {
+                    compileLineReturnWithError(KBE_SYNTAX_ERROR, " in function parameter list.");
+                }
+                pUserFunc->numArg++;
+                /* 把参数名字创建为变量 */
+                varName = token->content;
+                varIndex = contextGetLocalVariableIndex(context, varName);
+                if (varIndex < 0) {
+                    varIndex = contextSetLocalVariable(context, varName);
+                    if (varIndex < 0) {
+                        compileLineReturnWithError(KBE_TOO_MANY_VAR, varName);
+                    }
+                }
+                /* 尝试下一个token */
+                token = nextToken(&analyzer);
+                /* 右括号，结束 */
+                if (token->type == TOKEN_BKT && token->content[0] == ')') {
+                    break;
+                }
+                /* 逗号，继续匹配 */
+                else if (token->type == TOKEN_CMA) {
+                    continue;
+                }
+                /* 错误 */
+                compileLineReturnWithError(KBE_SYNTAX_ERROR, " in function parameter list.");
+            }
+        }
     }
     /* if 语句 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_IF, token->content)) {
@@ -1396,6 +1619,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
     /* end 语句 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_END, token->content)) {
         int popTarget = KBCS_NONE;
+        int popFunc = 0;
         /* 获取 end 之后的 token，可以是 if / while */
         token = nextToken(&analyzer);
         if (token->type == TOKEN_KEY && StringEqual(KEYWORD_IF, token->content)) {
@@ -1403,6 +1627,9 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         }
         else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_WHILE, token->content)) {
             popTarget = KBCS_WHILE;
+        }
+        else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_FUNC, token->content)) {
+            popFunc = 1;
         }
         else {
             compileLineReturnWithError(KBE_SYNTAX_ERROR, ", invalid token after `end`");
@@ -1412,8 +1639,15 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         if (token->type != TOKEN_END) {
             compileLineReturnWithError(KBE_SYNTAX_ERROR, "");
         }
+        /* 检查最近的函数定义 */
+        if (popFunc) {
+            if (context->pCurrentFunc == NULL) {
+                compileLineReturnWithError(KBE_SYNTAX_ERROR, "end func not in a function");
+            }
+            context->pCurrentFunc = NULL;
+        }
         /* 弹出最近 if 语句块 */
-        if (popTarget == KBCS_IF_THEN) {
+        else if (popTarget == KBCS_IF_THEN) {
             while (1) {
                 int peakCsType = contextCtrlPeekType(context);
                 /* 先弹出 else / else if */
@@ -1480,8 +1714,6 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
     /* 用户自己写的 label */
     else if (token->type == TOKEN_LABEL) {
         char labelName[KB_TOKEN_LENGTH_MAX];
-        KbLabelType labelType = KBL_USER;
-        int isSyntaxError = 0;
     
         token = nextToken(&analyzer);
         if (token->type != TOKEN_ID) {
@@ -1491,30 +1723,16 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         StringCopy(labelName, sizeof(labelName), token->content);
 
         token = nextToken(&analyzer);
-        if (token->type == TOKEN_END) {
-            labelType = KBL_USER;
-        }
-        else if (token->type == TOKEN_ID && StringEqual(token->content, "export")) {
-            token = nextToken(&analyzer);
-            labelType = KBL_EXPORT;
-            if (token->type != TOKEN_END) {
-                isSyntaxError = 1;
-            }
-        }
-        else {
-            isSyntaxError = 1;
-        }
-
-        if (isSyntaxError) {
+        /* 匹配结束*/
+        if (token->type != TOKEN_END) {
             compileLineReturnWithError(KBE_SYNTAX_ERROR, " in label command.");
         }
-
-        if (strlen(labelName) > KB_LABEL_MAX) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", label name too long.");
+        /* 标签长度太长 */
+        if (strlen(labelName) > KN_ID_LEN_MAX) {
+            compileLineReturnWithError(KBE_ID_TOO_LONG, token->content);
         }
-
-        ret = contextAddLabel(context, labelName, labelType);
-        if (!ret) {
+        /* 添加新标签 */
+        if (!contextAddLabel(context, labelName, KBL_USER)) {
             compileLineReturnWithError(KBE_DUPLICATED_LABEL, labelName);
         }
     }
@@ -1525,11 +1743,15 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         if (token->type != TOKEN_ID) {
             compileLineReturnWithError(KBE_SYNTAX_ERROR, " in dim statement, missing variable");
         }
+        /* 变量长度太长 */
+        if (strlen(token->content) > KN_ID_LEN_MAX) {
+            compileLineReturnWithError(KBE_ID_TOO_LONG, token->content);
+        }
         /* 匹配行结束或者= */
         token = nextToken(&analyzer);
         /* 等号，带赋值的dim */
         if (token->type == TOKEN_OPR && StringEqual("=", token->content)) {
-            /* 保存表达式位置 */
+            /* 表达式 */
             if (!checkExpr(&analyzer, errorRet)) {
                 compileLineReturn(0);
             }
@@ -1605,6 +1827,22 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
     /* 空行 */
     if (token->type == TOKEN_END) {
         /* 什么也不做 */
+    }
+    /* func 函数定义 */
+    else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_FUNC, token->content)) {
+        KbContextLabel* pLabelFuncStart;
+        KbContextLabel* pLabelFuncEnd;
+        KbUserFunc*     pFunc;
+        /* 找到函数并且设置为当前上下文的函数 */
+        token = nextToken(&analyzer);
+        pFunc = contextFuncFind(context, token->content, NULL);
+        pLabelFuncStart = contextFuncGetLabel(context, pFunc->iLblFuncBegin);
+        pLabelFuncEnd = contextFuncGetLabel(context, pFunc->iLblFuncEnd);
+        /* 添加跳转指令，全局执行跳过函数定义 */
+        vlPushBack(context->commandList, opCommandCreateGoto(pLabelFuncEnd));
+        /* 更新函数开始标签的位置 */
+        pLabelFuncStart->pos = context->commandList->size;
+        context->pCurrentFunc = pFunc;
     }
     /* if 语句 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_IF, token->content)) {        
@@ -1758,6 +1996,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         KbContextLabel* label;
         KbCtrlStructItem* pPrevCsItem;
         int popTarget = KBCS_NONE;
+        int popFunc = 0;
         /* 获取 end 之后的 token，可以是 if / while */
         token = nextToken(&analyzer);
         if (token->type == TOKEN_KEY && StringEqual(KEYWORD_IF, token->content)) {
@@ -1766,8 +2005,28 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_WHILE, token->content)) {
             popTarget = KBCS_WHILE;
         }
+        else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_FUNC, token->content)) {
+            popFunc = 1;
+        }
+        /* 函数结束 */
+        if (popFunc) {
+            KbOpCommand* pOpCmd = NULL;
+            label = contextFuncGetLabel(context, context->pCurrentFunc->iLblFuncEnd);
+            context->pCurrentFunc = NULL;
+            /* 如果用户写了return 就不自动添加return了 */
+            if (context->commandList->size > 0) {
+                pOpCmd = (KbOpCommand *)context->commandList->tail->data;
+            }
+            if (pOpCmd == NULL || pOpCmd->op != KBO_RETURN) {
+                /* 生成cmd，默认情况返回0 */
+                vlPushBack(context->commandList, opCommandCreatePushNum(0));
+                vlPushBack(context->commandList, opCommandCreateReturn());
+            }
+            /* 更新函数结束标签的位置 */
+            label->pos = context->commandList->size;
+        }
         /* 弹出最近 if / elseif / else 语句块 */
-        if (popTarget == KBCS_IF_THEN) {
+        else if (popTarget == KBCS_IF_THEN) {
             /* 不断弹出直到弹出if */
             while (1) {
                 int csType;
@@ -1808,6 +2067,15 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
     }
     /* return 语句 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_RETURN, token->content)) {
+        /* 编译表达式 */
+        exprRoot = buildExprTree(&analyzer);
+        sortExpr(&exprRoot);
+        ret = compileExprTree(context, exprRoot, errorRet);
+        if (!ret) {
+            compileLineReturn(0);
+        }
+        enDestroy(exprRoot);
+        /* 生成cmd */
         vlPushBack(context->commandList, opCommandCreateReturn());
     }
     /* goto 语句 */
@@ -1833,21 +2101,44 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
     }
     /* dim 变量声明 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_DIM, token->content)) {
-        char    varName[KB_TOKEN_LENGTH_MAX];
+        char*   varName;;
         int     varIndex;
-
+        int     isFuncScope = context->pCurrentFunc != NULL;
         /* 获取变量名 */
-        StringCopy(varName, sizeof(varName), token->content);
-        /* 获取变量 index */
-        varIndex = contextGetVariableIndex(context, varName);
-        if (varIndex < 0) {
-            varIndex = contextSetVariable(context, varName);
-            /* 不存在的话创建新变量 */
+        token = nextToken(&analyzer);
+        varName = token->content;
+        /* 当前在函数内 */
+        if (isFuncScope) {
+            /* 获取变量 index */
+            varIndex = contextGetLocalVariableIndex(context, varName);
+            /* 创建新变量 */
             if (varIndex < 0) {
-                compileLineReturnWithError(KBE_TOO_MANY_VAR, varName);
+                varIndex = contextSetLocalVariable(context, varName);
+                if (varIndex < 0) {
+                    compileLineReturnWithError(KBE_TOO_MANY_VAR, varName);
+                }
+            }
+            /* 变量已经定义过了 */
+            else {
+                compileLineReturnWithError(KBE_DUPLICATED_VAR, varName);
             }
         }
-
+        /* 当前是全局*/
+        else {
+            /* 获取变量 index */
+            varIndex = contextGetVariableIndex(context, varName);
+            /* 创建新变量 */
+            if (varIndex < 0) {
+                varIndex = contextSetVariable(context, varName);
+                if (varIndex < 0) {
+                    compileLineReturnWithError(KBE_TOO_MANY_VAR, varName);
+                }
+            }
+            /* 变量已经定义过了 */
+            else {
+                compileLineReturnWithError(KBE_DUPLICATED_VAR, varName);
+            }
+        }
         /* 匹配行结束或者= */
         token = nextToken(&analyzer);
         /* 赋值 = */
@@ -1860,7 +2151,11 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
             }
             enDestroy(exprRoot);
             /* 生成cmd，赋值 */
-            vlPushBack(context->commandList, opCommandCreateAssignVar(varIndex));
+            if (isFuncScope) {
+                vlPushBack(context->commandList, opCommandCreateAssignLocal(varIndex));
+            } else {
+                vlPushBack(context->commandList, opCommandCreateAssignVar(varIndex));
+            }
         }
         /* 直接结束 */
         else if (token->type == TOKEN_END) {
@@ -1957,19 +2252,19 @@ int kbSerialize(
 ) {
     unsigned char * entireRaw;
     int             byteLengthHeader;
-    int             numLabel;
-    int             byteLengthLabel;
+    int             numFunc;
+    int             byteLengthFunc;
     int             byteLengthCmd;
     int             numCmd;
     int             byteLengthString;
     int             byteLengthEntire;
     int             i;
 
-    KbBinaryHeader*   pHeader;
-    KbExportedLabel*        pLabel;
-    KbOpCommand*            pCmd;
-    char *                  pString;
-    VlistNode*              node;
+    KbBinaryHeader*     pHeader;
+    KbExportedFunction* pExpFunc;
+    KbOpCommand*        pCmd;
+    char *              pString;
+    VlistNode*          node;
 
     /*
     ---------- layout ----------
@@ -1991,25 +2286,16 @@ int kbSerialize(
     ----------------------------
     */
 
-    // count exported label
-    numLabel = 0;
-    for (node = context->labelList->head; node; node = node->next) {
-        KbContextLabel* contextLabel = (KbContextLabel *)node->data;
-        if (contextLabel->type != KBL_EXPORT) {
-            continue;
-        }
-        numLabel++;
-    }
+    numFunc = context->userFuncList->size;
 
     // calculate length
-
     byteLengthHeader    = sizeof(KbBinaryHeader);
-    byteLengthLabel     = sizeof(KbExportedLabel) * numLabel;
+    byteLengthFunc      = sizeof(KbExportedFunction) * numFunc;
     numCmd              = context->commandList->size;
     byteLengthCmd       = sizeof(KbOpCommand) * numCmd;
     byteLengthString    = context->stringBufferPtr - context->stringBuffer;
     byteLengthEntire    = byteLengthHeader
-                        + byteLengthLabel
+                        + byteLengthFunc
                         + byteLengthCmd
                         + byteLengthString;
 
@@ -2019,33 +2305,32 @@ int kbSerialize(
     pHeader                     = (KbBinaryHeader *)entireRaw;
     pHeader->headerMagic        = HEADER_MAGIC_FLAG;
     pHeader->numVariables       = context->numVar;
-    pHeader->numLabel           = numLabel;
-    pHeader->labelBlockStart    = 0 + byteLengthHeader;
-    pHeader->cmdBlockStart      = pHeader->labelBlockStart + byteLengthLabel;
+    pHeader->numFunc            = numFunc;
+    pHeader->funcBlockStart     = 0 + byteLengthHeader;
+    pHeader->cmdBlockStart      = pHeader->funcBlockStart + byteLengthFunc;
     pHeader->numCmd             = numCmd;
     pHeader->stringBlockStart   = pHeader->cmdBlockStart + byteLengthCmd;
     pHeader->stringBlockLength  = byteLengthString;
 
     // set pointers for writting
-    pLabel  = (KbExportedLabel *)(entireRaw + pHeader->labelBlockStart);
-    pCmd    = (KbOpCommand *)(entireRaw + pHeader->cmdBlockStart);
-    pString = (char *)(entireRaw + pHeader->stringBlockStart);
+    pExpFunc    = (KbExportedFunction *)(entireRaw + pHeader->funcBlockStart);
+    pCmd        = (KbOpCommand *)(entireRaw + pHeader->cmdBlockStart);
+    pString     = (char *)(entireRaw + pHeader->stringBlockStart);
 
-    /* dump label */
-    printf("label %d byteLengthLabel = %d  %d\n", pHeader->labelBlockStart, byteLengthLabel,sizeof(KbExportedLabel));
+    /* dump func */
     for (
-        node = context->labelList->head;
+        node = context->userFuncList->head;
         node != NULL;
         node = node->next
     ) {
-        KbContextLabel* contextLabel = (KbContextLabel *)node->data;
-        if (contextLabel->type != KBL_EXPORT) {
-            continue;
-        }
-        memset(pLabel, 0, sizeof(*pLabel));
-        StringCopy(pLabel->labelName, KB_LABEL_MAX + 1, contextLabel->name);
-        pLabel->pos = contextLabel->pos;
-        pLabel++;
+        KbUserFunc*     pUserFunc = (KbUserFunc *)node->data;
+        KbContextLabel* pLabel = contextFuncGetLabel(context, pUserFunc->iLblFuncBegin);
+        memset(pExpFunc, 0, sizeof(*pExpFunc));
+        StringCopy(pExpFunc->funcName, KN_ID_LEN_MAX + 1, pUserFunc->funcName);
+        pExpFunc->numArg = pUserFunc->numArg;
+        pExpFunc->numVar = pUserFunc->numVar;
+        pExpFunc->pos = pLabel->pos;
+        pExpFunc++;
     }
 
     /* dump commands */
@@ -2065,12 +2350,12 @@ int kbSerialize(
 }
 
 void dbgPrintHeader(KbBinaryHeader* h) {
-    printf("header              = 0x%x\n", h->headerMagic);
-    printf("variable num        = %d\n", h->numVariables);
-    printf("label block start   = %d\n", h->labelBlockStart);
-    printf("label num           = %d\n", h->numLabel);
-    printf("cmd block start     = %d\n", h->cmdBlockStart);
-    printf("cmd num             = %d\n", h->numCmd);
-    printf("string block start  = %d\n", h->stringBlockStart);
-    printf("string block length = %d\n", h->stringBlockLength);
+    printf("header              = 0x%x\n",  h->headerMagic);
+    printf("variable num        = %d\n",    h->numVariables);
+    printf("func block start    = %d\n",    h->funcBlockStart);
+    printf("func num            = %d\n",    h->numFunc);
+    printf("cmd block start     = %d\n",    h->cmdBlockStart);
+    printf("cmd num             = %d\n",    h->numCmd);
+    printf("string block start  = %d\n",    h->stringBlockStart);
+    printf("string block length = %d\n",    h->stringBlockLength);
 }
