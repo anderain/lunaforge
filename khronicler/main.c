@@ -198,11 +198,11 @@ int parseCommandLineParameters(int argc, char** argv) {
     while (HAVE_ARG()) {
         /* 输出文件名 */
         if (ARG_IS(CLI_OUTPUT) || ARG_IS(CLI_OUTPUT_S)) {
+            NEXT_ARG();
             if (!HAVE_ARG()) {
-                fprintf(stderr, "Invalid parameter: missing output file after -o flag.\n");
+                fprintf(stderr, "Invalid parameter: missing output file after -o flag.\n\n");
                 return 0;
             }
-            ++argIndex;
             cliParams.outputPath = CURRENT_ARG();
         }
         /* 编译字节码模式 */
@@ -224,7 +224,7 @@ int parseCommandLineParameters(int argc, char** argv) {
         /* 输入文件名 */
         else {
             if (cliParams.inputPath != NULL) {
-                fprintf(stderr, "Invalid flag: unrecognized flag '%s'.\n", CURRENT_ARG());
+                fprintf(stderr, "Invalid flag: unrecognized flag '%s'.\n\n", CURRENT_ARG());
                 return 0;
             }
             cliParams.inputPath = CURRENT_ARG();
@@ -233,17 +233,17 @@ int parseCommandLineParameters(int argc, char** argv) {
     }
 
     if (cliParams.target == TARGET_NONE) {
-        fprintf(stderr, "Missing target.\n");
+        fprintf(stderr, "Missing target.\n\n");
         return 0;
     }
 
     if (cliParams.inputPath == NULL) {
-        fprintf(stderr, "Missing input file.\n");
+        fprintf(stderr, "Missing input file.\n\n");
         return 0;
     }
 
     if (cliParams.target == TARGET_COMPILE && cliParams.outputPath == NULL) {
-        fprintf(stderr, "Missing output file.\n");
+        fprintf(stderr, "Missing output file.\n\n");
         return 0;
     }
 
