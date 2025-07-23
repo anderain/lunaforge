@@ -41,6 +41,7 @@ KbRuntimeValue* rtvalueCreateNumber         (const KB_FLOAT num);
 KbRuntimeValue* rtvalueCreateString         (const char* sz);
 void            rtvalueDestroy              (KbRuntimeValue* val);
 void            rtvalueDestoryVoidPointer   (void* p);
+char*           rtvalueStringify            (const KbRuntimeValue* v);
 
 typedef struct {
     int                 prevCmdPos;

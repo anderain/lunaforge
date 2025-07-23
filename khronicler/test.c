@@ -286,14 +286,16 @@ compileEnd:
 }
 
 typedef struct {
-    KB_FLOAT    excepted;
+    int         exceptedType;
+    KB_FLOAT    exceptedNum;
+    char*       exceptedStr;
     char*       name;
     char*       source;
 } RuntimeValueTestCase;
 
 RuntimeValueTestCase RuntimeValueTestCases[] = {
     {
-        120,
+        RVT_NUMBER, 120, NULL,
         "factorial",
         "dim result = factorial(5)\n"
         "func factorial(n)\n"
@@ -305,7 +307,7 @@ RuntimeValueTestCase RuntimeValueTestCases[] = {
         "end func"
     },
     {
-        8,
+        RVT_NUMBER, 8, NULL,
         "fibonacci",
         "dim result = fib(6)\n"
         "func fib(n)\n"
@@ -319,7 +321,7 @@ RuntimeValueTestCase RuntimeValueTestCases[] = {
         "end func"
     },
     {
-        1,
+        RVT_NUMBER, 1, NULL,
         "random range test",
         "dim result = chkRandRange()\n"
         "func chkRandRange()\n"
@@ -337,7 +339,7 @@ RuntimeValueTestCase RuntimeValueTestCases[] = {
         "end func"
     },
     {
-        1,
+        RVT_NUMBER, 1, NULL,
         "mutual prime test",
         "dim result = gcd(28463, 79867)\n"
         "func gcd(a, b)\n"
@@ -351,7 +353,7 @@ RuntimeValueTestCase RuntimeValueTestCases[] = {
         "end func"
     },
     {
-        1024,
+        RVT_NUMBER, 1024, NULL,
         "fast power algorithm",
         "dim result = fastPow(2,10)\n"
         "func fastPow(x, n)\n"
@@ -366,10 +368,22 @@ RuntimeValueTestCase RuntimeValueTestCases[] = {
         "    end if\n"
         "end func"
     },
-    { 0, NULL, NULL }
+    {
+        RVT_STRING, 0, "A->C;A->B;C->B;A->C;B->A;B->C;A->C;",
+        "hanoi",
+        "dim actions = hanoi(3, \"A\", \"C\", \"B\")\n"
+        "func hanoi(n, s, t, a)\n"
+        "    if n > 0\n"
+        "        dim move = s & \"->\" & t & \";\"\n"
+        "        return hanoi(n - 1, s, a, t) & move & hanoi(n - 1, a, t, s)\n"
+        "    end if\n"
+        "    return \"\"\n"
+        "end func"
+    },
+    { RVT_NIL, 0, NULL, NULL }
 };
 
-int runBinary(const unsigned char* raw, float* pCheckValue) {
+int runBinary(const unsigned char* raw, KbRuntimeValue** rtValueGot) {
     KbRuntimeError  errorRet;
     int             ret;
     KbMachine*      app;
@@ -385,12 +399,11 @@ int runBinary(const unsigned char* raw, float* pCheckValue) {
         char error_message[200];
         formatExecError(&errorRet, error_message, sizeof(error_message));
         printf("Runtime Error: %s\n", error_message);
+        machineDestroy(app);
         return 0;
     }
 
-    if (pCheckValue) {
-        *pCheckValue = app->variables[0]->data.num;
-    }
+    *rtValueGot = app->variables[0];
 
     machineDestroy(app);
     return 1;
@@ -412,7 +425,6 @@ void TestRuntimeValue() {
 
     for (i = 0; RuntimeValueTestCases[i].name; i++) {
         int casePassed = 0;
-        KB_FLOAT valueToCheck = 0;
         pCase = RuntimeValueTestCases + i;
         textBuf = pCase->source;
         context = kbCompileStart();
@@ -456,35 +468,72 @@ void TestRuntimeValue() {
         kbCompileEnd(context);
 
 compileEnd:
+        printf("Source Code: \n%s\n", pCase->source);
+    
         if (!isSuccess) {
             char buf[200];
             kbFormatBuildError(&errorRet, buf, sizeof(buf));
             printf("(%d) ERROR: %s\n", lineCount, buf);
             contextDestroy(context);
+            printf("Result: ERROR; NOT PASSED\n");
         }
         else {
+            int runResult = 0;
+            KbRuntimeValue* rtVarGot;
+            char *szExcepted, *szVarGot;
             ret = kbSerialize(context, &serializedRaw, &resultByteLength);
 
             if (ret) {
-                int runResult;
-                runResult = runBinary(serializedRaw, &valueToCheck);
-                if (runResult && valueToCheck == pCase->excepted) {
-                    casePassed = 1;
-                    numPassCount++;
-                }
+                runResult = runBinary(serializedRaw, &rtVarGot);
                 free(serializedRaw);
             }
             contextDestroy(context);
-        } 
-        printf("Source Code: \n%s\n", pCase->source);
-        printf("Result: Expected %f, Got %f. %s\n", pCase->excepted, valueToCheck, casePassed ? "PASSED" : "NOT PASSED");
+
+            if (runResult) {
+                KbRuntimeValue tempRtValue;
+                tempRtValue.type = pCase->exceptedType;
+                if (tempRtValue.type == RVT_STRING) {
+                    tempRtValue.data.sz = pCase->exceptedStr;
+                }
+                else if (tempRtValue.type == RVT_NUMBER) {
+                    tempRtValue.data.num = pCase->exceptedNum;
+                }
+                szExcepted = rtvalueStringify(&tempRtValue);
+                szVarGot = rtvalueStringify(rtVarGot);
+                if (pCase->exceptedType != rtVarGot->type) {
+                    casePassed = 0;
+                }
+                else {
+                    switch (pCase->exceptedType) {
+                    case RVT_NUMBER:
+                        casePassed = pCase->exceptedNum == rtVarGot->data.num;
+                        break;
+                    case RVT_STRING:
+                        casePassed = StringEqual(pCase->exceptedStr, rtVarGot->data.sz);
+                        break;
+                    default:
+                        casePassed = 0;
+                        break;
+                    }
+                }
+                if (casePassed) {
+                    numPassCount++;
+                }
+                printf("Result: Expected %s, Got %s. %s\n", szExcepted, szVarGot, casePassed ? "PASSED" : "NOT PASSED");
+                free(szExcepted);
+                free(szVarGot);
+            }
+            else {
+                printf("Result: ERROR, NOT PASSED\n");
+            }
+        }
         puts(DIVIDER);
     }
     printf("Runtime test completed, %d/%d passed.\n", numPassCount, i);
 }
 
 int main(int argc, char** argv) {
-    TestAllSyntaxError();
+    TestAllSyntaxError(); 
     TestRuntimeValue();
     return 0;
 }
