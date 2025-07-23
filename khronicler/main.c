@@ -372,6 +372,7 @@ int main(int argc, char** argv) {
         if (!writeRet) {
             fprintf(stderr, "Failed to write '%s'\n", cliParams.outputPath);
         }
+        runSuccess = 1;
     }
     else if (cliParams.target == TARGET_DUMP) {
         KbContext*      context;
@@ -395,9 +396,11 @@ int main(int argc, char** argv) {
         dumpRawKBinary(resultRaw, pListMapping);
         vlDestroy(pListMapping, free);
         free(resultRaw);
+        runSuccess = 1;
     }
     else if (cliParams.target == TARGET_INSPECT) {
         dumpRawKBinary(inputBinary, NULL);
+        runSuccess = 1;
     }
     else if (cliParams.target == TARGET_EXECUTE) {
         runSuccess = runBinary(inputBinary);
@@ -407,7 +410,7 @@ dispose:
     if (inputText) free(inputText);
     if (inputBinary) free(inputBinary);
 
-    return runSuccess;
+    return !runSuccess;
 }
 
 /* 文件工具函数 */

@@ -4,6 +4,9 @@
 #define isDigit(c)      ((c) >= '0' && (c) <= '9')
 #define isUppercase(c)  ((c) >= 'a' && (c) <= 'z')
 #define isLowercase(c)  ((c) >= 'A' && (c) <= 'Z')
+#define isHexAlphaU(c)  ((c) >= 'A' && (c) <= 'F')
+#define isHexAlphaL(c)  ((c) >= 'a' && (c) <= 'f')
+#define isHexDigit(c)   (isDigit(c) || isHexAlphaU(c) || isHexAlphaL(c))
 #define isAlpha(c)      (isUppercase(c) || isLowercase(c) || (c) == '_')
 #define isAlphaNum(c)   ((isDigit(c)) || (isAlpha(c)))
 #define isSpace(c)      ((c) == ' ' || (c) == '\t' || (c) == '\n' || (c) == '\r')
@@ -23,7 +26,8 @@ typedef unsigned short KWord;
 #define KB_TOKEN_LENGTH_MAX             50
 #define KB_CONTEXT_VAR_MAX              32
 #define KB_CONTEXT_STRING_BUFFER_MAX    1000
-#define KN_ID_LEN_MAX                   15
+#define KB_IDENTIFIER_LEN_MAX           15
+#define KB_EXTENDED_BUILT_IN_FUNC_MIN   1000
 
 typedef struct tagVlistNode {
     struct tagVlistNode *prev, *next;
@@ -117,7 +121,7 @@ typedef struct {
     int     pos;
     int     numArg;
     int     numVar;
-    char    funcName[KN_ID_LEN_MAX + 1];
+    char    funcName[KB_IDENTIFIER_LEN_MAX + 1];
 } KbExportedFunction;
 
 /* 文件头魔法数字，用于校验 */

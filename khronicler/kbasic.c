@@ -355,9 +355,36 @@ Token* nextToken(Analyzer *_self) {
                 else if (nextChar == '"') {
                     *pbuffer++ = '\"';
                 }
+                /* 十六进制转义序列 */
+                else if (nextChar == 'x') {
+                    int hexDigitCount = 0;
+                    int hexValue = 0;
+                    while (hexDigitCount <= 2) {
+                        char hexChar = *++_self->eptr;
+                        if (isHexAlphaL(hexChar)) {
+                            hexValue = (hexValue << 4) + (hexChar - 'a' + 0xA);
+                        }
+                        else if (isHexAlphaU(hexChar)) {
+                            hexValue = (hexValue << 4) + (hexChar - 'A' + 0xA);
+                        }
+                        else if (isDigit(hexChar)) {
+                            hexValue = (hexValue << 4) + (hexChar - '0' + 0);
+                        }
+                        else {
+                            /* 不是十六进制数字，回退一位 */
+                            --_self->eptr;
+                            break;
+                        }
+                        ++hexDigitCount;
+                    }
+                    if (hexDigitCount <= 0) {
+                        return setToken(&_self->token, TOKEN_ERR, "Invalid hex escape char", _self->eptr - eptrStart);
+                    }
+                    *pbuffer++ = hexValue;
+                }
                 /* 非法转义字符 */
                 else {
-                    return setToken(&_self->token, TOKEN_ERR, "Invalid escape", _self->eptr - eptrStart);
+                    return setToken(&_self->token, TOKEN_ERR, "Invalid escape char", _self->eptr - eptrStart);
                 }
                 _self->eptr++;
             }
@@ -691,7 +718,7 @@ int kbFormatBuildError(const KbBuildError *errorVal, char *strBuffer, int strLen
         char buf[100];
         sprintf(buf, "(%d) ", errorVal->errorPos);
         kbFormatErrorAppend(buf);
-        kbFormatErrorAppend("Syntax Error");
+        kbFormatErrorAppend("Syntax Error - ");
         if (!StringEqual("", errorVal->message)) {
             kbFormatErrorAppend(errorVal->message);
         }
@@ -1036,7 +1063,7 @@ KbCtrlFlowItem* contextCtrlPush(KbContext* context, int csType) {
 KbUserFunc* contextFuncAdd(KbContext* context, const char* funcName, int numArg) {
     KbUserFunc* pUserFunc = (KbUserFunc *)malloc(sizeof(KbUserFunc));
 
-    StringCopy(pUserFunc->funcName, KN_ID_LEN_MAX + 1, funcName);
+    StringCopy(pUserFunc->funcName, KB_IDENTIFIER_LEN_MAX + 1, funcName);
     pUserFunc->numArg = numArg;
     pUserFunc->numVar = 0;
     pUserFunc->iLblFuncBegin = context->funcLabelCounter++;
@@ -1447,19 +1474,19 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
     
         /* 当前函数定义还没结束 */
         if (context->pCurrentFunc != NULL) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", nested function not allowed.");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Nested function not allowed.");
         }
         /* 当前控制结构还没结束 */
         if (context->ctrlFlow.stack->size > 0) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", cannot define function in control flow.");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Cannot define function in control flow.");
         }
         /* 匹配函数名称 */
         token = nextToken(&analyzer);
         if (token->type != TOKEN_FNC) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, " missing function name");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Missing function name");
         }
         /* 检查函数名称长度 */
-        if (strlen(token->content) > KN_ID_LEN_MAX) {
+        if (strlen(token->content) > KB_IDENTIFIER_LEN_MAX) {
             compileLineReturnWithError(KBE_ID_TOO_LONG, token->content);
         }
         /* 在上下文中创建函数 */
@@ -1481,7 +1508,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
                 /* 参数名字 */
                 token = nextToken(&analyzer);
                 if (token->type != TOKEN_ID) {
-                    compileLineReturnWithError(KBE_SYNTAX_ERROR, " in function parameter list.");
+                    compileLineReturnWithError(KBE_SYNTAX_ERROR, "Error in function parameter list.");
                 }
                 pUserFunc->numArg++;
                 /* 把参数名字创建为变量 */
@@ -1508,7 +1535,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
                     continue;
                 }
                 /* 错误 */
-                compileLineReturnWithError(KBE_SYNTAX_ERROR, " in function parameter list.");
+                compileLineReturnWithError(KBE_SYNTAX_ERROR, "Error in function parameter list.");
             }
         }
     }
@@ -1517,7 +1544,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         /* 匹配表达式 */
         ret = matchExpr(&analyzer);
         if (!ret) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", invalid express in if statement");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid express in if statement");
         }
         /* 下一个 token，结束或者 goto */
         token = nextToken(&analyzer);
@@ -1526,12 +1553,12 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
             /* 匹配标签 */
             token = nextToken(&analyzer);
             if (token->type != TOKEN_ID) {
-                compileLineReturnWithError(KBE_SYNTAX_ERROR, ", missing label in if ... goto statement");
+                compileLineReturnWithError(KBE_SYNTAX_ERROR, "Missing label in if ... goto statement");
             }
             /* 匹配行结束 */
             token = nextToken(&analyzer);
             if (token->type != TOKEN_END) {
-                compileLineReturnWithError(KBE_SYNTAX_ERROR, " in if statement");
+                compileLineReturnWithError(KBE_SYNTAX_ERROR, "Error in if statement");
             }
             return 1;
         }
@@ -1540,7 +1567,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
             contextCtrlPush(context, KBCS_IF_THEN);
         }
         else {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in if statement");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Error in if statement");
         }
     }
     /* elseif 语句 */
@@ -1548,17 +1575,17 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         /* 匹配表达式 */
         ret = matchExpr(&analyzer);
         if (!ret) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", invalid express in elseif statement");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid express in elseif statement");
         }
         /* 匹配语句结束 */
         token = nextToken(&analyzer);
         if (token->type != TOKEN_END) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", invalid elseif statement");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid elseif statement");
         }
         peakCsType = contextCtrlPeekType(context);
         /* elseif 的前一个控制结构应该是 elseif 或者 if then */
         if (peakCsType != KBCS_IF_THEN && peakCsType != KBCS_ELSE_IF) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", invalid `elseif`");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid 'elseif'");
         }
         contextCtrlPush(context, KBCS_ELSE_IF);
     }
@@ -1567,12 +1594,12 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         /* 匹配语句结束 */
         token = nextToken(&analyzer);
         if (token->type != TOKEN_END) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", invalid else statement");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid else statement");
         }
         peakCsType = contextCtrlPeekType(context); 
         /* else 的前一个控制结构应该是 else if 或者 if then */
         if (peakCsType != KBCS_IF_THEN && peakCsType != KBCS_ELSE_IF) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", invalid `else`");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid 'else'");
         }
         contextCtrlPush(context, KBCS_ELSE);
     }
@@ -1581,12 +1608,12 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         /* 匹配表达式 */
         ret = matchExpr(&analyzer);
         if (!ret) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", invalid express in while statement");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid express in while statement");
         }
         /* 匹配语句结束 */
         token = nextToken(&analyzer);
         if (token->type != TOKEN_END) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", invalid while statement");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid while statement");
         }
         contextCtrlPush(context, KBCS_WHILE);
     }
@@ -1595,7 +1622,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         /* 匹配语句结束 */
         token = nextToken(&analyzer);
         if (token->type != TOKEN_END) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", invalid token after `break`");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid token after 'break'");
         }
         /* 从栈顶向下寻找循环语句 */
         else {
@@ -1611,7 +1638,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
                 node = node->prev;
             }
             if (!found) {
-                compileLineReturnWithError(KBE_SYNTAX_ERROR, ", invalid `break`, no matching loop found.");
+                compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid 'break', no matching loop found.");
             }
         }
     }
@@ -1631,7 +1658,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
             popFunc = 1;
         }
         else {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", invalid token after `end`");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid token after `end`");
         }
         /* 匹配语句结束 */
         token = nextToken(&analyzer);
@@ -1641,7 +1668,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         /* 检查最近的函数定义 */
         if (popFunc) {
             if (context->pCurrentFunc == NULL) {
-                compileLineReturnWithError(KBE_SYNTAX_ERROR, "end func not in a function");
+                compileLineReturnWithError(KBE_SYNTAX_ERROR, "The 'end func' not in a function");
             }
             context->pCurrentFunc = NULL;
         }
@@ -1660,7 +1687,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
                 }
                 /* 其他的均为错误 */
                 else {
-                    compileLineReturnWithError(KBE_SYNTAX_ERROR, ", invalid `end if`, no matching if statement found.");
+                    compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid 'end if', no matching if statement found.");
                 }
             }
         }
@@ -1672,7 +1699,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
             }
             /* 其他的均为错误 */
             else {
-                compileLineReturnWithError(KBE_SYNTAX_ERROR, ", invalid `end while`, no matching while statement found.");
+                compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid 'end while', no matching while statement found.");
             }
         }
     }
@@ -1681,7 +1708,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         /* 匹配行结束 */
         token = nextToken(&analyzer);
         if (token->type != TOKEN_END) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in exit statement");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Error in exit statement");
         }
     }
     /* return 语句 */
@@ -1689,12 +1716,12 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         /* 匹配表达式 */
         ret = matchExpr(&analyzer);
         if (!ret) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", invalid express in return statement");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid express in return statement");
         }
         /* 匹配行结束 */
         token = nextToken(&analyzer);
         if (token->type != TOKEN_END) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in return statement");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Error in return statement");
         }
     }
     /* goto 语句 */
@@ -1702,12 +1729,12 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         /* 匹配标签 */
         token = nextToken(&analyzer);
         if (token->type != TOKEN_ID) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, " missing label in goto statement");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Missing label in goto statement");
         }
         /* 匹配行结束 */
         token = nextToken(&analyzer);
         if (token->type != TOKEN_END) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in goto statement");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Error in goto statement");
         }
     }
     /* 用户自己写的 label */
@@ -1716,7 +1743,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
     
         token = nextToken(&analyzer);
         if (token->type != TOKEN_ID) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, ", invalid label.");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid label name.");
         }
 
         StringCopy(labelName, sizeof(labelName), token->content);
@@ -1724,10 +1751,10 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         token = nextToken(&analyzer);
         /* 匹配结束*/
         if (token->type != TOKEN_END) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in label command.");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Error in label command.");
         }
         /* 标签长度太长 */
-        if (strlen(labelName) > KN_ID_LEN_MAX) {
+        if (strlen(labelName) > KB_IDENTIFIER_LEN_MAX) {
             compileLineReturnWithError(KBE_ID_TOO_LONG, token->content);
         }
         /* 添加新标签 */
@@ -1740,10 +1767,10 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         /* 匹配是变量名 */
         token = nextToken(&analyzer);
         if (token->type != TOKEN_ID) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in dim statement, missing variable");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Missing variable in dim statement");
         }
         /* 变量长度太长 */
-        if (strlen(token->content) > KN_ID_LEN_MAX) {
+        if (strlen(token->content) > KB_IDENTIFIER_LEN_MAX) {
             compileLineReturnWithError(KBE_ID_TOO_LONG, token->content);
         }
         /* 匹配行结束或者= */
@@ -1757,7 +1784,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
             /* 匹配行结束 */
             token = nextToken(&analyzer);
             if (token->type != TOKEN_END) {
-                compileLineReturnWithError(KBE_SYNTAX_ERROR, " in dim statement.");
+                compileLineReturnWithError(KBE_SYNTAX_ERROR, "Error in dim statement.");
             }
         }
         /* 直接结束 */
@@ -1766,7 +1793,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         }
         /* 其他情况是错误*/
         else {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in dim statement");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Error in dim statement");
         }
     }
     /* 可能是赋值 */
@@ -1788,7 +1815,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         /* 匹配行结束 */
         token = nextToken(&analyzer);
         if (token->type != TOKEN_END) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in assignment statement.");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Error in assignment statement.");
         }
     }
     /* 其他情况，此行是表达式 */
@@ -1802,7 +1829,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         /* 匹配行结束 */
         token = nextToken(&analyzer);
         if (token->type != TOKEN_END) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, " in express.");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Error in expression.");
         }
     }
     return 1;
@@ -1860,9 +1887,6 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
             KbContextLabel *label;
             /* 跳转标签 */
             token = nextToken(&analyzer);
-            if (token->type != TOKEN_ID) {
-                compileLineReturnWithError(KBE_SYNTAX_ERROR, " missing label in if statement");
-            }
             /* 找到标签定义 */
             label = contextGetLabel(context, token->content);
             if (!label) {
@@ -2336,7 +2360,7 @@ int kbSerialize(
         KbUserFunc*     pUserFunc = (KbUserFunc *)node->data;
         KbContextLabel* pLabel = contextFuncGetLabel(context, pUserFunc->iLblFuncBegin);
         memset(pExpFunc, 0, sizeof(*pExpFunc));
-        StringCopy(pExpFunc->funcName, KN_ID_LEN_MAX + 1, pUserFunc->funcName);
+        StringCopy(pExpFunc->funcName, KB_IDENTIFIER_LEN_MAX + 1, pUserFunc->funcName);
         pExpFunc->numArg = pUserFunc->numArg;
         pExpFunc->numVar = pUserFunc->numVar;
         pExpFunc->pos = pLabel->pos;

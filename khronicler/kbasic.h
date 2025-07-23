@@ -55,16 +55,16 @@ typedef struct {
 } KbCtrlFlowItem;
 
 typedef struct {
-    char    funcName[KN_ID_LEN_MAX + 1];
+    char    funcName[KB_IDENTIFIER_LEN_MAX + 1];
     int     numArg;
     int     numVar;
-    char    varList[KB_CONTEXT_VAR_MAX][KN_ID_LEN_MAX + 1];
+    char    varList[KB_CONTEXT_VAR_MAX][KB_IDENTIFIER_LEN_MAX + 1];
     int     iLblFuncBegin;
     int     iLblFuncEnd;
 } KbUserFunc;
 
 typedef struct {
-    char        varList[KB_CONTEXT_VAR_MAX][KN_ID_LEN_MAX + 1];
+    char        varList[KB_CONTEXT_VAR_MAX][KB_IDENTIFIER_LEN_MAX + 1];
     int         numVar;
     char        stringBuffer[KB_CONTEXT_STRING_BUFFER_MAX];
     char*       stringBufferPtr;
