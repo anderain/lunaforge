@@ -29,8 +29,8 @@
 typedef struct {
     int     lineNum;
     int     cmdPos;
-    char    lineContent[1];
-} LineCmdPostContent;
+    char    lineStr[1];
+} CmdLineMapping;
 
 struct {
     int         target;
@@ -43,7 +43,7 @@ char*           readTextFile    (const char *fileName);
 unsigned char*  readBinaryFile  (const char *filename);
 int             writeBinaryFile (const char *fileName, const void * data, int length);
 
-int buildFromScript(const char *fileContent, KbContext** retContext, Vlist* pListLinePos) {
+int buildFromScript(const char *fileContent, KbContext** retContext, Vlist* pListMapping) {
     KbBuildError    errorRet;
     KbContext*      context;
     int             ret;
@@ -107,12 +107,12 @@ int buildFromScript(const char *fileContent, KbContext** retContext, Vlist* pLis
         /* 获取行的内容，并且移除尾部的空白和注释 */
         textPtr += getLineTrimRemarks(textPtr, line);
         /* 保存行对应的 cmd 位置*/
-        if (pListLinePos) {
-            LineCmdPostContent* pContent = malloc(sizeof(LineCmdPostContent) + strlen(line));
-            strcpy(pContent->lineContent, line);
-            pContent->cmdPos = cmdPos;
-            pContent->lineNum = lineCount;
-            vlPushBack(pListLinePos, pContent);
+        if (pListMapping) {
+            CmdLineMapping* pMapping = malloc(sizeof(CmdLineMapping) + strlen(line));
+            strcpy(pMapping->lineStr, line);
+            pMapping->cmdPos = cmdPos;
+            pMapping->lineNum = lineCount;
+            vlPushBack(pListMapping, pMapping);
         }
         /* 编译一行 */
         ret = kbCompileLine(line, context, &errorRet);
@@ -250,7 +250,7 @@ int parseCommandLineParameters(int argc, char** argv) {
     return 1;
 }
 
-void dumpRawKBinary(const unsigned char* raw, Vlist* pListLinePos) {
+void dumpRawKBinary(const unsigned char* raw, Vlist* pListMapping) {
     FILE*                       fp      = stdout;
     const KbBinaryHeader*       h       = (const KbBinaryHeader *)raw;
     const KbExportedFunction*   pFunc   = (const KbExportedFunction *)(raw + h->funcBlockStart);
@@ -267,6 +267,7 @@ void dumpRawKBinary(const unsigned char* raw, Vlist* pListLinePos) {
     fprintf(fp, "numCmd            = %d\n",    h->numCmd);
     fprintf(fp, "stringBlockStart  = %d\n",    h->stringBlockStart);
     fprintf(fp, "stringBlockLength = %d\n",    h->stringBlockLength);
+
     if (h->numFunc > 0) {
         fprintf(fp, "---------------- Function ----------------\n");
         for (i = 0; i < h->numFunc; ++i) {
@@ -274,6 +275,7 @@ void dumpRawKBinary(const unsigned char* raw, Vlist* pListLinePos) {
             fprintf(fp, "[%3d] %16s, args = %2d, vars = %2d\n", i, pf->funcName, pf->numArg, pf->numVar - pf->numArg);
         }
     }
+
     if (h->stringBlockLength > 0) {
         fprintf(fp, "----------------- String -----------------\n");
         int pos = 0;
@@ -285,12 +287,13 @@ void dumpRawKBinary(const unsigned char* raw, Vlist* pListLinePos) {
             index++;
         }
     }
-    if (h->numCmd > 0) {
-        const VlistNode*            pNode = NULL;
-        const LineCmdPostContent*   pContent = NULL;
 
-        if (pListLinePos) {
-            pNode = pListLinePos->head;
+    if (h->numCmd > 0) {
+        const VlistNode*        pNode = NULL;
+        const CmdLineMapping*   pMapping = NULL;
+
+        if (pListMapping) {
+            pNode = pListMapping->head;
         }
 
         fprintf(fp, "------------------ Cmd ------------------\n");
@@ -299,16 +302,16 @@ void dumpRawKBinary(const unsigned char* raw, Vlist* pListLinePos) {
             fprintf(fp, "[%04d] ", i);
             dbgPrintContextCommand(cmd);
             /* 打印对应的行 */
-            pContent = NULL;
+            pMapping = NULL;
             while (pNode != NULL) {
-                pContent = (LineCmdPostContent*)pNode->data;
-                if (pContent->cmdPos >= i) {
+                pMapping = (CmdLineMapping*)pNode->data;
+                if (pMapping->cmdPos >= i) {
                     break;
                 }
                 pNode = pNode->next;
             }
-            if (pContent != NULL && pContent->cmdPos == i) {
-                fprintf(fp, "[%04d] %s", pContent->lineNum, pContent->lineContent);
+            if (pMapping != NULL && pMapping->cmdPos == i) {
+                fprintf(fp, "[%04d] %s", pMapping->lineNum, pMapping->lineStr);
             }
             fprintf(fp, "\n");
         }
@@ -376,21 +379,21 @@ int main(int argc, char** argv) {
         int             serializeRet;
         int             resultByteLength;
         unsigned char*  resultRaw;
-        Vlist*          pListLinePos = vlNewList();
+        Vlist*          pListMapping = vlNewList();
         /* 编译内容 */
-        compileRet = buildFromScript(inputText, &context, pListLinePos);
+        compileRet = buildFromScript(inputText, &context, pListMapping);
         if (!compileRet) goto dispose;
         /* 序列化二进制内容 */
         serializeRet = kbSerialize(context, &resultRaw, &resultByteLength);
         contextDestroy(context);
         if (!serializeRet) {
-            vlDestroy(pListLinePos, free);
+            vlDestroy(pListMapping, free);
             fprintf(stderr, "Failed to serialize context.");
             goto dispose;
         }
         /* 输出分析信息 */
-        dumpRawKBinary(resultRaw, pListLinePos);
-        vlDestroy(pListLinePos, free);
+        dumpRawKBinary(resultRaw, pListMapping);
+        vlDestroy(pListMapping, free);
         free(resultRaw);
     }
     else if (cliParams.target == TARGET_INSPECT) {
