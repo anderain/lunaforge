@@ -151,12 +151,11 @@ int runBinary(const unsigned char* raw) {
     if (!ret) {
         char error_message[200];
         formatExecError(&errorRet, error_message, sizeof(error_message));
-        fprintf(stderr, "Runtime Error: %s\n%s\n", error_message);
+        fprintf(stderr, "Runtime Error:\n%s\n", error_message);
     }
-    fprintf(stderr, "[Execution Finished] Call stack = %d, Value stack = %d\n", app->callEnvStack->size, app->stack->size);
+    fprintf(stderr, "[Execution Finished] Call stack -> %d, Value stack -> %d\n", app->callEnvStack->size, app->stack->size);
 
     machineDestroy(app);
-
     return 1;
 }
 
