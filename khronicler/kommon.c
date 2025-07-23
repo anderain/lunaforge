@@ -34,29 +34,31 @@ Vlist* vlPushBack(Vlist* _self, void *data) {
     return _self;
 }
 
-// void* vlPopFront(Vlist* _self) {
-//     VlistNode *head;
-//     void *data;
+/*
+void* vlPopFront(Vlist* _self) {
+    VlistNode *head;
+    void *data;
 
-//     head = _self->head;
+    head = _self->head;
 
-//     if (head == NULL) return NULL;
+    if (head == NULL) return NULL;
 
-//     data = head->data;
+    data = head->data;
 
-//     _self->head = head->next;
-//     if (_self->head) {
-//         _self->head->prev = NULL;
-//     }
-//     else {
-//         _self->tail = NULL;
-//     }
+    _self->head = head->next;
+    if (_self->head) {
+        _self->head->prev = NULL;
+    }
+    else {
+        _self->tail = NULL;
+    }
 
-//     free(head);
-//     _self->size--;
+    free(head);
+    _self->size--;
 
-//     return data;
-// }
+    return data;
+}
+*/
 
 void* vlPopBack(Vlist* _self) {
     VlistNode *tail, *prevTail; 
@@ -108,12 +110,14 @@ void vlDestroy(Vlist* _self, void (* releaseData)(void *)) {
 }
 
 const char *_KOCODE_NAME[] = {
-    "NUL",
+    "NOP",
     "PUSH_VAR",
     "PUSH_LOCAL",
     "PUSH_NUM",
     "PUSH_STR",
     "POP",
+    "ASSIGN_VAR",
+    "ASSIGN_LOCAL",
     "NEG",
     "CONCAT",
     "ADD",
@@ -133,8 +137,6 @@ const char *_KOCODE_NAME[] = {
     "LTEQ",
     "CALL_BUILT_IN",
     "CALL_USER",
-    "ASSIGN_VAR",
-    "ASSIGN_LOCAL",
     "GOTO",
     "IFGOTO",
     "RETURN",

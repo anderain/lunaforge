@@ -1,5 +1,5 @@
 CC          = gcc
-C_FLAGS     = -c -Wall
+C_FLAGS     = -c -Wall -ansi
 LD_FLAGS 	=
 CORE_OBJS   = k_utils.o kbasic.o kommon.o krt.o
 MAIN_EXE	= khronicler.exe

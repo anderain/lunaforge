@@ -5,7 +5,7 @@
 #include "kbasic.h"
 #include "k_utils.h"
 
-// keywords
+/* 关键字定义 */
 typedef struct {
     const char *word;
 } KeywordDef;
@@ -37,14 +37,14 @@ static const KeywordDef KEYWORDS[] = {
     { NULL              }
 };
 
-// function: defined num of parameters
+/* 内建函数定义 */
 typedef struct {
     const char* funcName;
     int         numArg;
     int         funcId;
-} FunctionDef;
+} BuiltInFunction;
 
-static const FunctionDef FUNCTION_LIST[] = {
+static const BuiltInFunction FUNCTION_LIST[] = {
     { "p",          1, KFID_P           },
     { "sin",        1, KFID_SIN         },
     { "cos",        1, KFID_COS         },
@@ -80,13 +80,11 @@ typedef struct {
 } Token;
 
 typedef struct tagExprNode {
-    int type;
-    // 'param' is only for operator
-    // to store OPERATOR 
-    int param;
-    char content[KB_CONTEXT_STRING_BUFFER_MAX];
+    int     type;
+    int     param; /* 只在 type 是 TOKEN_OPR 的时候才有意义 */
+    char    content[KB_CONTEXT_STRING_BUFFER_MAX];
+    int     numChild;
     struct tagExprNode **children;
-    int numChild;
 } ExprNode;
 
 typedef enum {
@@ -114,12 +112,12 @@ const struct {
     { "&&", OPR_AND     },
     { "||", OPR_OR      },
     { "=",  OPR_EQUAL   },
-    { "<>",  OPR_NEQ    },
+    { "<>", OPR_NEQ    },
     { ">",  OPR_GT      },
     { "<",  OPR_LT      },
     { ">=", OPR_GTEQ    },
     { "<=", OPR_LTEQ    },
-    // place at bottom, not in use
+    /* 取负放在最下，不会被使用到 */
     { "-",  OPR_NEG     }
 };
 
@@ -155,7 +153,6 @@ Token* setToken(Token *token, TokenType type, const char *content, int sourceLen
     token->type = type;
     StringCopy(token->content, KB_CONTEXT_STRING_BUFFER_MAX, content);
     token->sourceLength = sourceLength;
-    // printf("token: %s %s\n", token->content, DBG_TOKEN_NAME[token->type]);
     return token;
 }
 
@@ -179,7 +176,7 @@ Token* nextToken(Analyzer *_self) {
 
     firstChar = *_self->eptr;
 
-    // operator 
+    /* 操作符 */
     switch (firstChar) {
     case '+':   case '-':   case '*':   case '/':   case '^':
     case '%':   case '=':   case '!':   case '\\':
@@ -266,35 +263,34 @@ Token* nextToken(Analyzer *_self) {
         }
     }
 
-    // expr end here 
+    /* 扫描到结尾 */
     if (firstChar == '\0') {
         return setToken(&_self->token, TOKEN_END, "", 0);
     }
-    // numberic
+    /* 数字 */
     else if (isDigit(firstChar)) {
         while (isDigit(*_self->eptr)) {
             *pbuffer++ = *_self->eptr++;
         }
-        // check if is float
+        /* 检查是不是带有小数 */
         if (*_self->eptr == '.') {
-            // write '.' to buffer
+            /* 保存小数点 */
             *pbuffer++ = *_self->eptr++;
-            // continue read digits
+            /* 继续写入数字 */
             while (isDigit(*_self->eptr)) {
                 *pbuffer++ = *_self->eptr++;
             }
         }
 
         *pbuffer = '\0';
-
-        // Token error: to long
+        /* 过长 */
         if ((pbuffer - buffer) >= KB_CONTEXT_STRING_BUFFER_MAX) {
             return setToken(&_self->token, TOKEN_ERR, "Number too long", _self->eptr - eptrStart);
         }
 
         return setToken(&_self->token, TOKEN_NUM, buffer, _self->eptr - eptrStart);
     }
-    // identifier
+    /* 标志符 identifier */
     else if (isAlpha(firstChar)) {
         int i;
         int isFunc = 0;
@@ -304,7 +300,7 @@ Token* nextToken(Analyzer *_self) {
         }
         *pbuffer = '\0';
 
-        // check is keyword?
+        /* 检查是否是关键字？*/
         for (i = 0; KEYWORDS[i].word; ++i) {
             if (StringEqual(KEYWORDS[i].word, buffer)) {
                 return setToken(&_self->token, TOKEN_KEY, buffer, _self->eptr - eptrStart);
@@ -315,13 +311,13 @@ Token* nextToken(Analyzer *_self) {
             _self->eptr++;
         }
 
-        // func
+        /* 后面是左括号，是函数定义或者函数调用 */
         if (*_self->eptr == '(') {
             _self->eptr++;
             isFunc = 1;
         }
         
-        // Token error: to long
+        /* token 过长 */
         if ((pbuffer - buffer) >= KB_CONTEXT_STRING_BUFFER_MAX) {
             return setToken(&_self->token, TOKEN_ERR, "Identifier too long", _self->eptr - eptrStart);
         }
@@ -333,39 +329,39 @@ Token* nextToken(Analyzer *_self) {
             return setToken(&_self->token, TOKEN_ID, buffer, _self->eptr - eptrStart);
         }
     }
-    // string
+    /* 是字符串 */
     else if (firstChar == '"') {
-        // skip first '"'
+        /* 跳过" */
         _self->eptr++;
 
         while (*_self->eptr != '"') {
             const char currentChar = *_self->eptr;
-
-            // escape sequence
+            /* 处理转义字符*/
             if (currentChar == '\\') {
                 const char nextChar = *++_self->eptr;
-                // newline
+                /* 换行 */
                 if (nextChar == 'n') {
                     *pbuffer++ = '\n';
                 }
-                // carriage return
+                /* 回车 */
                 else if (nextChar == 'r') {
                     *pbuffer++ = '\r';
                 }
-                // tab
+                /* 制表 */
                 else if (nextChar == 't') {
                     *pbuffer++ = '\t';
                 }
-                // "
+                /* 转义引号 */
                 else if (nextChar == '"') {
                     *pbuffer++ = '\"';
                 }
+                /* 非法转义字符 */
                 else {
                     return setToken(&_self->token, TOKEN_ERR, "Invalid escape", _self->eptr - eptrStart);
                 }
                 _self->eptr++;
             }
-            // incomplete
+            /* 不完整 */
             else if (currentChar == '\0') {
                 return setToken(&_self->token, TOKEN_ERR, "Incomplete string", _self->eptr - eptrStart);
             }
@@ -374,10 +370,10 @@ Token* nextToken(Analyzer *_self) {
             }
         }
         
-        // skip last '"'
+        /* 跳过" */
         _self->eptr++;
 
-        // Token error: to long
+        /* String过长 */
         if ((pbuffer - buffer) >= KB_CONTEXT_STRING_BUFFER_MAX) {
             return setToken(&_self->token, TOKEN_ERR, "String too long", _self->eptr - eptrStart);
         }
@@ -386,7 +382,7 @@ Token* nextToken(Analyzer *_self) {
 
         return setToken(&_self->token, TOKEN_STR, buffer, _self->eptr - eptrStart);
     }
-    // undefined
+    /* 没定义的字符 */
     else {
         _self->eptr++;
         buffer[0] = firstChar;
@@ -419,7 +415,7 @@ int matchTryNext(Analyzer *_self) {
 
 int matchExpr(Analyzer *_self) {
     Token *token = nextToken(_self);
-    // printf("[%s] %s\n", DBG_TOKEN_NAME[token->type], token->content);
+    /* printf("[%s] %s\n", DBG_TOKEN_NAME[token->type], token->content); */
     if (token->type == TOKEN_ID || token->type == TOKEN_NUM || token->type == TOKEN_STR) {
         return matchTryNext(_self);
     }
@@ -430,10 +426,10 @@ int matchExpr(Analyzer *_self) {
     else if (token->type == TOKEN_FNC) {
         token = nextToken(_self);
         if (token->type == TOKEN_BKT && *token->content == ')') {
-            // no arg?
+            /* 没有参数的函数调用 */
         }
         else {
-            // at least 1 arg
+            /* 至少有一个参数 */
             rewindToken(_self);
             while (1) {
                 int result = matchExpr(_self);
@@ -464,12 +460,8 @@ int matchExpr(Analyzer *_self) {
             }
             return 1;
         }
-        return 0; //return matchTryNext(_self);
+        return 0;
     }
-    // else {
-    //  // Debug
-    //  printf("Token = %s, %s\n", token->content, DBG_TOKEN_NAME[token->type]);
-    // }
     return 0;
 }
 
@@ -488,8 +480,6 @@ int checkExpr(Analyzer *_self, KbBuildError *errorRet) {
     int result = matchExpr(_self);
     /* 表达式里有语法错误 */
     if (!result) {
-        // return error
-        // displaySyntaxError(_self);
         if (errorRet) {
             errorRet->errorType = KBE_SYNTAX_ERROR;
             errorRet->errorPos = _self->eptr - _self->expr;
@@ -589,18 +579,19 @@ ExprNode* buildExprTree(Analyzer *_self) {
     Token *token;
 
     token = nextToken(_self);
-    // printf("token = %s,%s\n", DBG_TOKEN_NAME[token->type], token->content);
-
+    /* printf("token = %s,%s\n", DBG_TOKEN_NAME[token->type], token->content); */
     if (token->type == TOKEN_ID || token->type == TOKEN_NUM || token->type == TOKEN_STR) {
         ExprNode *leftNode = enCreateByToken(token, 0);
         return buildTryNext(_self, leftNode);
     }
-    else if (token->type == TOKEN_OPR && StringEqual("-", token->content)) { // negative '-'
-        ExprNode* oprNode = enCreateOperatorNegative(token); // enCreateByToken(token, 1);
+    /* 一元操作符：取负 */
+    else if (token->type == TOKEN_OPR && StringEqual("-", token->content)) {
+        ExprNode* oprNode = enCreateOperatorNegative(token); /* enCreateByToken(token, 1); */ 
         exprNodeLeftChild(oprNode) = buildExprTree(_self);
         return buildTryNext(_self, oprNode);
     }
-    else if (token->type == TOKEN_OPR && StringEqual("!", token->content)) { // not '!'
+    /* 一元操作符：逻辑非 */
+    else if (token->type == TOKEN_OPR && StringEqual("!", token->content)) {
         ExprNode* oprNode = enCreateOperatorNot(token); 
         exprNodeLeftChild(oprNode) = buildExprTree(_self);
         return buildTryNext(_self, oprNode);
@@ -613,9 +604,9 @@ ExprNode* buildExprTree(Analyzer *_self) {
 
         token = nextToken(_self);
         if (token->type == TOKEN_BKT && *token->content == ')') {
-            // no arg
+            /* 没有参数 */
         } else {
-            // at least 1 arg
+            /* 至少一个参数 */
             rewindToken(_self);
             while (1) {
                 ExprNode *child = buildExprTree(_self);
@@ -644,7 +635,7 @@ ExprNode* buildExprTree(Analyzer *_self) {
     else if (token->type == TOKEN_BKT && *token->content == '(') {
         ExprNode *bktNode = enNew(TOKEN_BKT, "()", 1);
         bktNode->children[0] = buildExprTree(_self);
-        nextToken(_self); // ignore ')'
+        nextToken(_self); /* 忽略最后的 ')' */ 
 
         return buildTryNext(_self, bktNode);
     }
@@ -762,7 +753,7 @@ int kbFormatBuildError(const KbBuildError *errorVal, char *strBuffer, int strLen
 }
 
 ExprNode* sortExprTree(ExprNode *en, int *ptrChangeFlag) {
-    // printf("en=%s -> '%s' childs = %d\n", DBG_TOKEN_NAME[en->type], en->content, en->numChild);
+    /* printf("en=%s -> '%s' childs = %d\n", DBG_TOKEN_NAME[en->type], en->content, en->numChild); */
     if (en == NULL) {
         return NULL;
     }
@@ -777,8 +768,8 @@ ExprNode* sortExprTree(ExprNode *en, int *ptrChangeFlag) {
         ExprNode *enr, *enrl;
         int i;
 
-        // exprNodeLeftChild(en) = sortExprTree(exprNodeLeftChild(en), ptrChangeFlag);
-        // exprNodeRightChild(en) = sortExprTree(exprNodeRightChild(en), ptrChangeFlag);
+        /* exprNodeLeftChild(en) = sortExprTree(exprNodeLeftChild(en), ptrChangeFlag); */
+        /* exprNodeRightChild(en) = sortExprTree(exprNodeRightChild(en), ptrChangeFlag); */
         
         for (i = 0; i < en->numChild; ++i) {
             en->children[i] = sortExprTree(en->children[i], ptrChangeFlag);
@@ -796,7 +787,7 @@ ExprNode* sortExprTree(ExprNode *en, int *ptrChangeFlag) {
                 en->children[en->numChild - 1] = enrl;
                 exprNodeLeftChild(enr) = en;
 
-                // exprNodeRightChild(enr) = sortExprTree(exprNodeRightChild(enr), ptrChangeFlag);
+                /* exprNodeRightChild(enr) = sortExprTree(exprNodeRightChild(enr), ptrChangeFlag); */
                 return enr;
             }
         }
@@ -1211,9 +1202,9 @@ int compileExprTree(KbContext *context, ExprNode *node, KbBuildError *errorRet) 
         if (!ret) return 0;
     }
 
-    // function
+    /* 函数调用 */
     if (node->type == TOKEN_FNC) {
-        const FunctionDef*  targetFunc = NULL;
+        const BuiltInFunction*  targetFunc = NULL;
         int                 funcDefLength = sizeof(FUNCTION_LIST) / sizeof(FUNCTION_LIST[0]);
         char*               funcName = node->content;
         int                 iUserFuncIndex = -1;
@@ -1234,7 +1225,7 @@ int compileExprTree(KbContext *context, ExprNode *node, KbBuildError *errorRet) 
         /* 尝试寻找内建函数 */
         else {
             for (i = 0; i < funcDefLength; ++i) {
-                const FunctionDef *func = FUNCTION_LIST + i;
+                const BuiltInFunction *func = FUNCTION_LIST + i;
                 if (StringEqual(func->funcName, funcName)) {
                     targetFunc = func;
                     break;
@@ -1257,11 +1248,11 @@ int compileExprTree(KbContext *context, ExprNode *node, KbBuildError *errorRet) 
             vlPushBack(context->commandList, opCommandCreateBuiltInFunction(targetFunc->funcId));
         }
     }
-    // operator
+    /* 操作符 */
     else if (node->type == TOKEN_OPR) {
         vlPushBack(context->commandList, opCommandCreateOperator(node->param));
     }
-    // variable
+    /* 变量 */
     else if (node->type == TOKEN_ID) {
         int varIndex = -1;
         int isFuncScope = context->pCurrentFunc != NULL;
@@ -1292,7 +1283,7 @@ int compileExprTree(KbContext *context, ExprNode *node, KbBuildError *errorRet) 
             vlPushBack(context->commandList, opCommandCreatePushVar(varIndex));
         }
     }
-    // string
+    /* 字符串 */
     else if (node->type == TOKEN_STR) {
         int strIndex = contextAppendText(context, node->content);
         if (strIndex < 0) {
@@ -1303,17 +1294,17 @@ int compileExprTree(KbContext *context, ExprNode *node, KbBuildError *errorRet) 
         }
         vlPushBack(context->commandList, opCommandCreatePushStr(strIndex));
     }
-    // number
+    /* 数字 */
     else if (node->type == TOKEN_NUM) {
         KB_FLOAT num = (KB_FLOAT)kAtof(node->content);
         vlPushBack(context->commandList, opCommandCreatePushNum(num));
     }
-    // bkt
+    /* 括号 */
     else if (node->type == TOKEN_BKT) {
-        // do nothing here
+        /* 什么也不用做 */
     }
+    /* 未定义的 node */
     else {
-        // undefined variable
         errorRet->errorPos = 0;
         errorRet->errorType = KBE_OTHER;
         StringCopy(errorRet->message, KB_ERROR_MESSAGE_MAX, "unknown express");
@@ -1326,6 +1317,7 @@ int compileExprTree(KbContext *context, ExprNode *node, KbBuildError *errorRet) 
 void dbgPrintContextCommand(const KbOpCommand *cmd) {
     printf("%-15s ", _KOCODE_NAME[cmd->op]);
 
+    /* 带整数参数的cmd */
     if (cmd->op == KBO_PUSH_VAR
      || cmd->op == KBO_PUSH_LOCAL
      || cmd->op == KBO_PUSH_STR
@@ -1335,25 +1327,27 @@ void dbgPrintContextCommand(const KbOpCommand *cmd) {
      || cmd->op == KBO_ASSIGN_LOCAL
      || cmd->op == KBO_GOTO
      || cmd->op == KBO_IFGOTO) {
-        printf("%d", cmd->param.index);
+        printf("%-8d", cmd->param.index);
     }
+    /* 带浮点数参数的cmd */
     else if (cmd->op == KBO_PUSH_NUM) {
         char szNum[KB_TOKEN_LENGTH_MAX];
         kFtoa((float)cmd->param.number, szNum, DEFAUL_FTOA_PRECISION);
-        printf("%s", szNum);
+        printf("%-8s", szNum);
     }
+    /* 不带参数的cmd */
     else if ((cmd->op >= KBO_OPR_NEG && cmd->op <= KBO_OPR_LTEQ)
      || cmd->op == KBO_POP
      || cmd->op == KBO_STOP
      || cmd->op == KBO_RETURN
     ) {
-        // nothing here
+        /* 打印空白 */
+        printf("%-8s", " ");
     }
+    /* 无法识别的cmd */
     else {
         printf("INVALID CMD [%x]", cmd->op);
     }
-
-    printf("\n");
 }
 
 void dbgPrintContextCommandList (const KbContext *context) {
@@ -1363,6 +1357,7 @@ void dbgPrintContextCommandList (const KbContext *context) {
     while (node != NULL) {
         printf("%03d ", lineNum);
         dbgPrintContextCommand((KbOpCommand *)node->data);
+        printf("\n");
         ++lineNum;
         node = node->next;
     }
@@ -1419,11 +1414,11 @@ KbContext* kbCompileStart(const char * line) {
 
     context = contextCreate();
     
-    /* 内置变量 */
-    // contextSetVariable(context, "hh");
-    // contextSetVariable(context, "mm");
-    // contextSetVariable(context, "ss");
-    // contextSetVariable(context, "ms");
+    /* 设置内置全局变量 */
+    /* contextSetVariable(context, "hh"); */
+    /* contextSetVariable(context, "mm"); */
+    /* contextSetVariable(context, "ss"); */
+    /* contextSetVariable(context, "ms"); */
 
     return context;
 }
@@ -1825,7 +1820,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
     errorRet->errorType = KBE_NO_ERROR;
     errorRet->message[0] = '\0';
 
-    // try first token
+    /* 尝试读取第一个token */
     token = nextToken(&analyzer);
 
     /* 空行 */
@@ -2169,7 +2164,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
     /* 可能是赋值 */
     else if (token->type == TOKEN_ID) {
         char    varName[KB_TOKEN_LENGTH_MAX];
-        int     varIndex;
+        int     varIndex = -1;
         int     isFuncScope = context->pCurrentFunc != NULL;
         int     isLocalVar = 0;
     
@@ -2191,9 +2186,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
                 varIndex = contextGetVariableIndex(context, varName);
             }
             if (varIndex < 0) {
-                errorRet->errorPos = 0;
-                errorRet->errorType = KBE_UNDEFINED_IDENTIFIER;
-                StringCopy(errorRet->message, KB_ERROR_MESSAGE_MAX, varName);
+                compileLineReturnWithError(KBE_UNDEFINED_IDENTIFIER, varName);
                 return 0;
             }
             /* 编译表达式 */
@@ -2250,7 +2243,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
 int kbCompileEnd(KbContext *context) {
     VlistNode *node;
 
-    // update position of goto / ifgoto
+    /* 更新所有GOTO / IFGOTO cmd的标签，把ptr改为具体的cmd位置 */
     for (node = context->commandList->head; node != NULL; node = node->next) { 
         KbOpCommand *cmd = (KbOpCommand *)node->data;
         
@@ -2260,7 +2253,7 @@ int kbCompileEnd(KbContext *context) {
         }
     }
 
-    // add assign command
+    /* 手动在末尾添加一个停止命令 */
     vlPushBack(context->commandList, opCommandCreateStop());
     return 1;
 }
@@ -2286,29 +2279,29 @@ int kbSerialize(
     char *              pString;
     VlistNode*          node;
 
-    /*
+    /* 序列化后的内存布局
     ---------- layout ----------   <--- 0
     |                          |
-    |        * header *        |
+    |        * header *        |      + sizeof(KbBinaryHeader)
     |                          |
-    ----------------------------   <--- labelBlockStart
+    ----------------------------   <--- funcBlockStart
     |                          |
-    |        * label *         |
+    |         * func *         |      + byteLengthFunc
     |                          |
     ----------------------------   <--- cmdBlockStart
     |                          |
-    |         * cmd *
+    |         * cmd *          |      + byteLengthCmd
     |                          |
     ----------------------------   <--- stringBlockStart
     |                          |
-    |        * string *        |
+    |        * string *        |      + byteLengthString
     |                          |
     ----------------------------
     */
 
     numFunc = context->userFuncList->size;
 
-    // calculate length
+    /* 计算分段长度和总长度 */
     byteLengthHeader    = sizeof(KbBinaryHeader);
     byteLengthFunc      = sizeof(KbExportedFunction) * numFunc;
     numCmd              = context->commandList->size;
@@ -2318,10 +2311,9 @@ int kbSerialize(
                         + byteLengthFunc
                         + byteLengthCmd
                         + byteLengthString;
-
-    // allocate space and write header
+    /* 申请空间*/
     entireRaw = (unsigned char *)malloc(byteLengthEntire);
-
+    /* 写入文件头 */
     pHeader                     = (KbBinaryHeader *)entireRaw;
     pHeader->headerMagic        = HEADER_MAGIC_FLAG;
     pHeader->numVariables       = context->numVar;
@@ -2331,13 +2323,11 @@ int kbSerialize(
     pHeader->numCmd             = numCmd;
     pHeader->stringBlockStart   = pHeader->cmdBlockStart + byteLengthCmd;
     pHeader->stringBlockLength  = byteLengthString;
-
-    // set pointers for writting
+    /* 设置写入用的指针头 */
     pExpFunc    = (KbExportedFunction *)(entireRaw + pHeader->funcBlockStart);
     pCmd        = (KbOpCommand *)(entireRaw + pHeader->cmdBlockStart);
     pString     = (char *)(entireRaw + pHeader->stringBlockStart);
-
-    /* dump func */
+    /* 写入用户函数定义 */
     for (
         node = context->userFuncList->head;
         node != NULL;
@@ -2352,14 +2342,12 @@ int kbSerialize(
         pExpFunc->pos = pLabel->pos;
         pExpFunc++;
     }
-
-    /* dump commands */
+    /* 写入cmd */
     node = context->commandList->head;
     for (i = 0; node != NULL; ++i, node = node->next) {
         memcpy(pCmd + i, node->data, sizeof(KbOpCommand));
     }
-
-    /* dump string block */
+    /* 写入字符串 */
     memset(pString, 0, byteLengthString);
     memcpy(pString, context->stringBuffer, byteLengthString);
 

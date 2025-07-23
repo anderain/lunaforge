@@ -37,24 +37,24 @@ int StringEndWith(const char *str, const char *token) {
 double kAtof(const char *str) {
     int sign;
     double number = 0.0, power = 1.0;
-
-    while(*str == ' ' || *str == '\n' || *str == '\t' || *str == '\r')
-        ++str;
-
-    sign = (*str == '-') ? -1 : 1; // Save the sign
-
-    if (*str == '-' || *str == '+') // Skip the sign
+    /* 跳过空白 */
+    while(isSpace(*str)) ++str;
+    /* 处理正负号 */
+    sign = (*str == '-') ? -1 : 1; 
+    if (*str == '-' || *str == '+') {
         str++;
-
-    while(*str >= '0' && *str <= '9') { // Digits before the decimal point
+    }
+    /* 处理小数点后的数字 */
+    while(*str >= '0' && *str <= '9') {
         number = 10.0 * number + (*str - '0');
         str++;
     }
-
-    if(*str == '.') // Skip the decimal point
+    /* 跳过小数点 */
+    if(*str == '.') {
         str++;
-
-    while(*str >= '0' && *str <= '9') { // Digits after the decimal point
+    }
+    /* 处理小数点后的数字 */
+    while(*str >= '0' && *str <= '9') {
         number = 10.0 * number + (*str - '0');
         power *= 10.0;
         str++;
@@ -65,17 +65,17 @@ double kAtof(const char *str) {
 #define MAX_PRECISION   (10)
 
 static const double rounders[MAX_PRECISION + 1] = {
-    0.5,                // 0
-    0.05,               // 1
-    0.005,              // 2
-    0.0005,             // 3
-    0.00005,            // 4
-    0.000005,           // 5
-    0.0000005,          // 6
-    0.00000005,         // 7
-    0.000000005,        // 8
-    0.0000000005,       // 9
-    0.00000000005       // 10
+    0.5,                /* 0 */
+    0.05,               /* 1 */
+    0.005,              /* 2 */
+    0.0005,             /* 3 */
+    0.00005,            /* 4 */
+    0.000005,           /* 5 */
+    0.0000005,          /* 6 */
+    0.00000005,         /* 7 */
+    0.000000005,        /* 8 */
+    0.0000000005,       /* 9 */
+    0.00000000005       /* 10 */
 };
 
 char* kFtoa(double f, char * buf, int precision) {
@@ -85,17 +85,17 @@ char* kFtoa(double f, char * buf, int precision) {
     char c;
     long intPart;
 
-    // check precision bounds
+    /* 检查精度边界 */
     if (precision > MAX_PRECISION)
         precision = MAX_PRECISION;
 
-    // sign stuff
+    /* 处理符号 */
     if (f < 0) {
         f = -f;
         *ptr++ = '-';
     }
 
-    // negative precision == automatic precision guess
+    /* 负精度表示自动精度推测 */
     if (precision < 0) {
         if (f < 1.0) precision = 6;
         else if (f < 10.0) precision = 5;
@@ -106,46 +106,46 @@ char* kFtoa(double f, char * buf, int precision) {
         else precision = 0;
     }
 
-    // round value according the precision
+    /* 根据精度舍入值 */
     if (precision)
         f += rounders[precision];
 
-    // integer part...
+    /* 整数部分... */
     intPart = (long)f;
     f -= intPart;
 
     if (!intPart)
         *ptr++ = '0';
     else {
-        // save start pointer
+        /* 保存起始指针 */
         p = ptr;
 
-        // convert (reverse order)
+        /* 逆序转换 */
         while (intPart) {
             *p++ = '0' + intPart % 10;
             intPart /= 10;
         }
 
-        // save end pos
+        /* 保存结束位置 */
         p1 = p;
 
-        // reverse result
+        /* 反转结果 */
         while (p > ptr) {
             c = *--p;
             *p = *ptr;
             *ptr++ = c;
         }
 
-        // restore end pos
+        /* 恢复结束位置 */
         ptr = p1;
     }
 
-    // decimal part
+    /* 小数部分 */
     if (precision) {
-        // place decimal point
+        /* 放置小数点 */
         *ptr++ = '.';
 
-        // convert
+        /* 进行转换 */
         while (precision--) {
             f *= 10.0;
             c = (int)f % 10;
@@ -153,11 +153,10 @@ char* kFtoa(double f, char * buf, int precision) {
             f -= c;
         }
     }
-
-    // terminating zero
     *ptr = 0;
 
-    {
+    /* 移除小数部分末尾多余的"0" */
+    if (precision) {
         int j = 0;
         char *cBuf = buf;
         for (j = strlen(cBuf) - 1; j > 0 && cBuf[j] == '0'; --j) {
@@ -169,15 +168,15 @@ char* kFtoa(double f, char * buf, int precision) {
     return buf;
 }
 
+/* 重新实现 atoi()，某些平台缺少此函数 */
 long kAtoi(const char* S) {
     long num = 0;
  
     int i = 0;
  
-    // run till the end of the string is reached, or the
-    // current character is non-numeric
-    while (S[i] && (S[i] >= '0' && S[i] <= '9'))
-    {
+    /* 运行直到到达字符串末尾， */
+    /* 或者当前字符为非数字 */
+    while (S[i] && (S[i] >= '0' && S[i] <= '9')) {
         num = num * 10 + (S[i] - '0');
         i++;
     }
@@ -185,7 +184,7 @@ long kAtoi(const char* S) {
     return num;
 }
 
-/* A utility function to reverse a string  */
+/* itoa需要的翻转字符串功能  */
 void kItoaReverse(char str[], int length) {
     int start = 0;
     int end = length -1;
@@ -199,39 +198,38 @@ void kItoaReverse(char str[], int length) {
     }
 }
  
-// Implementation of itoa()
+/* 重新实现 itoa()，某些平台缺少此函数 */
 char* kItoa(int num, char* str, int base) {
     int i = 0;
     int isNegative = 0;
  
-    /* Handle 0 explicitly, otherwise empty string is printed for 0 */
+    /* 专门处理输入是0的情况 */
     if (num == 0) {
         str[i++] = '0';
         str[i] = '\0';
         return str;
     }
  
-    // In standard itoa(), negative numbers are handled only with
-    // base 10. Otherwise numbers are considered unsigned.
+    /* 在标准 itoa() 中，负数只处理十进制 */
     if (num < 0 && base == 10) {
         isNegative = 1;
         num = -num;
     }
  
-    // Process individual digits
+    /* 处理单个数字 */
     while (num != 0) {
         int rem = num % base;
         str[i++] = (rem > 9)? (rem-10) + 'a' : rem + '0';
         num = num/base;
     }
  
-    // If number is negative, append '-'
+    /* 如果数字为负数，则附加"-" */
     if (isNegative)
         str[i++] = '-';
  
-    str[i] = '\0'; // Append string terminator
+    str[i] = '\0';
  
-    // Reverse the string
+    /* 翻转内容 */
     kItoaReverse(str, i);
  
     return str;
@@ -241,22 +239,25 @@ int getLineTrimRemarks(const char* textPtr, char* line) {
     char *linePtr = line;
     const char *originalTextPtr = textPtr;
 
-    // get line from file buffer
+    /* 跳过空白 */
+    while (isSpace(*textPtr)) ++textPtr;
+
+    /* 从缓存中获取一行 */
     do {
         *linePtr++ = *textPtr++;
     } while(*textPtr != '\n' && *textPtr != '\0');
 
     *linePtr = '\0';
 
-    // remove remarks
+    /* 移除#开头的注释 */
     for (linePtr = line; *linePtr && *linePtr != '#'; ++linePtr) NULL;
     *linePtr = '\0';
 
-    // trim ending spaces
+    /* 移除尾部空白 */
     for (--linePtr; linePtr >= line && isSpace(*linePtr); --linePtr) {
         *linePtr = '\0';
     }
 
-    // return how many char read
+    /* 返回读取了多少字符 */
     return textPtr - originalTextPtr;
 }

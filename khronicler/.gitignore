@@ -1,4 +1,5 @@
 *.bin
+*.kbn
 *.o
 *.exe
 *.kbs

@@ -91,6 +91,7 @@ int         kbCompileLine           (const char* lineContent, KbContext *context
 int         kbCompileEnd            (KbContext* context);
 int         kbSerialize             (const KbContext* context, unsigned char** pRaw, int* pByteLength);
 
+void dbgPrintContextCommand         (const KbOpCommand *cmd);
 void dbgPrintContextCommandList     (const KbContext *context);
 void dbgPrintContextVariables       (const KbContext *context);
 void dbgPrintContextListText        (const KbContext *context);

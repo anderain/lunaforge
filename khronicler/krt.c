@@ -81,7 +81,7 @@ void rtvalueDestoryVoidPointer(void* p) {
     rtvalueDestroy((KbRuntimeValue *)p);
 }
 
-KbCallEnv* callEnvCreate(int prevCmdPos, KbExportedFunction* pExportedFunc) {
+KbCallEnv* callEnvCreate(int prevCmdPos, const KbExportedFunction* pExportedFunc) {
     KbCallEnv* pEnv = (KbCallEnv *)malloc(sizeof(KbCallEnv));
     int i;
     pEnv->numArg = pExportedFunc->numArg;
@@ -120,12 +120,12 @@ KbMachine* machineCreate(const unsigned char * raw) {
     machine = (KbMachine *)malloc(sizeof(KbMachine));
 
     machine->raw            = raw;
-    machine->header         = (KbBinaryHeader *)raw;
-    machine->pExportedFunc  = (KbExportedFunction *)(raw + machine->header->funcBlockStart);
+    machine->header         = (const KbBinaryHeader *)raw;
+    machine->pExportedFunc  = (const KbExportedFunction *)(raw + machine->header->funcBlockStart);
     machine->stack          = vlNewList();
     machine->callEnvStack   = vlNewList();
 
-    // initialize var with number 0
+    /* 全部以数字0初始化全局变量 */
     numVar = machine->header->numVariables;
     machine->variables  = (KbRuntimeValue **)malloc(sizeof(KbRuntimeValue *) * numVar);
     for (i = 0; i < numVar; ++i) {
@@ -167,7 +167,7 @@ int machineVarAssignNum(KbMachine* machine, int varIndex, KB_FLOAT num) {
     return 1;
 }
 
-KbExportedFunction* machineGetFunctionByIndex(KbMachine* machine, int userFuncIndex) {
+const KbExportedFunction* machineGetFunctionByIndex(KbMachine* machine, int userFuncIndex) {
     if (userFuncIndex < 0 || userFuncIndex >= machine->header->numFunc) {
         return NULL;
     }
@@ -222,7 +222,7 @@ void formatExecError(const KbRuntimeError *errorRet, char *message, int messageL
 
 void dbgPrintContextCommand(const KbOpCommand *cmd);
 
-#define machineCmdStartPointer(machine) ((KbOpCommand *)((machine)->raw + (machine)->header->cmdBlockStart))
+#define machineCmdStartPointer(machine) ((const KbOpCommand *)((machine)->raw + (machine)->header->cmdBlockStart))
 
 #define execReturnErrorWithMessage(errorCode, msg) NULL;            \
     errorRet->type = errorCode;                                     \
@@ -271,7 +271,7 @@ void machineMovePushValue(KbMachine* machine, KbRuntimeValue* pRtValue) {
 int machineExecCallUserFuncByIndex(KbMachine* machine, int funcIndex, KbRuntimeError *errorRet) {
     int currentPos = machine->header->numCmd;
     int i;
-    KbExportedFunction* pExpFunc = machineGetFunctionByIndex(machine, funcIndex);
+    const KbExportedFunction* pExpFunc = machineGetFunctionByIndex(machine, funcIndex);
     KbCallEnv *pEnv = callEnvCreate(currentPos, pExpFunc);
     for (i = 0; i < pEnv->numArg; ++i) {
         pEnv->variables[pEnv->numArg - 1 - i] = (KbRuntimeValue *)vlPopBack(machine->stack);
@@ -281,10 +281,10 @@ int machineExecCallUserFuncByIndex(KbMachine* machine, int funcIndex, KbRuntimeE
 }
 
 int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
-    KbOpCommand*    cmdBlockPtr = machineCmdStartPointer(machine);
-    int             numCmd = machine->header->numCmd;
-    KbRuntimeValue* operand[10];
-    KB_FLOAT        numResult;
+    const KbOpCommand*  cmdBlockPtr = machineCmdStartPointer(machine);
+    int                 numCmd = machine->header->numCmd;
+    KbRuntimeValue*     operand[10];
+    KB_FLOAT            numResult;
 
     errorRet->type = KBRE_NO_ERROR;
     errorRet->message[0] = '\0';
@@ -293,12 +293,12 @@ int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
     machine->cmdPtr += startPos;
 
     while (machine->cmdPtr - cmdBlockPtr < numCmd) {
-        KbOpCommand* cmd = machine->cmdPtr;
+        const KbOpCommand* cmd = machine->cmdPtr;
         
-        // printf("        [%04d] ", machine->cmdPtr - cmdBlockPtr); dbgPrintContextCommand(cmd);
+        /* printf("        [%04d] ", machine->cmdPtr - cmdBlockPtr); dbgPrintContextCommand(cmd); */
 
         switch(cmd->op) {
-            case KBO_NUL: {
+            case KBO_NOP: {
 	            break;
             }
             case KBO_PUSH_VAR: {
@@ -425,13 +425,30 @@ int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
 	            break;
             }
             case KBO_OPR_NOT: {
+                /* 旧逻辑，只处理数字 */
+                /*
                 execPopAndCheckType(0, RVT_NUMBER);
 
                 numResult = (KB_FLOAT)(!(int)operand[0]->data.num);
 
                 vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
                 rtvalueDestroy(operand[0]);
-                break;
+                */
+                /* 新逻辑，除了数字，增加了字符串的逻辑 */
+                int isPopedTrue = 0;
+                KbRuntimeValue* popped = (KbRuntimeValue *)vlPopBack(machine->stack);
+                /* 数字不为零是真 */
+                if (popped->type == RVT_NUMBER) {
+                    isPopedTrue = (int)popped->data.num;
+                }
+                /* 字符串不为空是真 */
+                else if (popped->type == RVT_STRING && strlen(popped->data.sz) > 0) {
+                    isPopedTrue = 1;
+                }
+                rtvalueDestroy(popped);
+                /* 入栈一个相反的数字值 */
+                vlPushBack(machine->stack, rtvalueCreateNumber((KB_FLOAT)!isPopedTrue));
+	            break;
             }
             case KBO_OPR_AND: {
                 execPopAndCheckType(1, RVT_NUMBER);
@@ -531,7 +548,7 @@ int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
             case KBO_CALL_USER: {
                 int i;
                 int currentPos = machine->cmdPtr - cmdBlockPtr;
-                KbExportedFunction* pExpFunc = machineGetFunctionByIndex(machine, cmd->param.index);
+                const KbExportedFunction* pExpFunc = machineGetFunctionByIndex(machine, cmd->param.index);
                 KbCallEnv *pEnv = callEnvCreate(currentPos, pExpFunc);
                 for (i = 0; i < pEnv->numArg; ++i) {
                     pEnv->variables[pEnv->numArg - 1 - i] = (KbRuntimeValue *)vlPopBack(machine->stack);
@@ -569,7 +586,7 @@ int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
                 if (popped->type == RVT_NUMBER) {
                     isTrue = (int)popped->data.num;
                 }
-                else if (popped->type == RVT_STRING) {
+                else if (popped->type == RVT_STRING && strlen(popped->data.sz) > 0) {
                     isTrue = 1;
                 }
                 rtvalueDestroy(popped);

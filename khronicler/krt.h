@@ -49,13 +49,13 @@ typedef struct {
 } KbCallEnv;
 
 typedef struct {
-    const KbBinaryHeader*   header;
-    Vlist*                  stack;          /* <KbRuntimeValue> */
-    KbOpCommand *           cmdPtr;
-    const unsigned char*    raw;
-    KbRuntimeValue**        variables;
-    Vlist*                  callEnvStack;   /* <KbCallEnv> */
-    KbExportedFunction*     pExportedFunc;
+    const KbBinaryHeader*       header;
+    Vlist*                      stack;          /* <KbRuntimeValue> */
+    const KbOpCommand *         cmdPtr;
+    const unsigned char*        raw;
+    KbRuntimeValue**            variables;
+    Vlist*                      callEnvStack;   /* <KbCallEnv> */
+    const KbExportedFunction*   pExportedFunc;
 } KbMachine;
 
 typedef struct {

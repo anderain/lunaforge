@@ -25,26 +25,22 @@ typedef unsigned short KWord;
 #define KB_CONTEXT_STRING_BUFFER_MAX    1000
 #define KN_ID_LEN_MAX                   15
 
-// Node of List
 typedef struct tagVlistNode {
     struct tagVlistNode *prev, *next;
     void *data;
 } VlistNode;
 
-// List
 typedef struct {
     VlistNode *head, *tail;
     int size;
 } Vlist;
 
-// List API
 Vlist*      vlNewList     ();
 Vlist*      vlPushBack    (Vlist* _self, void *data);
 void*       vlPopFront    (Vlist* _self);
 void*       vlPopBack     (Vlist* _self);
 void        vlDestroy     (Vlist* _self, void (* releaseData)(void *));
 
-// Queue API
 typedef Vlist VQueue;
 #define vqNewQueue                  vlNewList
 #define vqPush                      vlPushBack
@@ -52,51 +48,53 @@ typedef Vlist VQueue;
 #define vqIsEmpty(q)                ((q)->size <= 0)
 #define vqDestroy(q, releaseData)   vlDestroy(q, releaseData)
 
-// Command
-
 typedef struct {
     KDword op;
     union {
         KB_FLOAT    number;
         KDword      index;
-        void*       ptr;
+        /* 只有第一轮处理在 goto / ifgoto 命令使用这种值 */
+        void*       ptr; /* <KbContextLabel *> */
     } param;
 } KbOpCommand;
 
 #define opCommandRelease free
 
 typedef enum {
-    KBO_NUL = 0,
-    KBO_PUSH_VAR,       // push / pop actions
-    KBO_PUSH_LOCAL,     //
-    KBO_PUSH_NUM,
-    KBO_PUSH_STR,
-    KBO_POP,
-    KBO_OPR_NEG,        // operators
-    KBO_OPR_CONCAT,
-    KBO_OPR_ADD,
-    KBO_OPR_SUB,
-    KBO_OPR_MUL,
-    KBO_OPR_DIV,
-    KBO_OPR_INTDIV,
-    KBO_OPR_MOD,
-    KBO_OPR_NOT,
-    KBO_OPR_AND,
-    KBO_OPR_OR,
-    KBO_OPR_EQUAL,
-    KBO_OPR_NEQ,
-    KBO_OPR_GT,
-    KBO_OPR_LT,
-    KBO_OPR_GTEQ,
-    KBO_OPR_LTEQ,
-    KBO_CALL_BUILT_IN,  // call built-in function
-    KBO_CALL_USER,      //
-    KBO_ASSIGN_VAR,     // assign to variable
-    KBO_ASSIGN_LOCAL,   // assign to local variable
-    KBO_GOTO,           // goto commands
-    KBO_IFGOTO,
-    KBO_RETURN,         // return
-    KBO_STOP            // stop command
+    KBO_NOP = 0,            /* 空命令 */
+    /* 基本栈操作命令 */
+    KBO_PUSH_VAR,           /* 取全局变量入栈 */
+    KBO_PUSH_LOCAL,         /* 取局部变量入栈 */
+    KBO_PUSH_NUM,           /* 数字入栈 */
+    KBO_PUSH_STR,           /* 字符串入栈 */
+    KBO_POP,                /* 出栈 */
+    KBO_ASSIGN_VAR,         /* 出栈并且赋值给全局变量 */
+    KBO_ASSIGN_LOCAL,       /* 出栈并且赋值给局部变量 */
+    /* 运算符命令 */
+    KBO_OPR_NEG,            /* 数字取负 */
+    KBO_OPR_CONCAT,         /* 字符串连接 */
+    KBO_OPR_ADD,            /* 相加 */
+    KBO_OPR_SUB,            /* 相减 */
+    KBO_OPR_MUL,            /* 相乘 */
+    KBO_OPR_DIV,            /* 相除 */
+    KBO_OPR_INTDIV,         /* 整数除法 */
+    KBO_OPR_MOD,            /* 取模 */
+    KBO_OPR_NOT,            /* 逻辑反 */
+    KBO_OPR_AND,            /* 逻辑与 */
+    KBO_OPR_OR,             /* 逻辑或 */
+    KBO_OPR_EQUAL,          /* 相等 */
+    KBO_OPR_NEQ,            /* 不相等 */
+    KBO_OPR_GT,             /* 大于 */
+    KBO_OPR_LT,             /* 小于 */
+    KBO_OPR_GTEQ,           /* 大于等于 */
+    KBO_OPR_LTEQ,           /* 小于等于 */
+    KBO_CALL_BUILT_IN,      /* 调用内置函数 */
+    KBO_CALL_USER,          /* 调用 */
+    /* 跳转控制命令 */
+    KBO_GOTO,               /* 无条件跳转 */
+    KBO_IFGOTO,             /* 出栈，检查后跳转 */
+    KBO_RETURN,             /* 函数返回 */
+    KBO_STOP                /* 结束执行 */
 } KB_OPCODE;
 
 typedef enum {
@@ -115,8 +113,6 @@ typedef enum {
 
 extern const char *_KOCODE_NAME[];
 
-#define HEADER_MAGIC_FLAG 0x424B
-
 typedef struct {
     int     pos;
     int     numArg;
@@ -124,24 +120,27 @@ typedef struct {
     char    funcName[KN_ID_LEN_MAX + 1];
 } KbExportedFunction;
 
+/* 文件头魔法数字，用于校验 */
+#define HEADER_MAGIC_FLAG 0x424B
+
 typedef struct {
-    /* File header magick number */
+    /* 文件头魔法数字，用于校验 */
     KDword headerMagic;
 
-    /* Number of variables */
+    /* 全局变量数 */
     KDword numVariables;
 
-    /* Exported function */
-    KDword funcBlockStart;     /* function start position */
-    KDword numFunc;            /* number of functions */
+    /* 导出的函数列表 */
+    KDword funcBlockStart;     /* 函数部分开始字节位置 */
+    KDword numFunc;            /* 函数数量 */
 
-    /* Blocks Commands */
-    KDword cmdBlockStart;       /* cmd start position */
-    KDword numCmd;              /* number of cmds */
+    /* cmd部分 */
+    KDword cmdBlockStart;       /* cmd部分开始字节位置  */
+    KDword numCmd;              /* cmd数量 */
 
-    /* Blocks of Strings */
-    KDword stringBlockStart;    /* string start position */
-    KDword stringBlockLength;   /* length of string block */
+    /* 字符串部分 */
+    KDword stringBlockStart;    /* 字符串部分开始字节位置 */
+    KDword stringBlockLength;   /* 字符串部分长度 */
 } KbBinaryHeader;
 
 #define endianSwapDword(l) (unsigned int)((((l) & 0x000000ff) << 24) | (((l) & 0x0000ff00) << 8) | (((l) & 0xff000000) >> 24) | (((l) & 0x00ff0000) >> 8))
