@@ -89,7 +89,7 @@ KbContext*  kbCompileStart          ();
 int         kbScanLineSyntax        (const char* line, KbContext *context, KbBuildError *errorRet);
 int         kbCompileLine           (const char* lineContent, KbContext *context, KbBuildError *pErrorRet);
 int         kbCompileEnd            (KbContext* context);
-int         kbSerialize             (const KbContext* context, unsigned char** pRaw, int* pByteLength);
+int         kbSerialize             (const KbContext* context, KByte** ppRaw, int* pByteLength);
 
 void dbgPrintContextCommand         (const KbOpCommand *cmd);
 void dbgPrintContextCommandList     (const KbContext *context);

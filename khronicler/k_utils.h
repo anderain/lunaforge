@@ -2,6 +2,10 @@
 #define _K_UTILS_H_
 
 #include <string.h>
+#include "kommon.h"
+
+int         RawEndianConvert    (KByte* pRaw);
+
 
 #define     StringEqual(s1, s2) (((s1) != NULL) && ((s2) != NULL) && strcmp((s1), (s2)) == 0)
 int         StringCopy          (char *dest, int max, const char *src);

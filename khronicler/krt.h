@@ -53,7 +53,7 @@ typedef struct {
     const KbBinaryHeader*       header;
     Vlist*                      stack;          /* <KbRuntimeValue> */
     const KbOpCommand *         cmdPtr;
-    const unsigned char*        raw;
+    const KByte*                raw;
     KbRuntimeValue**            variables;
     Vlist*                      callEnvStack;   /* <KbCallEnv> */
     const KbExportedFunction*   pExportedFunc;
@@ -65,7 +65,7 @@ typedef struct {
     char    message[KB_ERROR_MESSAGE_MAX];
 } KbRuntimeError;
 
-KbMachine*  machineCreate                   (const unsigned char * raw);
+KbMachine*  machineCreate                   (const KByte * raw);
 void        machineCommandReset             (KbMachine* machine);
 int         machineGetLabelPos              (KbMachine* machine, const char* labelName);
 int         machineExec                     (KbMachine* machine, int startPos, KbRuntimeError *errorRet);

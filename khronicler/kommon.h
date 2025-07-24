@@ -147,6 +147,6 @@ typedef struct {
     KDword stringBlockLength;   /* 字符串部分长度 */
 } KbBinaryHeader;
 
-#define endianSwapDword(l) (unsigned int)((((l) & 0x000000ff) << 24) | (((l) & 0x0000ff00) << 8) | (((l) & 0xff000000) >> 24) | (((l) & 0x00ff0000) >> 8))
+#define endianSwapDword(l) (KDword)((((l) & 0x000000ff) << 24) | (((l) & 0x0000ff00) << 8) | (((l) & 0xff000000) >> 24) | (((l) & 0x00ff0000) >> 8))
 
 #endif

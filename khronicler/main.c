@@ -39,9 +39,9 @@ struct {
 } cliParams = { TARGET_NONE, NULL, NULL };
 
 /* 文件工具函数 */
-char*           readTextFile    (const char *fileName);
-unsigned char*  readBinaryFile  (const char *filename);
-int             writeBinaryFile (const char *fileName, const void * data, int length);
+char*   readTextFile    (const char *fileName);
+KByte*  readBinaryFile  (const char *filename);
+int     writeBinaryFile (const char *fileName, const void * data, int length);
 
 int buildFromScript(const char *fileContent, KbContext** retContext, Vlist* pListMapping) {
     KbBuildError    errorRet;
@@ -141,12 +141,12 @@ compileEnd:
     return 1;
 }
 
-int runBinary(const unsigned char* raw) {
+int runBinary(const KByte* pRaw) {
     KbRuntimeError  errorRet;
     int             ret;
     KbMachine*      app;
 
-    app = machineCreate(raw);
+    app = machineCreate(pRaw);
     ret = machineExec(app, 0, &errorRet);
     if (!ret) {
         char error_message[200];
@@ -250,7 +250,7 @@ int parseCommandLineParameters(int argc, char** argv) {
     return 1;
 }
 
-void dumpRawKBinary(const unsigned char* raw, Vlist* pListMapping) {
+void dumpRawKBinary(const KByte* raw, Vlist* pListMapping) {
     FILE*                       fp      = stdout;
     const KbBinaryHeader*       h       = (const KbBinaryHeader *)raw;
     const KbExportedFunction*   pFunc   = (const KbExportedFunction *)(raw + h->funcBlockStart);
@@ -319,10 +319,10 @@ void dumpRawKBinary(const unsigned char* raw, Vlist* pListMapping) {
 }
 
 int main(int argc, char** argv) {
-    int             runSuccess      = 0;
-    int             parseResult     = 0;
-    char*           inputText       = NULL;
-    unsigned char*  inputBinary     = NULL;
+    int     runSuccess      = 0;
+    int     parseResult     = 0;
+    char*   inputText       = NULL;
+    KByte*  inputBinary     = NULL;
 
     parseResult = parseCommandLineParameters(argc, argv);
     if (!parseResult) {
@@ -354,7 +354,7 @@ int main(int argc, char** argv) {
         int             compileRet;
         int             serializeRet;
         int             resultByteLength;
-        unsigned char*  resultRaw;
+        KByte*  resultRaw;
         int             writeRet;
         /* 编译内容 */
         compileRet = buildFromScript(inputText, &context, NULL);
@@ -379,13 +379,13 @@ int main(int argc, char** argv) {
         int             compileRet;
         int             serializeRet;
         int             resultByteLength;
-        unsigned char*  resultRaw;
+        KByte*          pResultRaw;
         Vlist*          pListMapping = vlNewList();
         /* 编译内容 */
         compileRet = buildFromScript(inputText, &context, pListMapping);
         if (!compileRet) goto dispose;
         /* 序列化二进制内容 */
-        serializeRet = kbSerialize(context, &resultRaw, &resultByteLength);
+        serializeRet = kbSerialize(context, &pResultRaw, &resultByteLength);
         contextDestroy(context);
         if (!serializeRet) {
             vlDestroy(pListMapping, free);
@@ -393,9 +393,9 @@ int main(int argc, char** argv) {
             goto dispose;
         }
         /* 输出分析信息 */
-        dumpRawKBinary(resultRaw, pListMapping);
+        dumpRawKBinary(pResultRaw, pListMapping);
         vlDestroy(pListMapping, free);
-        free(resultRaw);
+        free(pResultRaw);
         runSuccess = 1;
     }
     else if (cliParams.target == TARGET_INSPECT) {
@@ -447,10 +447,10 @@ int writeBinaryFile(const char *fileName, const void * data, int length) {
     return 1;
 }
 
-unsigned char *readBinaryFile(const char *filename) {
-    FILE *fp;
-    int length = 0;
-    unsigned char *buf;
+KByte* readBinaryFile(const char *filename) {
+    FILE*   fp;
+    int     length = 0;
+    KByte*  buf;
 
     fp = fopen(filename, "rb");
 
@@ -459,7 +459,7 @@ unsigned char *readBinaryFile(const char *filename) {
     fseek(fp, 0, SEEK_END);
     length = ftell(fp);
 
-    buf = (unsigned char *)malloc(length);
+    buf = (KByte *)malloc(length);
     memset(buf, 0, length);
     fseek(fp, 0, SEEK_SET);
     fread(buf, length, 1, fp);

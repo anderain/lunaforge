@@ -383,12 +383,12 @@ RuntimeValueTestCase RuntimeValueTestCases[] = {
     { RVT_NIL, 0, NULL, NULL }
 };
 
-int runBinary(const unsigned char* raw, KbRuntimeValue** rtValueGot) {
+int runBinary(const KByte* pRaw, KbRuntimeValue** ppRtValueGot) {
     KbRuntimeError  errorRet;
     int             ret;
     KbMachine*      app;
 
-    app = machineCreate(raw);
+    app = machineCreate(pRaw);
 
     if (!app) {
         return 0;
@@ -403,7 +403,7 @@ int runBinary(const unsigned char* raw, KbRuntimeValue** rtValueGot) {
         return 0;
     }
 
-    *rtValueGot = app->variables[0];
+    *ppRtValueGot = app->variables[0];
 
     machineDestroy(app);
     return 1;
@@ -418,7 +418,7 @@ void TestRuntimeValue() {
     int             isSuccess = 1;
     int             lineCount = 1;
     int             resultByteLength;
-    unsigned char*  serializedRaw;
+    KByte*          pSerializedRaw;
     int             i;
     int             numPassCount = 0;
     RuntimeValueTestCase* pCase;
@@ -481,11 +481,11 @@ compileEnd:
             int runResult = 0;
             KbRuntimeValue* rtVarGot;
             char *szExcepted, *szVarGot;
-            ret = kbSerialize(context, &serializedRaw, &resultByteLength);
+            ret = kbSerialize(context, &pSerializedRaw, &resultByteLength);
 
             if (ret) {
-                runResult = runBinary(serializedRaw, &rtVarGot);
-                free(serializedRaw);
+                runResult = runBinary(pSerializedRaw, &rtVarGot);
+                free(pSerializedRaw);
             }
             contextDestroy(context);
 

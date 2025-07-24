@@ -113,7 +113,7 @@ void machineCommandReset(KbMachine* machine) {
     machine->cmdPtr = (KbOpCommand *)(machine->raw + machine->header->cmdBlockStart);
 }
 
-KbMachine* machineCreate(const unsigned char * raw) {
+KbMachine* machineCreate(const KByte* raw) {
     KbMachine* machine;
     int numVar, i;
 

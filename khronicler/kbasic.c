@@ -2283,19 +2283,19 @@ int kbCompileEnd(KbContext *context) {
 }
 
 int kbSerialize(
-    const           KbContext* context,
-    unsigned char** pRaw,
-    int *           pByteLength
+    const KbContext*    context,
+    KByte**             ppRaw,
+    int *               pByteLength
 ) {
-    unsigned char * entireRaw;
-    int             byteLengthHeader;
-    int             numFunc;
-    int             byteLengthFunc;
-    int             byteLengthCmd;
-    int             numCmd;
-    int             byteLengthString;
-    int             byteLengthEntire;
-    int             i;
+    KByte*  pEntireRaw;
+    int     byteLengthHeader;
+    int     numFunc;
+    int     byteLengthFunc;
+    int     byteLengthCmd;
+    int     numCmd;
+    int     byteLengthString;
+    int     byteLengthEntire;
+    int     i;
 
     KbBinaryHeader*     pHeader;
     KbExportedFunction* pExpFunc;
@@ -2335,10 +2335,11 @@ int kbSerialize(
                         + byteLengthFunc
                         + byteLengthCmd
                         + byteLengthString;
+
     /* 申请空间*/
-    entireRaw = (unsigned char *)malloc(byteLengthEntire);
+    pEntireRaw                  = (KByte *)malloc(byteLengthEntire);
     /* 写入文件头 */
-    pHeader                     = (KbBinaryHeader *)entireRaw;
+    pHeader                     = (KbBinaryHeader *)pEntireRaw;
     pHeader->headerMagic        = HEADER_MAGIC_FLAG;
     pHeader->numVariables       = context->numVar;
     pHeader->numFunc            = numFunc;
@@ -2348,9 +2349,9 @@ int kbSerialize(
     pHeader->stringBlockStart   = pHeader->cmdBlockStart + byteLengthCmd;
     pHeader->stringBlockLength  = byteLengthString;
     /* 设置写入用的指针头 */
-    pExpFunc    = (KbExportedFunction *)(entireRaw + pHeader->funcBlockStart);
-    pCmd        = (KbOpCommand *)(entireRaw + pHeader->cmdBlockStart);
-    pString     = (char *)(entireRaw + pHeader->stringBlockStart);
+    pExpFunc    = (KbExportedFunction *)(pEntireRaw + pHeader->funcBlockStart);
+    pCmd        = (KbOpCommand *)(pEntireRaw + pHeader->cmdBlockStart);
+    pString     = (char *)(pEntireRaw + pHeader->stringBlockStart);
     /* 写入用户函数定义 */
     for (
         node = context->userFuncList->head;
@@ -2375,7 +2376,7 @@ int kbSerialize(
     memset(pString, 0, byteLengthString);
     memcpy(pString, context->stringBuffer, byteLengthString);
 
-    *pRaw = entireRaw;
+    *ppRaw = pEntireRaw;
     *pByteLength = byteLengthEntire;
 
     return 1;
