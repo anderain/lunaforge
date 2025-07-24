@@ -259,14 +259,16 @@ void dumpRawKBinary(const KByte* raw, Vlist* pListMapping) {
     int                         i;
 
     fprintf(fp, "----------------- Header -----------------\n");
-    fprintf(fp, "headerMagic       = 0x%x\n",  h->headerMagic);
-    fprintf(fp, "numVariables      = %d\n",    h->numVariables);
-    fprintf(fp, "funcBlockStart    = %d\n",    h->funcBlockStart);
-    fprintf(fp, "numFunc           = %d\n",    h->numFunc);
-    fprintf(fp, "cmdBlockStart     = %d\n",    h->cmdBlockStart);
-    fprintf(fp, "numCmd            = %d\n",    h->numCmd);
-    fprintf(fp, "stringBlockStart  = %d\n",    h->stringBlockStart);
-    fprintf(fp, "stringBlockLength = %d\n",    h->stringBlockLength);
+    fprintf(fp, "headerMagic       = 0x%x\n",   h->headerMagic.dVal);
+    fprintf(fp, "isLittleEndian    = %s\n",     h->isLittleEndian ? "Yes" : "No");
+    fprintf(fp, "szExtensionId     = %s\n",     h->szExtensionId);
+    fprintf(fp, "numVariables      = %d\n",     h->numVariables);
+    fprintf(fp, "funcBlockStart    = %d\n",     h->funcBlockStart);
+    fprintf(fp, "numFunc           = %d\n",     h->numFunc);
+    fprintf(fp, "cmdBlockStart     = %d\n",     h->cmdBlockStart);
+    fprintf(fp, "numCmd            = %d\n",     h->numCmd);
+    fprintf(fp, "stringBlockStart  = %d\n",     h->stringBlockStart);
+    fprintf(fp, "stringBlockLength = %d\n",     h->stringBlockLength);
 
     if (h->numFunc > 0) {
         fprintf(fp, "---------------- Function ----------------\n");

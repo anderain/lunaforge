@@ -138,7 +138,8 @@ const char *_KOCODE_NAME[] = {
     "CALL_BUILT_IN",
     "CALL_USER",
     "GOTO",
-    "IFGOTO",
+    "IF_GOTO",
+    "UNLESS_GOTO",
     "RETURN",
     "STOP"
 };

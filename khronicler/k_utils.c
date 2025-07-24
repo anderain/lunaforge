@@ -282,3 +282,12 @@ int getLineOnly(const char* textPtr, char* line) {
     /* 返回读取了多少字符 */
     return textPtr - originalTextPtr;
 }
+
+int checkIsLittleEndian() {
+    /* 定义一个32位整数并赋值为1 */
+    KDword num = 1;
+    /* 将整数的地址转换为字符指针（访问单个字节） */
+    KByte *bytePtr = (unsigned char *)&num;
+    /* 检查第一个字节的值（最低内存地址） */
+    return *bytePtr == 1;
+}

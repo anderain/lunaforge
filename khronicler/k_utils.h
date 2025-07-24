@@ -22,4 +22,6 @@ long    kAtoi(const char* S);
 int     getLineTrimRemarks  (const char* textPtr, char* line);
 int     getLineOnly         (const char* textPtr, char* line);
 
+int     checkIsLittleEndian ();
+
 #endif

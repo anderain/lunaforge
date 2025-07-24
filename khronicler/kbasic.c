@@ -2281,7 +2281,6 @@ int kbCompileEnd(KbContext *context) {
             cmd->param.index = label->pos;
         }
     }
-
     /* 手动在末尾添加一个停止命令 */
     vlPushBack(context->commandList, opCommandCreateStop());
     return 1;
@@ -2342,17 +2341,23 @@ int kbSerialize(
                         + byteLengthString;
 
     /* 申请空间*/
-    pEntireRaw                  = (KByte *)malloc(byteLengthEntire);
+    pEntireRaw  = (KByte *)malloc(byteLengthEntire);
+    pHeader     = (KbBinaryHeader *)pEntireRaw;
+    memset(pHeader, 0, sizeof(KbBinaryHeader));
+
     /* 写入文件头 */
-    pHeader                     = (KbBinaryHeader *)pEntireRaw;
-    pHeader->headerMagic        = HEADER_MAGIC_FLAG;
-    pHeader->numVariables       = context->numVar;
-    pHeader->numFunc            = numFunc;
-    pHeader->funcBlockStart     = 0 + byteLengthHeader;
-    pHeader->cmdBlockStart      = pHeader->funcBlockStart + byteLengthFunc;
-    pHeader->numCmd             = numCmd;
-    pHeader->stringBlockStart   = pHeader->cmdBlockStart + byteLengthCmd;
-    pHeader->stringBlockLength  = byteLengthString;
+    pHeader->headerMagic.bVal[0]    = HEADER_MAGIC_BYTE_0;
+    pHeader->headerMagic.bVal[1]    = HEADER_MAGIC_BYTE_1;
+    pHeader->headerMagic.bVal[2]    = HEADER_MAGIC_BYTE_2;
+    pHeader->headerMagic.bVal[3]    = HEADER_MAGIC_BYTE_3;
+    pHeader->isLittleEndian         = checkIsLittleEndian();
+    pHeader->numVariables           = context->numVar;
+    pHeader->numFunc                = numFunc;
+    pHeader->funcBlockStart         = 0 + byteLengthHeader;
+    pHeader->cmdBlockStart          = pHeader->funcBlockStart + byteLengthFunc;
+    pHeader->numCmd                 = numCmd;
+    pHeader->stringBlockStart       = pHeader->cmdBlockStart + byteLengthCmd;
+    pHeader->stringBlockLength      = byteLengthString;
     /* 设置写入用的指针头 */
     pExpFunc    = (KbExportedFunction *)(pEntireRaw + pHeader->funcBlockStart);
     pCmd        = (KbOpCommand *)(pEntireRaw + pHeader->cmdBlockStart);
@@ -2388,7 +2393,9 @@ int kbSerialize(
 }
 
 void dbgPrintHeader(const KbBinaryHeader* h) {
-    printf("header              = 0x%x\n",  h->headerMagic);
+    printf("header              = 0x%x\n",  h->headerMagic.dVal);
+    printf("is little endian    = %d\n",    h->isLittleEndian);
+    printf("extension id        = %s\n",    h->szExtensionId);
     printf("variable num        = %d\n",    h->numVariables);
     printf("func block start    = %d\n",    h->funcBlockStart);
     printf("func num            = %d\n",    h->numFunc);

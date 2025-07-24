@@ -127,12 +127,26 @@ typedef struct {
     char    funcName[KB_IDENTIFIER_LEN_MAX + 1];
 } KbExportedFunction;
 
+#define HEADER_EXTENSION_MAX_LENGTH 15
+
 /* 文件头魔法数字，用于校验 */
-#define HEADER_MAGIC_FLAG 0x424B
+#define HEADER_MAGIC_BYTE_0     'k'
+#define HEADER_MAGIC_BYTE_1     'b'
+#define HEADER_MAGIC_BYTE_2     's'
+#define HEADER_MAGIC_BYTE_3     '2'
 
 typedef struct {
     /* 文件头魔法数字，用于校验 */
-    KDword headerMagic;
+    union {
+        unsigned char bVal[4];
+        KDword dVal;
+    } headerMagic;
+
+    /* 是否是小端序 */
+    KDword isLittleEndian;
+
+    /* 拓展标志 */
+    char szExtensionId[HEADER_EXTENSION_MAX_LENGTH + 1];
 
     /* 全局变量数 */
     KDword numVariables;
