@@ -4,3 +4,5 @@
 *.exe
 *.kbs
 .vscode
+*.html
+*.json

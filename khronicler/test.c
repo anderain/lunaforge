@@ -6,15 +6,15 @@
 
 #define RESULT_SUCCESS      1
 #define RESULT_FAILED       0
-#define DIVIDER             "--------------------"
+#define ABS(v)  ((v) >= 0 ? (v) : -(v))
 
 typedef struct {
     int excepted;
     char* name;
     char* source;
-} SyntaxTestCase;
+} SyntaxTest;
 
-SyntaxTestCase SyntaxTestCases[] = {
+SyntaxTest SyntaxTestCases[] = {
     {
         RESULT_SUCCESS,
         "empty_input",
@@ -55,7 +55,7 @@ SyntaxTestCase SyntaxTestCases[] = {
     {
         RESULT_FAILED,
         "function_too_many_parameters",
-        "func too_many(v0,v1,v2,v3,v4,v5,v6,v7,v8,v9,a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z)"
+        "func too_many(v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w)"
     },
     {
         RESULT_FAILED,
@@ -212,6 +212,21 @@ SyntaxTestCase SyntaxTestCases[] = {
         "1 2"
     },
     {
+        RESULT_FAILED,
+        "expression_invalid_case2",
+        "a >"
+    },
+    {
+        RESULT_FAILED,
+        "expression_invalid_case3",
+        "= b"
+    },
+    {
+        RESULT_SUCCESS,
+        "expression_plain",
+        "a > b"
+    },
+    {
         RESULT_SUCCESS,
         "all_correct",
         "dim a = 1\n"
@@ -224,28 +239,43 @@ SyntaxTestCase SyntaxTestCases[] = {
         "  a = a + 1\n"
         "end while\n"
         "p(\"loop exit\")"
-    },
-    { RESULT_FAILED, NULL, NULL }
+    }
 };
+#define SYNTAX_TEST_NUM (sizeof(SyntaxTestCases) / sizeof(SyntaxTestCases[0]))
 
-void TestAllSyntaxError() {
+typedef struct {
+    int isPassed;
+    char errMsg[200];
+} SyntaxTestResult;
+
+SyntaxTestResult syntaxTestResults[SYNTAX_TEST_NUM];
+
+int numSyntaxTestPassed = 0;
+
+int TestAllSyntaxError() {
     KbBuildError    errorRet = { KBE_NO_ERROR, 0, { '\0' }};
     KbContext*      context;
     int             ret;
     char            *textBuf;
     char            *textPtr;
     int             lineCount;
-    char            buf[100];
+    char            errBuf[100];
     int             i;
     int             numPassCount = 0;
 
-    for (i = 0; SyntaxTestCases[i].name; i++) {
-        int isSuccess = 0, isPassed = 0;
-        SyntaxTestCase* pCase = SyntaxTestCases + i;
+    for (i = 0; i < SYNTAX_TEST_NUM; i++) {
+        int                 isSyntaxCheckSuccess = 0;
+        SyntaxTest*         pCase = SyntaxTestCases + i;
+        SyntaxTestResult*   pCaseResult = syntaxTestResults + i;
+
         textBuf = pCase->source;
         errorRet.errorType = KBE_NO_ERROR;
+        StringCopy(pCaseResult->errMsg, sizeof(pCaseResult->errMsg), "");
+        pCaseResult->isPassed = 0;
+    
         context = kbCompileStart();
-        contextCtrlResetCounter(context);    
+        contextCtrlResetCounter(context);
+
         for (textPtr = textBuf, lineCount = 1; *textPtr; lineCount++) {
             char line[1000];
             textPtr += getLineTrimRemarks(textPtr, line);
@@ -254,35 +284,36 @@ void TestAllSyntaxError() {
                 goto compileEnd;
             }
         }
-        --lineCount;
+    
         if (context->pCurrentFunc != NULL) {
             errorRet.errorPos = 0;
             errorRet.errorType = KBE_INCOMPLETE_FUNC;
             errorRet.message[0] = '\0';
-            isSuccess = 0;
+            isSyntaxCheckSuccess = 0;
             goto compileEnd;
         }
+    
         if (context->ctrlFlow.stack->size > 0) {
             errorRet.errorPos = 0;
             errorRet.errorType = KBE_INCOMPLETE_CTRL_FLOW;
             errorRet.message[0] = '\0';
-            isSuccess = 0;
+            isSyntaxCheckSuccess = 0;
             goto compileEnd;
         }
-        isSuccess = 1;
+        isSyntaxCheckSuccess = 1;
+    
 compileEnd:
-        if (pCase->excepted == isSuccess) {
-            isPassed = 1;
+        if (pCase->excepted == isSyntaxCheckSuccess) {
+            pCaseResult->isPassed = 1;
             numPassCount++;
         }
-        kbFormatBuildError(&errorRet, buf, sizeof(buf));
-        printf("Case %d - %s\n", i + 1, pCase->name);
-        printf("Source Code: \n%s\n", pCase->source);
-        printf("Result: [%d] %s\n%s\n", lineCount, buf, isPassed ? "PASSED" : "NOT PASSED");
-        puts(DIVIDER);
+
+        kbFormatBuildError(&errorRet, errBuf, sizeof(errBuf));
+        StringCopy(pCaseResult->errMsg, sizeof(pCaseResult->errMsg), errBuf);
         contextDestroy(context);
     }
-    printf("Syntax test completed, %d/%d passed.\n", numPassCount, i);
+
+    return numPassCount;
 }
 
 typedef struct {
@@ -291,9 +322,9 @@ typedef struct {
     char*       exceptedStr;
     char*       name;
     char*       source;
-} RuntimeValueTestCase;
+} RuntimeValueTest;
 
-RuntimeValueTestCase RuntimeValueTestCases[] = {
+RuntimeValueTest RuntimeValueTestCases[] = {
     {
         RVT_NUMBER, 120, NULL,
         "factorial",
@@ -379,9 +410,20 @@ RuntimeValueTestCase RuntimeValueTestCases[] = {
         "    end if\n"
         "    return \"\"\n"
         "end func"
-    },
-    { RVT_NIL, 0, NULL, NULL }
+    }
 };
+#define RUNTIME_VALUE_TEST_NUM (sizeof(RuntimeValueTestCases) / sizeof(RuntimeValueTestCases[0]))
+
+typedef struct {
+    int isPassed;
+    char errMsg[200];
+    char szExcepted[200];
+    char szActualGot[200];
+} RuntimeTestResult;
+
+RuntimeTestResult RuntimeTestResults[RUNTIME_VALUE_TEST_NUM];
+
+int numRuntimeTestPassed = 0;
 
 int runBinary(const KByte* pRaw, KbRuntimeValue** ppRtValueGot) {
     KbRuntimeError  errorRet;
@@ -398,7 +440,7 @@ int runBinary(const KByte* pRaw, KbRuntimeValue** ppRtValueGot) {
     if (!ret) {
         char error_message[200];
         formatExecError(&errorRet, error_message, sizeof(error_message));
-        printf("Runtime Error: %s\n", error_message);
+        fprintf(stderr, "Runtime Error: %s\n", error_message);
         machineDestroy(app);
         return 0;
     }
@@ -409,7 +451,7 @@ int runBinary(const KByte* pRaw, KbRuntimeValue** ppRtValueGot) {
     return 1;
 }
 
-void TestRuntimeValue() {
+int TestRuntimeValue() {
     KbBuildError    errorRet;
     KbContext*      context;
     int             ret;
@@ -421,15 +463,25 @@ void TestRuntimeValue() {
     KByte*          pSerializedRaw;
     int             i;
     int             numPassCount = 0;
-    RuntimeValueTestCase* pCase;
 
-    for (i = 0; RuntimeValueTestCases[i].name; i++) {
-        int casePassed = 0;
-        pCase = RuntimeValueTestCases + i;
+
+    for (i = 0; i < RUNTIME_VALUE_TEST_NUM; i++) {
+        int isCasePassed = 0;
+        char* szExcepted = NULL;
+        char* szActualGot = NULL;
+        char  errBuf[200] = "";
+    
+        RuntimeValueTest*   pCase = RuntimeValueTestCases + i;
+        RuntimeTestResult*  pCaseResult = RuntimeTestResults + i;
+
+        StringCopy(pCaseResult->errMsg, sizeof(pCaseResult->errMsg), "");
+        StringCopy(pCaseResult->szActualGot, sizeof(pCaseResult->szActualGot), "");
+        StringCopy(pCaseResult->szExcepted, sizeof(pCaseResult->szExcepted), "");
+
         textBuf = pCase->source;
         context = kbCompileStart();
         contextCtrlResetCounter(context);
-        printf("Case %d - %s\n", i + 1, pCase->name);
+
         isSuccess = 1; 
         for (textPtr = textBuf, lineCount = 1; *textPtr; lineCount++) {
             char line[1000];
@@ -468,23 +520,19 @@ void TestRuntimeValue() {
         kbCompileEnd(context);
 
 compileEnd:
-        printf("Source Code: \n%s\n", pCase->source);
     
         if (!isSuccess) {
-            char buf[200];
-            kbFormatBuildError(&errorRet, buf, sizeof(buf));
-            printf("(%d) ERROR: %s\n", lineCount, buf);
+            kbFormatBuildError(&errorRet, errBuf, sizeof(errBuf));
             contextDestroy(context);
-            printf("Result: ERROR; NOT PASSED\n");
         }
         else {
             int runResult = 0;
-            KbRuntimeValue* rtVarGot;
-            char *szExcepted, *szVarGot;
+            KbRuntimeValue* rtActualGot;
+            
             ret = kbSerialize(context, &pSerializedRaw, &resultByteLength);
 
             if (ret) {
-                runResult = runBinary(pSerializedRaw, &rtVarGot);
+                runResult = runBinary(pSerializedRaw, &rtActualGot);
                 free(pSerializedRaw);
             }
             contextDestroy(context);
@@ -499,41 +547,249 @@ compileEnd:
                     tempRtValue.data.num = pCase->exceptedNum;
                 }
                 szExcepted = rtvalueStringify(&tempRtValue);
-                szVarGot = rtvalueStringify(rtVarGot);
-                if (pCase->exceptedType != rtVarGot->type) {
-                    casePassed = 0;
+                szActualGot = rtvalueStringify(rtActualGot);
+                if (pCase->exceptedType != rtActualGot->type) {
+                    isCasePassed = 0;
                 }
                 else {
                     switch (pCase->exceptedType) {
-                    case RVT_NUMBER:
-                        casePassed = pCase->exceptedNum == rtVarGot->data.num;
+                    case RVT_NUMBER: {
+                        KB_FLOAT abs = ABS(pCase->exceptedNum - rtActualGot->data.num);
+                        isCasePassed = abs < 1e-8;
                         break;
+                    }
                     case RVT_STRING:
-                        casePassed = StringEqual(pCase->exceptedStr, rtVarGot->data.sz);
+                        isCasePassed = StringEqual(pCase->exceptedStr, rtActualGot->data.sz);
                         break;
                     default:
-                        casePassed = 0;
+                        isCasePassed = 0;
                         break;
                     }
                 }
-                if (casePassed) {
+                if (isCasePassed) {
                     numPassCount++;
                 }
-                printf("Result: Expected %s, Got %s. %s\n", szExcepted, szVarGot, casePassed ? "PASSED" : "NOT PASSED");
-                free(szExcepted);
-                free(szVarGot);
-            }
-            else {
-                printf("Result: ERROR, NOT PASSED\n");
             }
         }
-        puts(DIVIDER);
+
+        StringCopy(pCaseResult->errMsg, sizeof(pCaseResult->errMsg), errBuf);
+        StringCopy(pCaseResult->szActualGot, sizeof(pCaseResult->szActualGot), szActualGot ? szActualGot : "N/A");
+        StringCopy(pCaseResult->szExcepted, sizeof(pCaseResult->szExcepted), szExcepted ? szExcepted : "N/A");
+        pCaseResult->isPassed = isCasePassed;
+    
+        if (szExcepted) free(szExcepted);
+        if (szActualGot) free(szActualGot);
     }
-    printf("Runtime test completed, %d/%d passed.\n", numPassCount, i);
+    return numPassCount;
+}
+
+void printStringInJson(FILE* fp, const char *str) {
+    int i;
+    for (i = 0; str[i]; ++i) {
+        char c = str[i];
+        if (c == '\n') {
+            fprintf(fp, "\\n");
+        }
+        else if (c == '"') {
+            fprintf(fp, "\\\"");
+        }
+        else if (c == '\t') {
+            fprintf(fp, "\t");
+        }
+        else if (c == '\r') {
+            fprintf(fp, "\r");
+        }
+        else {
+            fprintf(fp, "%c", c);
+        }
+    }
+}
+
+void printAsJson(FILE* fp) {
+    int i;
+
+    fprintf(fp, "{\n");
+    fprintf(fp, "  \"syntax_test\": [\n");
+
+    for (i = 0; i < SYNTAX_TEST_NUM; i++) {
+        SyntaxTest*         pCase = SyntaxTestCases + i;
+        SyntaxTestResult*   pCaseResult = syntaxTestResults + i;
+
+        fprintf(fp, "    {\n");
+        fprintf(fp, "      \"id\": \"SYN-%03d\",\n", i + 1);
+        fprintf(fp, "      \"name\": \"", i + 1); printStringInJson(fp, pCase->name); fprintf(fp, "\",\n");
+        fprintf(fp, "      \"src\": \"", i + 1); printStringInJson(fp, pCase->source); fprintf(fp, "\",\n");
+        fprintf(fp, "      \"expect_success\": %s,\n", pCase->excepted ? "true" : "false");
+        fprintf(fp, "      \"err_msg\": \"", i + 1); printStringInJson(fp, pCaseResult->errMsg); fprintf(fp, "\",\n");
+        fprintf(fp, "      \"passed\": %s\n", pCaseResult->isPassed ? "true" : "false");
+        fprintf(fp, "    }");
+        if (i >= SYNTAX_TEST_NUM - 1) {
+            fprintf(fp, "\n");
+        }
+        else {
+            fprintf(fp, ",\n");
+        }
+    }
+    fprintf(fp, "  ],\n");
+    fprintf(fp, "  \"runtime_test\": [\n");
+    for (i = 0; i < RUNTIME_VALUE_TEST_NUM; i++) {
+        RuntimeValueTest*   pCase = RuntimeValueTestCases + i;
+        RuntimeTestResult*  pCaseResult = RuntimeTestResults + i;
+    
+        fprintf(fp, "    {\n");
+        fprintf(fp, "      \"id\": \"RT-%03d\",\n", i + 1);
+        fprintf(fp, "      \"name\": \"", i + 1); printStringInJson(fp, pCase->name); fprintf(fp, "\",\n");
+        fprintf(fp, "      \"src\": \"", i + 1); printStringInJson(fp, pCase->source); fprintf(fp, "\",\n");
+        fprintf(fp, "      \"expected\": \"", i + 1); printStringInJson(fp, pCaseResult->szExcepted); fprintf(fp, "\",\n");
+        fprintf(fp, "      \"actual_got\": \"", i + 1); printStringInJson(fp, pCaseResult->szActualGot); fprintf(fp, "\",\n");
+        fprintf(fp, "      \"err_msg\": \"", i + 1); printStringInJson(fp, pCaseResult->errMsg); fprintf(fp, "\",\n");
+        fprintf(fp, "      \"passed\": %s\n", pCaseResult->isPassed ? "true" : "false");
+        fprintf(fp, "    }");
+        if (i >= RUNTIME_VALUE_TEST_NUM - 1) {
+            fprintf(fp, "\n");
+        }
+        else {
+            fprintf(fp, ",\n");
+        }
+    }
+    fprintf(fp, "  ]\n");
+    fprintf(fp, "}\n");
+}
+
+void printAsHtml(FILE* fp) {
+    int i;
+
+    fputs(
+        "<!DOCTYPE html>"
+        "<html lang=\"en-US\">"
+        "<head>"
+        "<meta charset=\"UTF-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+        "<title> KBasic Test Report </title>"
+        "</head>"
+        "<body>"
+        "<div class=\"report-container\">",
+        fp
+    );
+
+    fputs("<h1>KBasic Khronicler</h1>", fp);
+    fprintf(fp, "<p>Comipler / KRT Version %s</p>\n", KBASIC_VERSION);
+
+    fputs("<h2>Overall Test Summary</h2>\n", fp);
+    fputs("<table>\n", fp);
+    fputs(
+        "<tr>"
+        "<th>Test Category</th>"
+        "<th>Total Cases</th>"
+        "<th>Passed</th>"
+        "<th>Failed</th>"
+        "<th>Pass Rate</th>"
+        "</tr>",
+        fp
+    );
+    fprintf(fp, "<tr>");
+    fprintf(fp, "<td> Syntax Tests </td>");
+    fprintf(fp, "<td class=\"numeric\"> %d </td>", SYNTAX_TEST_NUM);
+    fprintf(fp, "<td class=\"numeric\"> %d </td>", numSyntaxTestPassed);
+    fprintf(fp, "<td class=\"numeric\"> %d </td>", SYNTAX_TEST_NUM - numSyntaxTestPassed);
+    fprintf(fp, "<td class=\"numeric\"> %d%% </td>", numSyntaxTestPassed * 100 / SYNTAX_TEST_NUM);
+    fprintf(fp, "</tr>");
+    fprintf(fp, "<tr>");
+    fprintf(fp, "<td> Runtime Tests </td>");
+    fprintf(fp, "<td class=\"numeric\"> %d </td>", RUNTIME_VALUE_TEST_NUM);
+    fprintf(fp, "<td class=\"numeric\"> %d </td>", numRuntimeTestPassed);
+    fprintf(fp, "<td class=\"numeric\"> %d </td>", RUNTIME_VALUE_TEST_NUM - numRuntimeTestPassed);
+    fprintf(fp, "<td class=\"numeric\"> %d%% </td>", numRuntimeTestPassed * 100 / RUNTIME_VALUE_TEST_NUM);
+    fprintf(fp, "</tr>");
+    fputs("</table>\n", fp);
+
+    fputs("<h2>Syntax Tests</h2>\n", fp);
+    fputs("<table>\n", fp);
+    fputs(
+        "<tr>"
+        "<th class=\"case-id\">Case ID</th>"
+        "<th class=\"case-name\">Case Name</th>"
+        "<th class=\"source-code\">Source Code</th>"
+        "<th class=\"text-expected\">Expected</th>"
+        "<th class=\"err-msg\">Error Message</th>"
+        "<th class=\"test-result\">Result</th>"
+        "</tr>",
+        fp
+    );
+    for (i = 0; i < SYNTAX_TEST_NUM; i++) {
+        SyntaxTest*         pCase = SyntaxTestCases + i;
+        SyntaxTestResult*   pCaseResult = syntaxTestResults + i;
+
+        fputs("<tr>", fp);
+        fprintf(fp, "<td class=\"case-id\"> SYN-%03d </td>", i + 1);
+        fprintf(fp, "<td class=\"case-name\"> %s </td>", pCase->name);
+        fprintf(fp, "<td class=\"source-code\"><pre>%s</pre></td>", pCase->source);
+        fprintf(fp, "<td class=\"text-expected\"> %s </td>", pCase->excepted ? "Success" : "Fail");
+        fprintf(fp, "<td class=\"err-msg\"> %s </td>", pCaseResult->errMsg);
+        fprintf(fp, "<td class=\"test-result\"><span class=\"%s\"> %s </span></td>", pCaseResult->isPassed ? "test-status success" : "test-status failed", pCaseResult->isPassed ? "PASSED" : "NOT PASSED");
+        fputs("</tr>", fp);
+    }
+    fputs("<table>\n", fp);
+
+    fputs("<h2>Runtime Value Tests</h2>\n", fp);
+    fputs(
+        "<tr>"
+        "<th class=\"case-id\">Case ID</th>"
+        "<th class=\"case-name\">Case Name</th>"
+        "<th class=\"source-code\">Source Code</th>"
+        "<th class=\"text-expected\">Expected Output</th>"
+        "<th class=\"text-got\">Actual Output</th>"
+        "<th class=\"err-msg\">Error Message</th>"
+        "<th class=\"test-result\">Result</th>"
+        "</tr>",
+        fp
+    );
+    for (i = 0; i < RUNTIME_VALUE_TEST_NUM; i++) {
+        RuntimeValueTest*   pCase = RuntimeValueTestCases + i;
+        RuntimeTestResult*  pCaseResult = RuntimeTestResults + i;
+
+        fputs("<tr>", fp);
+        fprintf(fp, "<td class=\"case-id\"> SYN-%03d </td>", i + 1);
+        fprintf(fp, "<td class=\"case-name\"> %s </td>", pCase->name);
+        fprintf(fp, "<td class=\"source-code\"><pre>%s</pre></td>", pCase->source);
+        fprintf(fp, "<td class=\"text-expected\"> %s </td>", pCaseResult->szExcepted);
+        fprintf(fp, "<td class=\"text-got\"> %s </td>", pCaseResult->szActualGot);
+        fprintf(fp, "<td class=\"err-msg\"> %s </td>", pCaseResult->errMsg);
+        fprintf(fp, "<td class=\"test-result\"><span class=\"%s\"> %s </span></td>", pCaseResult->isPassed ? "test-status success" : "test-status failed", pCaseResult->isPassed ? "PASSED" : "NOT PASSED");
+        fputs("</tr>", fp);
+    }
+
+    fputs(
+        "</div>"
+        "</body>\n"
+        "<style>"
+        "td.case-id{color:#999;font-weight:bold}"
+        ".test-status,pre{font-family:'Courier New',Courier,monospace}"
+        "body,html{color: #333;padding:0;margin:0;overflow-x:hidden;font-family:Arial,Helvetica,sans-serif}"
+        ".report-container{width:100%;max-width:1200px;margin:0 auto;padding:10px}"
+        "table{table-layout:auto;width:100%;font-size:12px;border-collapse:collapse}"
+        "h1,h2,h3,h4,h5,h6{color:#14509a}"
+        "h1{padding-bottom:4px;border-bottom:2px solid #5d93d5}"
+        "tr{border-bottom:1px solid #ddd}"
+        "td{padding:4px 4px}"
+        "th{color:#fff;background:linear-gradient(#306ab0,#4888d5);padding:8px 4px}"
+        "pre{white-space:break-spaces;text-align:left;margin: 0}"
+        "th.case-id{width:100px}"
+        "td.case-id{text-align:center}"
+        "td.text-expected,td.text-got{text-align:center;max-width:100px}"
+        "td.numeric{text-align:right}"
+        ".test-status{font-weight:700;white-space:nowrap;padding:2px 8px;border-radius:4px;color:#fff;display:block;margin:0 auto;width:fit-content}"
+        ".test-status.success{background-color:green}"
+        ".test-status.failed{background-color:red}"
+        "</style>\n"
+        "</html>",
+        fp
+    );
 }
 
 int main(int argc, char** argv) {
-    TestAllSyntaxError(); 
-    TestRuntimeValue();
+    numSyntaxTestPassed = TestAllSyntaxError();
+    numRuntimeTestPassed = TestRuntimeValue();
+    printAsHtml(stdout);
     return 0;
 }

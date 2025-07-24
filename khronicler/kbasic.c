@@ -1755,7 +1755,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         }
         /* 标签长度太长 */
         if (strlen(labelName) > KB_IDENTIFIER_LEN_MAX) {
-            compileLineReturnWithError(KBE_ID_TOO_LONG, token->content);
+            compileLineReturnWithError(KBE_ID_TOO_LONG, labelName);
         }
         /* 添加新标签 */
         if (!contextAddLabel(context, labelName, KBL_USER)) {
@@ -1779,7 +1779,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         if (token->type == TOKEN_OPR && StringEqual("=", token->content)) {
             /* 表达式 */
             if (!checkExpr(&analyzer, errorRet)) {
-                compileLineReturn(0);
+                compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid expression.");
             }
             /* 匹配行结束 */
             token = nextToken(&analyzer);
@@ -1803,13 +1803,16 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         if (token->type == TOKEN_OPR && StringEqual("=", token->content)) {
             /* 检查表达式合法性 */
             if (!checkExpr(&analyzer, errorRet)) {
-                compileLineReturn(0);
+                compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid expression.");
             }
         }
         /* 其他情况，此行是表达式 */
         else {
+            /* 解析器回到开始位置 */
+            resetToken(&analyzer);
+            /* 检查表达式合法性 */
             if (!checkExpr(&analyzer, errorRet)) {
-                compileLineReturn(0);
+                compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid expression.");
             }
         }
         /* 匹配行结束 */
@@ -1821,10 +1824,10 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
     /* 其他情况，此行是表达式 */
     else {
         /* 解析器回到开始位置 */
-        rewindToken(&analyzer);
+        resetToken(&analyzer);
         /* 检查表达式合法性 */
         if (!checkExpr(&analyzer, errorRet)) {
-            compileLineReturn(0);
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid expression.");
         }
         /* 匹配行结束 */
         token = nextToken(&analyzer);
@@ -2232,7 +2235,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         /* 其他情况，此行是表达式 */
         else {
             /* 解析器回到开始位置 */
-            rewindToken(&analyzer);
+            resetToken(&analyzer);
             /* 编译表达式 */
             exprRoot = buildExprTree(&analyzer);
             sortExpr(&exprRoot);
@@ -2248,7 +2251,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
     /* 其他情况，此行是表达式 */
     else {
         /* 解析器回到开始位置 */
-        rewindToken(&analyzer);
+        resetToken(&analyzer);
         /* 编译表达式 */
         exprRoot = buildExprTree(&analyzer);
         sortExpr(&exprRoot);

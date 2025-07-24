@@ -1,6 +1,8 @@
 #ifndef _KOMMON_H_
 #define _KOMMON_H_
 
+#define KBASIC_VERSION  "2.0"
+
 #define isDigit(c)      ((c) >= '0' && (c) <= '9')
 #define isUppercase(c)  ((c) >= 'a' && (c) <= 'z')
 #define isLowercase(c)  ((c) >= 'A' && (c) <= 'Z')
