@@ -19,6 +19,7 @@ char *  kFtoa(double f, char * buf, int precision);
 char*   kItoa(int num, char* str, int base);
 long    kAtoi(const char* S);
 
-int     getLineTrimRemarks(const char* textPtr, char* line);
+int     getLineTrimRemarks  (const char* textPtr, char* line);
+int     getLineOnly         (const char* textPtr, char* line);
 
 #endif

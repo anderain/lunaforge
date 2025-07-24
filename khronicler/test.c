@@ -241,6 +241,7 @@ SyntaxTest SyntaxTestCases[] = {
         "p(\"loop exit\")"
     }
 };
+
 #define SYNTAX_TEST_NUM (sizeof(SyntaxTestCases) / sizeof(SyntaxTestCases[0]))
 
 typedef struct {
@@ -656,6 +657,112 @@ void printAsJson(FILE* fp) {
     fprintf(fp, "}\n");
 }
 
+int printHighlightToken(int isPrevSpaceAfter, FILE* fp, Token* token, const char* szStart, int len) {
+    int i;
+    const char* htmlClassName = NULL;
+    int isSpaceBefore = 0;
+    int isSpaceAfter = 0;
+
+    switch (token->type)
+    {
+    case TOKEN_NUM:
+        htmlClassName = "tk-num";
+        break;
+    case TOKEN_ID:
+        htmlClassName = "tk-id";
+        break;
+    case TOKEN_OPR:
+        isSpaceBefore = 1;
+        isSpaceAfter = 1;
+        htmlClassName = "tk-opr";
+        break;
+    case TOKEN_FNC:
+        htmlClassName = "tk-fnc";
+        break;
+    case TOKEN_BKT:
+        htmlClassName = "tk-bkt";
+        break;
+    case TOKEN_CMA:
+        htmlClassName = "tk-cma";
+        break;
+    case TOKEN_STR:
+        htmlClassName = "tk-str";
+        break;
+    case TOKEN_LABEL:
+        htmlClassName = "tk-lbl";
+        break;
+    case TOKEN_KEY:
+        isSpaceAfter = 1;
+        if (!isPrevSpaceAfter && StringEqual("goto", token->content)) {
+            isSpaceBefore = 1;
+        }
+        htmlClassName = "tk-key";
+        break;
+    default:
+        break;
+    }
+    if (isSpaceBefore) {
+        fputc(' ', fp);
+    }
+    fprintf(fp, "<span class=\"%s\">", htmlClassName);
+    for (i = 0; i < len; ++i) {
+        fputc(szStart[i], fp);
+    }
+    if (isSpaceAfter) {
+        fputc(' ', fp);
+    }
+    fprintf(fp, "</span>");
+    return isSpaceAfter;
+}
+
+void printScriptWithHighlightHtml(FILE* fp, const char* script) {
+    const char* textPtr;
+    int         lineCount = 0;
+    char        line[1000];
+    char*       pRemark;
+    char        szRemark[200];
+    Analyzer    analyzer;
+    int         isSpaceAfter;
+
+    fprintf(fp, "<pre class=\"kbcode\">\n");
+    for (textPtr = script, lineCount = 1; *textPtr; lineCount++) {
+        char* linePtr;
+        /* 读取一行 */
+        textPtr += getLineOnly(textPtr, line);
+        linePtr = line;
+        /* 先打印空白内容 */
+        isSpaceAfter = 1;
+        while (*linePtr && isSpace(*linePtr)) {
+            fprintf(fp, "%c", *linePtr);
+            ++linePtr;
+        }
+        /* 寻找注释 */
+        pRemark = strchr(linePtr, '#');
+        if (pRemark) {
+            strcpy(szRemark, pRemark);
+            *pRemark = '\0';
+        }
+        /* 获取其他token */
+        analyzer.expr = linePtr;
+        resetToken(&analyzer);
+        while (1) {
+            Token* token = nextToken(&analyzer);
+            if (!token || token->type == TOKEN_END) {
+                break;
+            }
+            isSpaceAfter = printHighlightToken(isSpaceAfter, fp, token, linePtr + token->sourceStartPos, token->sourceLength);
+        }
+        /* 打印注释 */
+        if (pRemark) {
+            if (!isSpaceAfter) fputc(' ', fp);
+            fprintf(fp, "<span class=\"tk-remark\">%s</span>", szRemark);
+        }
+        /* 本行结束 */
+        fprintf(fp, "\n");
+    }
+    fprintf(fp, "</pre>\n");
+}
+
 void printAsHtml(FILE* fp) {
     int i;
 
@@ -723,7 +830,9 @@ void printAsHtml(FILE* fp) {
         fputs("<tr>", fp);
         fprintf(fp, "<td class=\"case-id\"> SYN-%03d </td>", i + 1);
         fprintf(fp, "<td class=\"case-name\"> %s </td>", pCase->name);
-        fprintf(fp, "<td class=\"source-code\"><pre>%s</pre></td>", pCase->source);
+        fprintf(fp, "<td class=\"source-code\">");
+        printScriptWithHighlightHtml(fp, pCase->source);
+        fprintf(fp, "</td>");
         fprintf(fp, "<td class=\"text-expected\"> %s </td>", pCase->excepted ? "Success" : "Fail");
         fprintf(fp, "<td class=\"err-msg\"> %s </td>", pCaseResult->errMsg);
         fprintf(fp, "<td class=\"test-result\"><span class=\"%s\"> %s </span></td>", pCaseResult->isPassed ? "test-status success" : "test-status failed", pCaseResult->isPassed ? "PASSED" : "NOT PASSED");
@@ -751,7 +860,9 @@ void printAsHtml(FILE* fp) {
         fputs("<tr>", fp);
         fprintf(fp, "<td class=\"case-id\"> SYN-%03d </td>", i + 1);
         fprintf(fp, "<td class=\"case-name\"> %s </td>", pCase->name);
-        fprintf(fp, "<td class=\"source-code\"><pre>%s</pre></td>", pCase->source);
+        fprintf(fp, "<td class=\"source-code\">");
+        printScriptWithHighlightHtml(fp, pCase->source);
+        fprintf(fp, "</td>");
         fprintf(fp, "<td class=\"text-expected\"> %s </td>", pCaseResult->szExcepted);
         fprintf(fp, "<td class=\"text-got\"> %s </td>", pCaseResult->szActualGot);
         fprintf(fp, "<td class=\"err-msg\"> %s </td>", pCaseResult->errMsg);
@@ -764,7 +875,6 @@ void printAsHtml(FILE* fp) {
         "</body>\n"
         "<style>"
         "td.case-id{color:#999;font-weight:bold}"
-        ".test-status,pre{font-family:'Courier New',Courier,monospace}"
         "body,html{color: #333;padding:0;margin:0;overflow-x:hidden;font-family:Arial,Helvetica,sans-serif}"
         ".report-container{width:100%;max-width:1200px;margin:0 auto;padding:10px}"
         "table{table-layout:auto;width:100%;font-size:12px;border-collapse:collapse}"
@@ -773,7 +883,18 @@ void printAsHtml(FILE* fp) {
         "tr{border-bottom:1px solid #ddd}"
         "td{padding:4px 4px}"
         "th{color:#fff;background:linear-gradient(#306ab0,#4888d5);padding:8px 4px}"
-        "pre{white-space:break-spaces;text-align:left;margin: 0}"
+        "pre{text-align:left;margin: 0;font-family:\"Consolas\",\"Monaco\",\"Lucida Console\",\"Courier New\",monospace;font-size:12px;line-height:1.25;tab-size:4}"
+        "pre.kbcode{color:#1E1E1E;background-color:#fff}"
+        ".kbcode .tk-num{color:#098658}"
+        ".kbcode .tk-id{color:#495057}"
+        ".kbcode .tk-opr{color:#9D7E14}"
+        ".kbcode .tk-fnc{color:#1E1E1E}"
+        ".kbcode .tk-bkt{color:#1E1E1E}"
+        ".kbcode .tk-cma{color:#1E1E1E}"
+        ".kbcode .tk-str{color:#A31515}"
+        ".kbcode .tk-lbl{color:#AF00DB}"
+        ".kbcode .tk-key{color:#0000FF}"
+        ".kbcode .tk-remark{color:#008000}"
         "th.case-id{width:100px}"
         "td.case-id{text-align:center}"
         "td.text-expected,td.text-got{text-align:center;max-width:100px}"

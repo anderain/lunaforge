@@ -261,3 +261,24 @@ int getLineTrimRemarks(const char* textPtr, char* line) {
     /* 返回读取了多少字符 */
     return textPtr - originalTextPtr;
 }
+
+int getLineOnly(const char* textPtr, char* line) {
+    char *linePtr = line;
+    const char *originalTextPtr = textPtr;
+
+    /* 从缓存中获取一行 */
+    do {
+        *linePtr++ = *textPtr++;
+    } while(*textPtr != '\n' && *textPtr != '\0');
+
+    /* 如果是换行，也读取进来 */
+    if (*textPtr == '\n') *linePtr++ = *textPtr++;
+
+    *linePtr-- = '\0';
+
+    /* 移除末尾的空白 */
+    while (isSpace(*linePtr)) *linePtr-- = '\0';
+
+    /* 返回读取了多少字符 */
+    return textPtr - originalTextPtr;
+}

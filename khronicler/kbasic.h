@@ -3,9 +3,33 @@
 
 #include "kommon.h"
 
-#define CTRL_LABEL_FORMAT "!_CS%03d_"
-#define FUNC_LABEL_FORMAT "!_FC%03d_"
+/* 此为解析KBasic代码所需定义 */
+/* 本应该只在 kbasic.c 中使用。为了渲染 HTML 所以开放。慎重使用 */
+typedef enum {
+    TOKEN_ERR,      TOKEN_END,      TOKEN_NUM,
+    TOKEN_ID,       TOKEN_OPR,      TOKEN_FNC,
+    TOKEN_BKT,      TOKEN_CMA,      TOKEN_STR,
+    TOKEN_LABEL,    TOKEN_KEY,
+    TOKEN_UDF
+} TokenType;
 
+typedef struct {
+    TokenType   type;
+    int         sourceStartPos;
+    int         sourceLength;
+    char        content[KB_CONTEXT_STRING_BUFFER_MAX];
+} Token;
+
+typedef struct tagAnalyzer {
+    const char *expr;
+    const char *eptr;
+    Token token;
+} Analyzer;
+
+Token*  nextToken   (Analyzer *_self);
+void    resetToken  (Analyzer *_self);
+
+/* 下为构建字节码所需定义 */
 typedef enum {
     KBE_NO_ERROR = 0,
     KBE_SYNTAX_ERROR,

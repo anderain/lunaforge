@@ -5,6 +5,9 @@
 #include "kbasic.h"
 #include "k_utils.h"
 
+#define CTRL_LABEL_FORMAT "!_CS%03d_"
+#define FUNC_LABEL_FORMAT "!_FC%03d_"
+
 /* 关键字定义 */
 typedef struct {
     const char *word;
@@ -57,14 +60,6 @@ static const BuiltInFunction FUNCTION_LIST[] = {
     { "zeropad",    2, KFID_ZEROPAD     },
 };
 
-typedef enum {
-    TOKEN_ERR,      TOKEN_END,      TOKEN_NUM,
-    TOKEN_ID,       TOKEN_OPR,      TOKEN_FNC,
-    TOKEN_BKT,      TOKEN_CMA,      TOKEN_STR,
-    TOKEN_LABEL,    TOKEN_KEY,
-    TOKEN_UDF
-} TokenType;
-
 const char* DBG_TOKEN_NAME[] = {
     "TOKEN_ERR",    "TOKEN_END",    "TOKEN_NUM",
     "TOKEN_ID",     "TOKEN_OPR",    "TOKEN_FNC",
@@ -72,12 +67,6 @@ const char* DBG_TOKEN_NAME[] = {
     "TOKEN_LABEL",
     "TOKEN_UDF"
 };
-
-typedef struct {
-    int type;
-    int sourceLength;
-    char content[KB_CONTEXT_STRING_BUFFER_MAX];
-} Token;
 
 typedef struct tagExprNode {
     int     type;
@@ -149,18 +138,18 @@ const struct {
 #define exprNodeLeftChild(en)   ((en)->children[0])
 #define exprNodeRightChild(en)  ((en)->children[1])
 
-Token* setToken(Token *token, TokenType type, const char *content, int sourceLength) {
+Token* assignToken(Analyzer* pAnalyzer, TokenType type, const char *content, const char *eptrStart) {
+    Token* token = &pAnalyzer->token;
     token->type = type;
+    /* 此为转义过的 token 内容，可能丢失了转义字符、引号、左括号等内容 */
     StringCopy(token->content, KB_CONTEXT_STRING_BUFFER_MAX, content);
-    token->sourceLength = sourceLength;
+    /* 所以需要专门记录长度信息 */
+    /* token 在此行中的起始下标 */
+    token->sourceStartPos = eptrStart - pAnalyzer->expr;
+    /* token 在此行中的原始长度 */
+    token->sourceLength = pAnalyzer->eptr - eptrStart;
     return token;
 }
-
-typedef struct tagAnalyzer {
-    const char *expr;
-    const char *eptr;
-    Token token;
-} Analyzer;
 
 Token* nextToken(Analyzer *_self) {
     char firstChar, secondChar;
@@ -183,22 +172,22 @@ Token* nextToken(Analyzer *_self) {
         buffer[0] = firstChar;
         buffer[1] = '\0';
         _self->eptr++;
-        return setToken(&_self->token, TOKEN_OPR, buffer, _self->eptr - eptrStart);
+        return assignToken(_self, TOKEN_OPR, buffer, eptrStart);
     case '(':   case ')':
         buffer[0] = firstChar;
         buffer[1] = '\0';
         _self->eptr++;
-        return setToken(&_self->token, TOKEN_BKT, buffer, _self->eptr - eptrStart);
+        return assignToken(_self, TOKEN_BKT, buffer, eptrStart);
     case ',':
         buffer[0] = firstChar;
         buffer[1] = '\0';
         _self->eptr++;
-        return setToken(&_self->token, TOKEN_CMA, buffer, _self->eptr - eptrStart);
+        return assignToken(_self, TOKEN_CMA, buffer, eptrStart);
     case ':':
         buffer[0] = firstChar;
         buffer[1] = '\0';
         _self->eptr++;
-        return setToken(&_self->token, TOKEN_LABEL, buffer, _self->eptr - eptrStart);
+        return assignToken(_self, TOKEN_LABEL, buffer, eptrStart);
     case '>':
         secondChar = *(_self->eptr + 1);
         if (secondChar == '=') {
@@ -206,12 +195,12 @@ Token* nextToken(Analyzer *_self) {
             buffer[1] = secondChar;
             buffer[2] = '\0';
             _self->eptr += 2;
-            return setToken(&_self->token, TOKEN_OPR, buffer, _self->eptr - eptrStart);
+            return assignToken(_self, TOKEN_OPR, buffer, eptrStart);
         } else {
             buffer[0] = firstChar;
             buffer[1] = '\0';
             _self->eptr++;
-            return setToken(&_self->token, TOKEN_OPR, buffer, _self->eptr - eptrStart);
+            return assignToken(_self, TOKEN_OPR, buffer, eptrStart);
         }
     case '<':
         secondChar = *(_self->eptr + 1);
@@ -220,18 +209,18 @@ Token* nextToken(Analyzer *_self) {
             buffer[1] = secondChar;
             buffer[2] = '\0';
             _self->eptr += 2;
-            return setToken(&_self->token, TOKEN_OPR, buffer, _self->eptr - eptrStart);
+            return assignToken(_self, TOKEN_OPR, buffer, eptrStart);
         } else if (secondChar == '>') {
             buffer[0] = firstChar;
             buffer[1] = secondChar;
             buffer[2] = '\0';
             _self->eptr += 2;
-            return setToken(&_self->token, TOKEN_OPR, buffer, _self->eptr - eptrStart);
+            return assignToken(_self, TOKEN_OPR, buffer, eptrStart);
         } else {
             buffer[0] = firstChar;
             buffer[1] = '\0';
             _self->eptr++;
-            return setToken(&_self->token, TOKEN_OPR, buffer, _self->eptr - eptrStart);
+            return assignToken(_self, TOKEN_OPR, buffer, eptrStart);
         }
     case '&':
         secondChar = *(_self->eptr + 1);
@@ -240,12 +229,12 @@ Token* nextToken(Analyzer *_self) {
             buffer[1] = secondChar;
             buffer[2] = '\0';
             _self->eptr += 2;
-            return setToken(&_self->token, TOKEN_OPR, buffer, _self->eptr - eptrStart);
+            return assignToken(_self, TOKEN_OPR, buffer, eptrStart);
         } else {
             buffer[0] = firstChar;
             buffer[1] = '\0';
             _self->eptr++;
-            return setToken(&_self->token, TOKEN_OPR, buffer, _self->eptr - eptrStart);
+            return assignToken(_self, TOKEN_OPR, buffer, eptrStart);
         }
     case '|':
         secondChar = *(_self->eptr + 1);
@@ -254,18 +243,18 @@ Token* nextToken(Analyzer *_self) {
             buffer[1] = secondChar;
             buffer[2] = '\0';
             _self->eptr += 2;
-            return setToken(&_self->token, TOKEN_OPR, buffer, _self->eptr - eptrStart);
+            return assignToken(_self, TOKEN_OPR, buffer, eptrStart);
         } else {
             buffer[0] = firstChar;
             buffer[1] = '\0';
             _self->eptr++;
-            return setToken(&_self->token, TOKEN_UDF, buffer, _self->eptr - eptrStart);
+            return assignToken(_self, TOKEN_UDF, buffer, eptrStart);
         }
     }
 
     /* 扫描到结尾 */
     if (firstChar == '\0') {
-        return setToken(&_self->token, TOKEN_END, "", 0);
+        return assignToken(_self, TOKEN_END, "", eptrStart);
     }
     /* 数字 */
     else if (isDigit(firstChar)) {
@@ -285,25 +274,29 @@ Token* nextToken(Analyzer *_self) {
         *pbuffer = '\0';
         /* 过长 */
         if ((pbuffer - buffer) >= KB_CONTEXT_STRING_BUFFER_MAX) {
-            return setToken(&_self->token, TOKEN_ERR, "Number too long", _self->eptr - eptrStart);
+            assignToken(_self, TOKEN_ERR, "Number too long", eptrStart);
         }
 
-        return setToken(&_self->token, TOKEN_NUM, buffer, _self->eptr - eptrStart);
+        return assignToken(_self, TOKEN_NUM, buffer, eptrStart);
     }
     /* 标志符 identifier */
     else if (isAlpha(firstChar)) {
-        int i;
-        int isFunc = 0;
+        int         i;
+        int         isFunc = 0;
+        const char* pIdEnd;
 
         while (isAlphaNum(*_self->eptr)) {
             *pbuffer++ = *_self->eptr++;
         }
         *pbuffer = '\0';
 
+        /* 记录 identifier 停止位置 */
+        pIdEnd = _self->eptr;
+
         /* 检查是否是关键字？*/
         for (i = 0; KEYWORDS[i].word; ++i) {
             if (StringEqual(KEYWORDS[i].word, buffer)) {
-                return setToken(&_self->token, TOKEN_KEY, buffer, _self->eptr - eptrStart);
+                return assignToken(_self, TOKEN_KEY, buffer, eptrStart);
             }
         }
         
@@ -319,14 +312,17 @@ Token* nextToken(Analyzer *_self) {
         
         /* token 过长 */
         if ((pbuffer - buffer) >= KB_CONTEXT_STRING_BUFFER_MAX) {
-            return setToken(&_self->token, TOKEN_ERR, "Identifier too long", _self->eptr - eptrStart);
+            assignToken(_self, TOKEN_ERR, "Identifier too long", eptrStart);
         }
 
         if (isFunc) {
-            return setToken(&_self->token, TOKEN_FNC, buffer, _self->eptr - eptrStart);
+            /* 函数名：读取长度 = id长度 + 中间的空白 + 右括号 */
+            return assignToken(_self, TOKEN_FNC, buffer, eptrStart);
         }
         else {
-            return setToken(&_self->token, TOKEN_ID, buffer, _self->eptr - eptrStart);
+            /* 变量：读取长度 = 仅id长度 */
+            _self->eptr = pIdEnd;
+            return assignToken(_self, TOKEN_ID, buffer, eptrStart);
         }
     }
     /* 是字符串 */
@@ -378,19 +374,19 @@ Token* nextToken(Analyzer *_self) {
                         ++hexDigitCount;
                     }
                     if (hexDigitCount <= 0) {
-                        return setToken(&_self->token, TOKEN_ERR, "Invalid hex escape char", _self->eptr - eptrStart);
+                        assignToken(_self, TOKEN_ERR, "Invalid hex escape char", eptrStart);
                     }
                     *pbuffer++ = hexValue;
                 }
                 /* 非法转义字符 */
                 else {
-                    return setToken(&_self->token, TOKEN_ERR, "Invalid escape char", _self->eptr - eptrStart);
+                    assignToken(_self, TOKEN_ERR, "Invalid escape char", eptrStart);
                 }
                 _self->eptr++;
             }
             /* 不完整 */
             else if (currentChar == '\0') {
-                return setToken(&_self->token, TOKEN_ERR, "Incomplete string", _self->eptr - eptrStart);
+                assignToken(_self, TOKEN_ERR, "Incomplete string", eptrStart);
             }
             else {
                 *pbuffer++ = *_self->eptr++;
@@ -402,19 +398,19 @@ Token* nextToken(Analyzer *_self) {
 
         /* String过长 */
         if ((pbuffer - buffer) >= KB_CONTEXT_STRING_BUFFER_MAX) {
-            return setToken(&_self->token, TOKEN_ERR, "String too long", _self->eptr - eptrStart);
+            assignToken(_self, TOKEN_ERR, "String too long", eptrStart);
         }
 
         *pbuffer = '\0';
 
-        return setToken(&_self->token, TOKEN_STR, buffer, _self->eptr - eptrStart);
+        return assignToken(_self, TOKEN_STR, buffer, eptrStart);
     }
     /* 没定义的字符 */
     else {
         _self->eptr++;
         buffer[0] = firstChar;
         buffer[1] = '\0';
-        return setToken(&_self->token, TOKEN_UDF, buffer, _self->eptr - eptrStart);
+        return assignToken(_self, TOKEN_UDF, buffer, eptrStart);
     }
     return NULL;
 }
