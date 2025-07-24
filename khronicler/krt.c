@@ -69,6 +69,20 @@ char* rtvalueStringify(const KbRuntimeValue* v) {
     return StringDump("<unknown-value>");
 }
 
+int rtvalueIsTrue(const KbRuntimeValue *v) {
+    if (v == NULL) {
+        return 0;
+    }
+    /* 数字不为零是真 */
+    else if (v->type == RVT_NUMBER) {
+        return (int)v->data.num;
+    }
+    /* 字符串不为空是真 */
+    else if (v->type == RVT_STRING && strlen(v->data.sz) > 0) {
+        return 1;
+    }
+    return 0;
+}
 
 void rtvalueDestroy(KbRuntimeValue* val) {
     if (val->type == RVT_STRING) {
@@ -435,19 +449,11 @@ int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
                 rtvalueDestroy(operand[0]);
                 */
                 /* 新逻辑，除了数字，增加了字符串的逻辑 */
-                int isPopedTrue = 0;
                 KbRuntimeValue* popped = (KbRuntimeValue *)vlPopBack(machine->stack);
-                /* 数字不为零是真 */
-                if (popped->type == RVT_NUMBER) {
-                    isPopedTrue = (int)popped->data.num;
-                }
-                /* 字符串不为空是真 */
-                else if (popped->type == RVT_STRING && strlen(popped->data.sz) > 0) {
-                    isPopedTrue = 1;
-                }
+                int isTrue = rtvalueIsTrue(popped);
                 rtvalueDestroy(popped);
                 /* 入栈一个相反的数字值 */
-                vlPushBack(machine->stack, rtvalueCreateNumber((KB_FLOAT)!isPopedTrue));
+                vlPushBack(machine->stack, rtvalueCreateNumber((KB_FLOAT)!isTrue));
 	            break;
             }
             case KBO_OPR_AND: {
@@ -580,17 +586,21 @@ int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
                 machine->cmdPtr = cmdBlockPtr + cmd->param.index;
 	            continue;
             }
-            case KBO_IFGOTO: {
-                int isTrue = 0;
+            case KBO_IF_GOTO: {
                 KbRuntimeValue *popped = (KbRuntimeValue *)vlPopBack(machine->stack);
-                if (popped->type == RVT_NUMBER) {
-                    isTrue = (int)popped->data.num;
-                }
-                else if (popped->type == RVT_STRING && strlen(popped->data.sz) > 0) {
-                    isTrue = 1;
-                }
+                int isTrue = rtvalueIsTrue(popped);
                 rtvalueDestroy(popped);
                 if (isTrue) {
+                    machine->cmdPtr = cmdBlockPtr + cmd->param.index;
+                    continue;
+                }
+                break;
+            }
+            case KBO_UNLESS_GOTO: {
+                KbRuntimeValue *popped = (KbRuntimeValue *)vlPopBack(machine->stack);
+                int isTrue = rtvalueIsTrue(popped);
+                rtvalueDestroy(popped);
+                if (!isTrue) {
                     machine->cmdPtr = cmdBlockPtr + cmd->param.index;
                     continue;
                 }

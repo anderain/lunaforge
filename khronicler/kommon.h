@@ -59,7 +59,7 @@ typedef struct {
     union {
         KB_FLOAT    number;
         KDword      index;
-        /* 只有第一轮处理在 goto / ifgoto 命令使用这种值 */
+        /* 只有第一轮处理在 GOTO / IF_GOTO / UNLESS_GOTO 命令使用这种值 */
         void*       ptr; /* <KbContextLabel *> */
     } param;
 } KbOpCommand;
@@ -98,7 +98,8 @@ typedef enum {
     KBO_CALL_USER,          /* 调用 */
     /* 跳转控制命令 */
     KBO_GOTO,               /* 无条件跳转 */
-    KBO_IFGOTO,             /* 出栈，检查后跳转 */
+    KBO_IF_GOTO,            /* 出栈，是真后跳转 */
+    KBO_UNLESS_GOTO,        /* 出栈，是假后跳转 */
     KBO_RETURN,             /* 函数返回 */
     KBO_STOP                /* 结束执行 */
 } KB_OPCODE;

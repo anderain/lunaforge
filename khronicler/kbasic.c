@@ -1209,12 +1209,20 @@ KbOpCommand* opCommandCreateGoto(KbContextLabel *label) {
 KbOpCommand* opCommandCreateIfGoto(KbContextLabel *label) {
     KbOpCommand* cmd = (KbOpCommand*)malloc(sizeof(KbOpCommand));
 
-    cmd->op = KBO_IFGOTO;
+    cmd->op = KBO_IF_GOTO;
     cmd->param.ptr = label;
 
     return cmd;
 }
 
+KbOpCommand* opCommandCreateUnlessGoto(KbContextLabel *label) {
+    KbOpCommand* cmd = (KbOpCommand*)malloc(sizeof(KbOpCommand));
+
+    cmd->op = KBO_UNLESS_GOTO;
+    cmd->param.ptr = label;
+
+    return cmd;
+}
 
 int compileExprTree(KbContext *context, ExprNode *node, KbBuildError *errorRet) {
     int i;
@@ -1349,7 +1357,8 @@ void dbgPrintContextCommand(const KbOpCommand *cmd) {
      || cmd->op == KBO_ASSIGN_VAR
      || cmd->op == KBO_ASSIGN_LOCAL
      || cmd->op == KBO_GOTO
-     || cmd->op == KBO_IFGOTO) {
+     || cmd->op == KBO_IF_GOTO
+     || cmd->op == KBO_UNLESS_GOTO) {
         printf("%-8d", cmd->param.index);
     }
     /* 带浮点数参数的cmd */
@@ -1903,8 +1912,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
             pCfItem = contextCtrlPush(context, KBCS_IF_THEN);
             label = contextCtrlGetLabel(context, pCfItem->iLabelNext);
             /* 生成 cmd */
-            vlPushBack(context->commandList, opCommandCreateOperator(OPR_NOT));
-            vlPushBack(context->commandList, opCommandCreateIfGoto(label));
+            vlPushBack(context->commandList, opCommandCreateUnlessGoto(label));
         }
     }
     /* elseif 语句 */
@@ -1946,8 +1954,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         label = contextCtrlGetLabel(context, pCfItem->iLabelNext);
 
         /* 生成cmd */
-        vlPushBack(context->commandList, opCommandCreateOperator(OPR_NOT));
-        vlPushBack(context->commandList, opCommandCreateIfGoto(label));
+        vlPushBack(context->commandList, opCommandCreateUnlessGoto(label));
     }
     /* else 语句 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_ELSE, token->content)) {
@@ -1993,8 +2000,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         /* 不满足的时候跳转标签 */
         labelEnd = contextCtrlGetLabel(context, pCfItem->iLabelEnd);
         /* 生成cmd */
-        vlPushBack(context->commandList, opCommandCreateOperator(OPR_NOT));
-        vlPushBack(context->commandList, opCommandCreateIfGoto(labelEnd));
+        vlPushBack(context->commandList, opCommandCreateUnlessGoto(labelEnd));
     }
     /* break 语句 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_BREAK, token->content)) {
@@ -2270,7 +2276,7 @@ int kbCompileEnd(KbContext *context) {
     for (node = context->commandList->head; node != NULL; node = node->next) { 
         KbOpCommand *cmd = (KbOpCommand *)node->data;
         
-        if (cmd->op == KBO_IFGOTO || cmd->op == KBO_GOTO) {
+        if (cmd->op == KBO_IF_GOTO || cmd->op == KBO_GOTO || cmd->op == KBO_UNLESS_GOTO) {
             KbContextLabel *label = (KbContextLabel *)cmd->param.ptr;
             cmd->param.index = label->pos;
         }
