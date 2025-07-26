@@ -91,7 +91,7 @@ void rtvalueDestroy(KbRuntimeValue* val) {
     free(val);
 }
 
-void rtvalueDestoryVoidPointer(void* p) {
+void rtvalueDestroyVoidPointer(void* p) {
     rtvalueDestroy((KbRuntimeValue *)p);
 }
 
@@ -156,7 +156,7 @@ void machineDestroy(KbMachine* machine) {
         rtvalueDestroy(machine->variables[i]);
     }
     free(machine->variables);
-    vlDestroy(machine->stack, rtvalueDestoryVoidPointer);
+    vlDestroy(machine->stack, rtvalueDestroyVoidPointer);
     vlDestroy(machine->callEnvStack, callEnvDestroyVoidPtr);
     free(machine);
 }

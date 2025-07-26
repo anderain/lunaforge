@@ -435,30 +435,29 @@ RuntimeTestResult RuntimeTestResults[RUNTIME_VALUE_TEST_NUM];
 
 int numRuntimeTestPassed = 0;
 
-int runBinary(const KByte* pRaw, KbRuntimeValue** ppRtValueGot) {
+KbRuntimeValue* runBinaryAndDumpFirstVar(const KByte* pRaw, char* errMsg, int errMsgLength) {
     KbRuntimeError  errorRet;
     int             ret;
     KbMachine*      app;
+    KbRuntimeValue* rtValueRet;
 
     app = machineCreate(pRaw);
 
     if (!app) {
-        return 0;
+        return NULL;
     }
 
     ret = machineExec(app, 0, &errorRet);
     if (!ret) {
-        char error_message[200];
-        formatExecError(&errorRet, error_message, sizeof(error_message));
-        fprintf(stderr, "Runtime Error: %s\n", error_message);
+        formatExecError(&errorRet, errMsg, errMsgLength);
         machineDestroy(app);
-        return 0;
+        return NULL;
     }
 
-    *ppRtValueGot = app->variables[0];
+    rtValueRet = rtvalueDuplicate(app->variables[0]);
 
     machineDestroy(app);
-    return 1;
+    return rtValueRet;
 }
 
 int TestRuntimeValue() {
@@ -484,9 +483,18 @@ int TestRuntimeValue() {
         RuntimeValueTest*   pCase = RuntimeValueTestCases + i;
         RuntimeTestResult*  pCaseResult = RuntimeTestResults + i;
 
+        KbRuntimeValue tempExpectValue;
+        tempExpectValue.type = pCase->exceptedType;
+        if (tempExpectValue.type == RVT_STRING) {
+            tempExpectValue.data.sz = pCase->exceptedStr;
+        }
+        else if (tempExpectValue.type == RVT_NUMBER) {
+            tempExpectValue.data.num = pCase->exceptedNum;
+        }
+        szExcepted = rtvalueStringify(&tempExpectValue);
+
         StringCopy(pCaseResult->errMsg, sizeof(pCaseResult->errMsg), "");
-        StringCopy(pCaseResult->szActualGot, sizeof(pCaseResult->szActualGot), "");
-        StringCopy(pCaseResult->szExcepted, sizeof(pCaseResult->szExcepted), "");
+        StringCopy(pCaseResult->szActualGot, sizeof(pCaseResult->szActualGot), "N/A");
 
         textBuf = pCase->source;
         context = kbCompileStart();
@@ -536,27 +544,17 @@ compileEnd:
             contextDestroy(context);
         }
         else {
-            int runResult = 0;
-            KbRuntimeValue* rtActualGot;
+            KbRuntimeValue* rtActualGot = NULL;
             
             ret = kbSerialize(context, &pSerializedRaw, &resultByteLength);
-
+            contextDestroy(context);
             if (ret) {
-                runResult = runBinary(pSerializedRaw, &rtActualGot);
+                rtActualGot = runBinaryAndDumpFirstVar(pSerializedRaw, errBuf, sizeof(errBuf));
                 free(pSerializedRaw);
             }
-            contextDestroy(context);
 
-            if (runResult) {
-                KbRuntimeValue tempRtValue;
-                tempRtValue.type = pCase->exceptedType;
-                if (tempRtValue.type == RVT_STRING) {
-                    tempRtValue.data.sz = pCase->exceptedStr;
-                }
-                else if (tempRtValue.type == RVT_NUMBER) {
-                    tempRtValue.data.num = pCase->exceptedNum;
-                }
-                szExcepted = rtvalueStringify(&tempRtValue);
+            if (rtActualGot) {
+
                 szActualGot = rtvalueStringify(rtActualGot);
                 if (pCase->exceptedType != rtActualGot->type) {
                     isCasePassed = 0;
@@ -575,6 +573,7 @@ compileEnd:
                         break;
                     }
                 }
+                rtvalueDestroy(rtActualGot);
                 if (isCasePassed) {
                     numPassCount++;
                 }
@@ -890,7 +889,7 @@ void printAsHtml(FILE* fp) {
         "h1{padding-bottom:4px;border-bottom:2px solid #5d93d5}"
         "tr{border-bottom:1px solid #ddd}"
         "td{padding:4px 4px}"
-        "th{color:#fff;background:#4888d5;padding:8px 4px}"
+        "th{color:#fff;background:linear-gradient(#14509a,#5d93d5);padding:8px 4px;background: -ms-linear-gradient(top,#14509a 0%,#5d93d5 100%)}"
         "pre{text-align:left;margin: 0;font-family:\"Consolas\",\"Monaco\",\"Lucida Console\",\"Courier New\",monospace;font-size:12px;line-height:1.25;tab-size:4}"
         "pre.kbcode{color:#1E1E1E;background-color:#fff}"
         ".kbcode .tk-num{color:#098658}"
