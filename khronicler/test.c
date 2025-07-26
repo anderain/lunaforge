@@ -327,7 +327,7 @@ typedef struct {
 RuntimeValueTest RuntimeValueTestCases[] = {
     {
         RVT_NUMBER, 1, NULL,
-        "relative_equality",
+        "relative equality",
         "dim result = floatRelEqual()\n"
         "func floatRelEqual()\n"
         "    dim a = 1.0000001\n"
@@ -420,6 +420,23 @@ RuntimeValueTest RuntimeValueTestCases[] = {
         "    end if\n"
         "    return \"\"\n"
         "end func"
+    },
+    {
+        RVT_NUMBER, 1, NULL,
+        "string functions",
+        "dim checkResult = checkLen() && checkVal() && checkAsc()\n"
+        "# String length\n"
+        "func checkLen()\n"
+        "    return len(\"hello world\") ~= 11\n"
+        "end func\n"
+        "# String to numeric\n"
+        "func checkVal()\n"
+        "    return val(\"123.456\") ~= 123.456\n"
+        "end func\n"
+        "# Character to ASCII code\n"
+        "func checkAsc()\n"
+        "    return asc(\"ASCII\") ~= 65\n"
+        "end func\n"
     }
 };
 #define RUNTIME_VALUE_TEST_NUM (sizeof(RuntimeValueTestCases) / sizeof(RuntimeValueTestCases[0]))

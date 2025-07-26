@@ -107,16 +107,19 @@ typedef enum {
 
 typedef enum {
     KFID_NONE = 0,
-    KFID_P,
-    KFID_SIN,
-    KFID_COS,
-    KFID_TAN,
-    KFID_SQRT,
-    KFID_EXP,
-    KFID_ABS,
-    KFID_LOG,
-    KFID_RAND,
-    KFID_ZEROPAD
+    KFID_P,         /* 打印内容 */
+    KFID_SIN,       /* 数学函数 sin */
+    KFID_COS,       /* 数学函数 cos */
+    KFID_TAN,       /* 数学函数 tan */
+    KFID_SQRT,      /* 数学函数 平方根 */
+    KFID_EXP,       /* 数学函数 指数 */
+    KFID_ABS,       /* 数学函数 绝对值 */
+    KFID_LOG,       /* 数学函数 对数 */
+    KFID_RAND,      /* 随机值，范围 [0, 1) */
+    KFID_LEN,       /* 字符串 求长度 */
+    KFID_VAL,       /* 字符串 转数字 */
+    KFID_ASC,       /* 字符串 第一个字符的ASCII值 */
+    KFID_ZEROPAD    /* 字符串 数字转字符串并补0 */
 } KB_BUILT_IN_FUNCTION_ID;
 
 extern const char *_KOCODE_NAME[];

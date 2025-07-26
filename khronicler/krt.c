@@ -479,11 +479,33 @@ int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
                 break;
             }
             case KBO_OPR_EQUAL: {
+                /* 旧版本逻辑，只能比较数值 */
+                /*
                 execPopAndCheckType(1, RVT_NUMBER);
                 execPopAndCheckType(0, RVT_NUMBER);
 
                 numResult = (KB_FLOAT)(operand[0]->data.num == operand[1]->data.num);
 
+                vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
+                rtvalueDestroy(operand[0]);
+                rtvalueDestroy(operand[1]);
+                */
+                /* 新逻辑，可以比较字符串 */
+                numResult = 0;
+                operand[1] = (KbRuntimeValue *)vlPopBack(machine->stack);
+                operand[0] = (KbRuntimeValue *)vlPopBack(machine->stack);
+                /* 类型不同，直接不相等 */
+                if (operand[0]->type != operand[1]->type) {
+                    numResult = 0;
+                }
+                /* 比较字符串 */
+                else if (operand[0]->type == RVT_STRING) {
+                    numResult = StringEqual(operand[0]->data.sz, operand[1]->data.sz);
+                }
+                /* 比较数值 */
+                else if (operand[0]->type == RVT_NUMBER) {
+                    numResult = (KB_FLOAT)(operand[0]->data.num == operand[1]->data.num);
+                }
                 vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
                 rtvalueDestroy(operand[0]);
                 rtvalueDestroy(operand[1]);
@@ -694,6 +716,31 @@ int machineExecCallBuiltInFunc (int funcId, KbMachine* machine, KbRuntimeError *
         case KFID_RAND: {
             int randInt = rand() % 1000;
             vlPushBack(machine->stack, rtvalueCreateNumber(1.0f * randInt / 1000));
+            return 1;
+        }
+        case KFID_LEN: {
+            execPopAndCheckType(0, RVT_STRING);
+            numResult = strlen(operand[0]->data.sz);
+            vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
+            rtvalueDestroy(operand[0]);
+            return 1;
+        }
+        case KFID_VAL: {
+            execPopAndCheckType(0, RVT_STRING);
+            numResult = kAtof(operand[0]->data.sz);
+            vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
+            rtvalueDestroy(operand[0]);
+            return 1;
+        }
+        case KFID_ASC: {
+            execPopAndCheckType(0, RVT_STRING);
+            if (strlen(operand[0]->data.sz) <= 0) {
+                numResult = 0;
+            }
+            else {
+                numResult = (KB_FLOAT)operand[0]->data.sz[0];
+            }
+            vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
             return 1;
         }
         case KFID_ZEROPAD: {

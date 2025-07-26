@@ -57,7 +57,10 @@ static const BuiltInFunction FUNCTION_LIST[] = {
     { "abs",        1, KFID_ABS         },
     { "log",        1, KFID_LOG         },
     { "rand",       0, KFID_RAND        },
-    { "zeropad",    2, KFID_ZEROPAD     },
+    { "len",        1, KFID_LEN         },
+    { "val",        1, KFID_VAL         },
+    { "asc",        1, KFID_ASC         },
+    { "zeropad",    2, KFID_ZEROPAD     }
 };
 
 const char* DBG_TOKEN_NAME[] = {
@@ -1562,6 +1565,11 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
                 /* 错误 */
                 compileLineReturnWithError(KBE_SYNTAX_ERROR, "Error in function parameter list.");
             }
+        }
+        /* 匹配函数定义结束 */
+        token = nextToken(&analyzer);
+        if (token->type != TOKEN_END) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Error in function declaring");
         }
     }
     /* if 语句 */
