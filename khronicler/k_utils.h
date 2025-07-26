@@ -14,10 +14,11 @@ int         StringEndWith       (const char *str, const char *token);
 
 #define DEFAUL_FTOA_PRECISION   8
 
-double  kAtof(const char *s);
-char *  kFtoa(double f, char * buf, int precision);
-char*   kItoa(int num, char* str, int base);
-long    kAtoi(const char* S);
+double  kAtof               (const char *s);
+char *  kFtoa               (double f, char * buf, int precision);
+char*   kItoa               (int num, char* str, int base);
+long    kAtoi               (const char* S);
+int     kFloatEqualRel      (KB_FLOAT a, KB_FLOAT b);
 
 int     getLineTrimRemarks  (const char* textPtr, char* line);
 int     getLineOnly         (const char* textPtr, char* line);

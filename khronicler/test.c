@@ -6,7 +6,6 @@
 
 #define RESULT_SUCCESS      1
 #define RESULT_FAILED       0
-#define ABS(v)  ((v) >= 0 ? (v) : -(v))
 
 typedef struct {
     int excepted;
@@ -327,6 +326,16 @@ typedef struct {
 
 RuntimeValueTest RuntimeValueTestCases[] = {
     {
+        RVT_NUMBER, 1, NULL,
+        "relative_equality",
+        "dim result = floatRelEqual()\n"
+        "func floatRelEqual()\n"
+        "    dim a = 1.0000001\n"
+        "    dim b = 1.0000002\n"
+        "    return a ~= b\n"
+        "end func"
+    },
+    {
         RVT_NUMBER, 120, NULL,
         "factorial",
         "dim result = factorial(5)\n"
@@ -555,8 +564,7 @@ compileEnd:
                 else {
                     switch (pCase->exceptedType) {
                     case RVT_NUMBER: {
-                        KB_FLOAT abs = ABS(pCase->exceptedNum - rtActualGot->data.num);
-                        isCasePassed = abs < 1e-8;
+                        isCasePassed = kFloatEqualRel(pCase->exceptedNum, rtActualGot->data.num);
                         break;
                     }
                     case RVT_STRING:
@@ -858,7 +866,7 @@ void printAsHtml(FILE* fp) {
         RuntimeTestResult*  pCaseResult = RuntimeTestResults + i;
 
         fputs("<tr>", fp);
-        fprintf(fp, "<td class=\"case-id\"> SYN-%03d </td>", i + 1);
+        fprintf(fp, "<td class=\"case-id\"> RT-%03d </td>", i + 1);
         fprintf(fp, "<td class=\"case-name\"> %s </td>", pCase->name);
         fprintf(fp, "<td class=\"source-code\">");
         printScriptWithHighlightHtml(fp, pCase->source);
@@ -882,7 +890,7 @@ void printAsHtml(FILE* fp) {
         "h1{padding-bottom:4px;border-bottom:2px solid #5d93d5}"
         "tr{border-bottom:1px solid #ddd}"
         "td{padding:4px 4px}"
-        "th{color:#fff;background:linear-gradient(#306ab0,#4888d5);padding:8px 4px}"
+        "th{color:#fff;background:#4888d5;padding:8px 4px}"
         "pre{text-align:left;margin: 0;font-family:\"Consolas\",\"Monaco\",\"Lucida Console\",\"Courier New\",monospace;font-size:12px;line-height:1.25;tab-size:4}"
         "pre.kbcode{color:#1E1E1E;background-color:#fff}"
         ".kbcode .tk-num{color:#098658}"

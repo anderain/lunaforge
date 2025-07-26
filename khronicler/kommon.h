@@ -89,6 +89,7 @@ typedef enum {
     KBO_OPR_AND,            /* 逻辑与 */
     KBO_OPR_OR,             /* 逻辑或 */
     KBO_OPR_EQUAL,          /* 相等 */
+    KBO_OPR_EQUAL_REL,      /* 浮点数相对相等 */
     KBO_OPR_NEQ,            /* 不相等 */
     KBO_OPR_GT,             /* 大于 */
     KBO_OPR_LT,             /* 小于 */

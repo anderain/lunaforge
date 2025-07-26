@@ -235,6 +235,16 @@ char* kItoa(int num, char* str, int base) {
     return str;
 }
 
+#define KB_FLOAT_EPSILON (1e-6f)
+
+int kFloatEqualRel(KB_FLOAT a, KB_FLOAT b) {
+    KB_FLOAT diff = a >= b ? a - b : b - a;
+    KB_FLOAT absA = a >= 0 ? a : -a;
+    KB_FLOAT absB = b >= 0 ? b : -b;
+    KB_FLOAT largest = absA > absB ? absA : absB;
+    return diff <= largest * KB_FLOAT_EPSILON;
+}
+
 int getLineTrimRemarks(const char* textPtr, char* line) {
     char *linePtr = line;
     const char *originalTextPtr = textPtr;

@@ -78,11 +78,16 @@ typedef struct tagExprNode {
 
 typedef enum {
     OPR_NEG = 0,
+    /* 字符串操作链接 */
     OPR_CONCAT,
+    /* 基本运算 加 减 乘 除*/
     OPR_ADD,        OPR_SUB,        OPR_MUL,        OPR_DIV,
+    /* 整数计算 整数除法 取模 */
     OPR_INTDIV,     OPR_MOD,
+    /* 逻辑操作 非 与 或者*/
     OPR_NOT,        OPR_AND,        OPR_OR,
-    OPR_EQUAL,      OPR_NEQ,        OPR_GT,         OPR_LT,
+    /* 比较操作 */
+    OPR_EQUAL,      OPR_EQUAL_REL,  OPR_NEQ,        OPR_GT,         OPR_LT,
     OPR_GTEQ,       OPR_LTEQ 
 } OperatorType;
 
@@ -101,7 +106,8 @@ const struct {
     { "&&", OPR_AND     },
     { "||", OPR_OR      },
     { "=",  OPR_EQUAL   },
-    { "<>", OPR_NEQ    },
+    { "~=", OPR_EQUAL_REL},
+    { "<>", OPR_NEQ     },
     { ">",  OPR_GT      },
     { "<",  OPR_LT      },
     { ">=", OPR_GTEQ    },
@@ -221,6 +227,20 @@ Token* nextToken(Analyzer *_self) {
             buffer[1] = '\0';
             _self->eptr++;
             return assignToken(_self, TOKEN_OPR, buffer, eptrStart);
+        }
+    case '~':
+        secondChar = *(_self->eptr + 1);
+        if (secondChar == '=') {
+            buffer[0] = firstChar;
+            buffer[1] = secondChar;
+            buffer[2] = '\0';
+            _self->eptr += 2;
+            return assignToken(_self, TOKEN_OPR, buffer, eptrStart);
+        } else {
+            buffer[0] = firstChar;
+            buffer[1] = '\0';
+            _self->eptr++;
+            return assignToken(_self, TOKEN_UDF, buffer, eptrStart);
         }
     case '&':
         secondChar = *(_self->eptr + 1);

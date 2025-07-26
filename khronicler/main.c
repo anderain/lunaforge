@@ -338,6 +338,7 @@ int main(int argc, char** argv) {
         inputText = readTextFile(cliParams.inputPath);
         if (!inputText) {
             fprintf(stderr, "Failed to load script '%s'\n", cliParams.inputPath);
+            goto dispose;
         }
         break;
     case TARGET_INSPECT:
@@ -345,6 +346,7 @@ int main(int argc, char** argv) {
         inputBinary = readBinaryFile(cliParams.inputPath);
         if (!inputBinary) {
             fprintf(stderr, "Failed to load binary file '%s'\n", cliParams.inputPath);
+            goto dispose;
         }
         break;
     }
@@ -356,7 +358,7 @@ int main(int argc, char** argv) {
         int             compileRet;
         int             serializeRet;
         int             resultByteLength;
-        KByte*  resultRaw;
+        KByte*          resultRaw;
         int             writeRet;
         /* 编译内容 */
         compileRet = buildFromScript(inputText, &context, NULL);

@@ -309,7 +309,7 @@ int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
     while (machine->cmdPtr - cmdBlockPtr < numCmd) {
         const KbOpCommand* cmd = machine->cmdPtr;
         
-        /* printf("        [%04d] ", machine->cmdPtr - cmdBlockPtr); dbgPrintContextCommand(cmd); */
+        /* printf("        [%04d] ", machine->cmdPtr - cmdBlockPtr); dbgPrintContextCommand(cmd); printf("\n");*/
 
         switch(cmd->op) {
             case KBO_NOP: {
@@ -483,6 +483,17 @@ int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
                 execPopAndCheckType(0, RVT_NUMBER);
 
                 numResult = (KB_FLOAT)(operand[0]->data.num == operand[1]->data.num);
+
+                vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
+                rtvalueDestroy(operand[0]);
+                rtvalueDestroy(operand[1]);
+	            break;
+            }
+            case KBO_OPR_EQUAL_REL: {
+                execPopAndCheckType(1, RVT_NUMBER);
+                execPopAndCheckType(0, RVT_NUMBER);
+
+                numResult = (KB_FLOAT)kFloatEqualRel(operand[0]->data.num, operand[1]->data.num);
 
                 vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
                 rtvalueDestroy(operand[0]);

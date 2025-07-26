@@ -31,4 +31,4 @@ test.o: test.c kbasic.h k_utils.h krt.h kommon.h
 
 .PHONY: clean
 clean:
-	rm *.o $(MAIN_EXE) $(TEST_EXE)
+	rm *.o *.kbn $(MAIN_EXE) $(TEST_EXE)

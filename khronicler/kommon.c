@@ -130,6 +130,7 @@ const char *_KOCODE_NAME[] = {
     "AND",
     "OR",
     "EQUAL",
+    "EQUAL_REL",
     "NEQ",
     "GT",
     "LT",
