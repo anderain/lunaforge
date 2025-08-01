@@ -13,7 +13,7 @@
         "name": "tags",
         "schema": {
           "type": "array",
-          "childType": "string"
+          "childSchema": { "type": "string" }
         }
       },
       {
@@ -26,16 +26,22 @@
             { "name": "country", "schema": { "type": "string" } },
             { "name": "phoneNumber", "schema": { "type": "string" } },
             { "name": "startDate", "schema": { "type": "string" } },
-            { "name": "endDate", "schema": { "type": "string" } },
-            {
-              "name": "owner",
-              "schema": {
-                "type": "object",
-                "isOptional": true,
-                "properties": []
-              }
-            }
+            { "name": "endDate", "schema": { "type": "string" } }
           ]
+        }
+      },
+      {
+        "name": "educationBackground",
+        "schema": {
+          "type": "array",
+          "childSchema": {
+            "type": "object",
+            "properties": [
+              { "name": "institution", "schema": { "type": "string" } },
+              { "name": "period", "schema": { "type": "string" } },
+              { "name": "degree", "schema": { "type": "string" } }
+            ]
+          }
         }
       }
     ]

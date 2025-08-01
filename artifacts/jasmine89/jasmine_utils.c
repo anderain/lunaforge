@@ -21,7 +21,7 @@ int JasmineSchema_Validate(
         if (errMessage) {
             sprintf(
                 errMessage,
-                "The type of property '%s' should be %s, but it gets %s",
+                "The type of property '%s' should be %s, but got %s",
                 pNodeName,
                 JASMINE_NODE_TYPE_NAME[pSchema->type],
                 JASMINE_NODE_TYPE_NAME[pNode->type]
@@ -32,22 +32,41 @@ int JasmineSchema_Validate(
     /* Validate children in array */
     if (pNode->type == JASMINE_NODE_ARRAY) {
         JasmineLinkedListNode* listNode = pNode->data.listArray->head;
-        while (listNode != NULL) {
-            JasmineNode* pChild = (JasmineNode *)listNode->data;
-            /* Children type mismatch */
-            if (pChild->type != pSchema->childrenType) {
-                if (errMessage) {
-                    sprintf(
-                        errMessage,
-                        "The elements in the array '%s' should be %s, but it gets %s",
-                        pNodeName,
-                        JASMINE_NODE_TYPE_NAME[pSchema->childrenType],
-                        JASMINE_NODE_TYPE_NAME[pChild->type]
-                    );
-                }
-                return 0;
+        int arrayIndex = 0;
+
+        /* Validate object elements */
+        if (pSchema->childrenType == JASMINE_NODE_OBJECT) {
+            JasmineSchema   tempSchema = { JASMINE_NODE_OBJECT, 0, pSchema->propertySchema };
+            char            szElementBuf[TOKEN_LENGTH_MAX * 2];
+            int             checkResult;
+            JasmineNode*    pChild;
+            for (; listNode != NULL; listNode = listNode->next, arrayIndex++) {
+                pChild = (JasmineNode *)listNode->data;
+                sprintf(szElementBuf, "%s[%d]", pNodeName, arrayIndex);
+                checkResult = JasmineSchema_Validate(szElementBuf, pChild, &tempSchema, errMessage);
+                if (!checkResult) return 0;
             }
-            listNode = listNode->next;
+        }
+        /* Validate basic type elements*/
+        else {
+            JasmineNode* pChild;
+            for (; listNode != NULL; listNode = listNode->next, arrayIndex++) {
+                pChild = (JasmineNode *)listNode->data;
+                /* Children type mismatch */
+                if (pChild->type != pSchema->childrenType) {
+                    if (errMessage) {
+                        sprintf(
+                            errMessage,
+                            "'%s[%d]' should be %s, but got %s",
+                            pNodeName,
+                            arrayIndex,
+                            JASMINE_NODE_TYPE_NAME[pSchema->childrenType],
+                            JASMINE_NODE_TYPE_NAME[pChild->type]
+                        );
+                    }
+                    return 0;
+                }
+            }
         }
         return 1;
     }

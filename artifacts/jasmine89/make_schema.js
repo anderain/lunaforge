@@ -2,7 +2,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const defaultTabSpace = "  ";
+const defaultTabSpace = "    ";
 const variableScope = 'static const';
 const cKeywords = [
   'auto', 'break', 'case', 'char', 'const', 'continue', 'default',
@@ -80,14 +80,20 @@ function convertSchema(schema, isNested = false) {
     declarePart += `${tabSpace}/* Properties */ ${propVarName}\n`;
   }
   if (schema.type === 'array') {
-    declarePart += `${tabSpace}/* Properties */ NULL,\n`;
-    declarePart += `${tabSpace}/* Child Type */ ${valueTypeMacroMapping[schema.childType]}\n`;
+    if (schema.childSchema.type === 'object') {
+      declarePart += `${tabSpace}/* Properties */ ${propVarName},\n`;
+      declarePart += `${tabSpace}/* ChildType  */ ${valueTypeMacroMapping[schema.childSchema.type]}\n`;
+    }
+    else {
+      declarePart += `${tabSpace}/* Properties */ NULL,\n`;
+      declarePart += `${tabSpace}/* ChildType  */ ${valueTypeMacroMapping[schema.childSchema.type]}\n`;
+    }
   }
   declarePart += `${topTabSpace}}`;
 
-  if (schema.type === 'object') {
+  const writeProperties = (properties) => {
     propertiesPart += `${variableScope} JasmineObjectPropertySchema ${propVarName}[] = {\n`;
-    for (let child of schema.properties) {
+    for (let child of properties) {
       const result = convertSchema(child.schema, true);
       propertiesPart =
         result.propertiesPart +
@@ -98,6 +104,13 @@ function convertSchema(schema, isNested = false) {
     }
     propertiesPart += `${defaultTabSpace}/* Terminator */ { NULL }, \n`;
     propertiesPart += `};\n`;
+  }
+
+  if (schema.type === 'object') {
+    writeProperties(schema.properties)
+  }
+  else if (schema.type === 'array' && schema.childSchema.type === 'object') {
+    writeProperties(schema.childSchema.properties)
   }
 
   if (!isNested) {
@@ -130,14 +143,25 @@ function validateSchema(propertyName, schema) {
   }
   const schemaKeys = Object.keys(schema)
   for (let schemaKey of schemaKeys) {
-    if (!['type', 'properties', 'isOptional', 'childType'].includes(schemaKey)) {
+    if (!['type', 'properties', 'isOptional', 'childSchema'].includes(schemaKey)) {
       throw new Error(`Invalid key '${schemaKey}' in schema of '${propertyName}'`);
     }
   }
   switch(schema.type) {
+    case 'null':
+    case 'string':
+    case 'number':
+    case 'boolean':
+      for (let schemaKey of schemaKeys) {
+        if (['properties', 'childType', 'childSchema'].includes(schemaKey)) {
+          throw new Error(`Invalid key '${schemaKey}' in basic element of '${propertyName}'`);
+        }
+      }
+      break;
     case 'array':
-      if (!validJsonValueType.includes(schema.type)) {
-        throw new Error(`Invalid child type '${schema.type}' of '${propertyName}'`)
+      validateSchema(`childSchema.type of '${propertyName}'`, schema.childSchema)
+      if (schema.childSchema.isOptional !== undefined) {
+        throw new Error(`'isOptional' is not applicable for 'childSchema' of '${propertyName}'`);
       }
       break;
     case 'object':
@@ -158,6 +182,7 @@ function validateSchema(propertyName, schema) {
       }
       break;
     default:
+      throw new Error(`Invalid type ${schema.type} of '${propertyName}'`);
   }
 }
 

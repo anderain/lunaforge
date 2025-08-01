@@ -25,12 +25,13 @@ int     JasmineString_Append        (char *dest, int max, const char *src);
 char*   JasmineString_Dump          (const char *str);
 
 /* Object type defination */
-#define JASMINE_NODE_NULL       0
-#define JASMINE_NODE_OBJECT     1
-#define JASMINE_NODE_ARRAY      2
-#define JASMINE_NODE_STRING     3
-#define JASMINE_NODE_NUMBER     4
-#define JASMINE_NODE_BOOLEAN    5
+#define JASMINE_NODE_NOT_APPLICABLE -1
+#define JASMINE_NODE_NULL            0
+#define JASMINE_NODE_OBJECT          1
+#define JASMINE_NODE_ARRAY           2
+#define JASMINE_NODE_STRING          3
+#define JASMINE_NODE_NUMBER          4
+#define JASMINE_NODE_BOOLEAN         5
 
 extern const char* JASMINE_NODE_TYPE_NAME_DEBUG[];
 
@@ -49,10 +50,10 @@ typedef struct {
 } JasmineLinkedList;
 
 JasmineLinkedListNode*  JasmineLListNode_Create     (void* data);
+void                    JasmineLListNode_Dispose    (JasmineLinkedListNode* vln, void (* releaseData)(void *));
 JasmineLinkedList*      JasmineLList_Create         ();
 JasmineLinkedList*      JasmineLList_PushBack       (JasmineLinkedList* _self, void *data);
 void*                   JasmineLList_PopFront       (JasmineLinkedList* _self);
-void                    JasmineLListNode_Dispose    (JasmineLinkedListNode* vln, void (* releaseData)(void *));
 void                    JasmineLList_Dispose        (JasmineLinkedList* _self, void (* releaseData)(void *));
 
 /* Json Node */
@@ -134,15 +135,13 @@ struct tagJasmineObjectPropertySchema;
 typedef struct tagJasmineSchema {
     int type;
     int isOptional;
-    /* only for object */
     const struct tagJasmineObjectPropertySchema* propertySchema;
-    /* only for array */
     int childrenType;
 } JasmineSchema;
 
 typedef struct tagJasmineObjectPropertySchema {
-    const char*             name;
-    struct tagJasmineSchema schema;
+    const char*     name;
+    JasmineSchema   schema;
 } JasmineObjectPropertySchema;
 
 int JasmineSchema_Validate(const char* nodeName, JasmineNode* pNode, const JasmineSchema* pSchema, char *errMessage);
