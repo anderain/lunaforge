@@ -218,73 +218,63 @@ int JasmineConfig_LoadInteger(JasmineNode* _node, const char *path, int fallback
 
 #define JASMINE_CONFIG_PATH_SPLITTER '.'
 
-JasmineNode * JasmineConfig_FindNode(JasmineNode *node, const char *path) {
-    int             numSplitted             = 1;
+JasmineNode * JasmineConfig_FindNode(JasmineNode *node, const char *paths) {
+    int             nestedLevel             = 1;
     int             i                       = 0;
-    int             prev                    = 0;
     char            buf[TOKEN_LENGTH_MAX]   = "";
+    const char*     pPaths                  = paths;
     JasmineNode*    currentNode             = node;
-    char**          explodedPath            = NULL;
 
-    for (i = 0; path[i] != '\0'; ++i) {
-        if (JASMINE_CONFIG_PATH_SPLITTER == path[i]) {
-            numSplitted++;
+    /* count nested level in path */
+    for (i = 0; paths[i] != '\0'; ++i) {
+        if (JASMINE_CONFIG_PATH_SPLITTER == pPaths[i]) {
+            nestedLevel++;
         }
     }
 
-    explodedPath = (char **)malloc(sizeof(char *) * numSplitted);
-
-    for (i = 0; i < numSplitted; ++i) {
-        int j;
-        int k = 0;
-        for (j = prev; path[j] && path[j] != JASMINE_CONFIG_PATH_SPLITTER; ++j, ++k) {
-            buf[k] = path[j];
+    for (i = 0; i < nestedLevel; ++i) {
+        /* extract single path from paths*/
+        char* pBuf;
+        const char* singlePath = buf;
+        for (
+            pBuf = buf;
+            *pPaths != JASMINE_CONFIG_PATH_SPLITTER && *pPaths != '\0';
+            ++pBuf, ++pPaths
+        ) {
+            *pBuf = *pPaths;
         }
-        buf[k] = '\0';
-        prev = j + 1;
-        explodedPath[i] = JasmineString_Dump(buf);
-    }
-
-    for (i = 0; i < numSplitted; ++i) {
-        const char *path = explodedPath[i];
-
-        /* Debug */
-        /* printf("[%d] path = %s\n", i, path); */
-        /* TestPrintNode(currentNode, 0, 0); */
+        *pBuf = '\0';
+        /* skip '.' for next loop */
+        if (*pPaths == JASMINE_CONFIG_PATH_SPLITTER) {
+            ++pPaths;
+        }
+        /* printf("single path = %s, %s\n", JASMINE_NODE_TYPE_NAME[currentNode->type], singlePath); */
 
         /* Length of splitted path = 0 ? */
-        if (JasmineString_Length(path) <= 0) {
-            currentNode = NULL;
-            break;
+        if (JasmineString_Length(singlePath) <= 0) {
+            return NULL;
         }
+    
         /* Index in array */
-        else if (JasmineChar_IsDigit(path[0])) {
-            int index;
-
-            index       = Jasmine_Atoi(path);
+        if (JasmineNode_IsArray(currentNode)) {
+            int index = Jasmine_Atoi(singlePath);
             currentNode = JasmineArray_At(currentNode, index);
-
             if (currentNode == NULL) {
-                break;
+                return NULL;
             }
         }
         /* Property in object */
-        else {
-            currentNode = JasmineObject_Child(currentNode, path);
-
+        else if (JasmineNode_IsObject(currentNode)) {
+            currentNode = JasmineObject_Child(currentNode, singlePath);
             if (currentNode == NULL) {
-                break;
+                return NULL;
             }
         }
+        /* Other basic type cannot have child */
+        else {
+            return NULL;
+        }
     }
-
-    for (i = 0; i < numSplitted; ++i) {
-        free(explodedPath[i]);
-    }
-    free(explodedPath);
-
-    /* printf("found!"); */
-    /* TestPrintNode(currentNode, 0, 0); */
 
     return currentNode;
 }

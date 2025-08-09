@@ -162,7 +162,7 @@ JasmineToken* JasmineParser_ReadToken(JasmineParser* parser) {
                 
                 nextChar = JasmineParser_PeakChar(parser);
                 if (nextChar == '"' || /* quotation mark */
-                    nextChar == '\\'|| /* reverse  solidus */
+                    nextChar == '\\'|| /* reverse solidus */
                     nextChar == '/' || /* solidus */
                     nextChar == 'b' || /* backspace */
                     nextChar == 'f' || /* formfeed */
