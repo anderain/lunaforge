@@ -4,3 +4,4 @@
 person_schema.h
 test/*.o
 test/*.exe
+test/*.html
