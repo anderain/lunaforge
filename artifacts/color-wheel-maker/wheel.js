@@ -117,6 +117,26 @@ function createSector(cx, cy, r, startAngle, endAngle, fill) {
   return `<path d="${d}" fill="${fill}" />`;
 }
 
+// 通过改变下列三个参数来改变颜色分布
+const ringRadiusMax = 40;
+const saturationFactor = 1
+const lightnessFactor = 0.75
+/**
+ * 模拟颜色的半径
+ * @param   {{s: number, l: number}} hsl - 颜色对象，l亮度，s饱和度
+ * @returns {number} 模拟的半径
+ * @note 决定了半径在哪个颜色环上
+ */
+function simulateRadius({ s, l }) {
+    const radius = Math.floor(
+        (
+            saturationFactor * (1 - l) + 
+            lightnessFactor * (1 - s)
+        ) * ringRadiusMax
+    );
+    return radius;
+}
+
 // 解析颜色
 const parsedColors = VgaMode13hColorPalette.map(hex => {
     const rgb = hexToRgb(hex);
@@ -138,10 +158,9 @@ const cy = size / 2;
 const shapes = [];
 
 // 计算需要多少圈圆环
-const ringRadiusMax = 20;
 const availableRingRadius = {}
 for (const c of colorColors) {
-    const radius = Math.floor((1 - c.l) * ringRadiusMax);
+    const radius = simulateRadius(c);
     availableRingRadius[radius] = true;
 }
 
@@ -154,7 +173,7 @@ Object.keys(availableRingRadius).sort((a, b) => a > b).forEach((radius, index) =
 // 创建圆环，把颜色按照亮度放到不同的环中
 const rings = new Array(Object.keys(ringRadiusIndexMap).length).fill(0).map(() => [])
 for (const c of colorColors) {
-    const radius = Math.floor((1 - c.l) * ringRadiusMax);
+    const radius = simulateRadius(c);
     const ringIndex = ringRadiusIndexMap[radius];
     rings[ringIndex].push(c)
 }
