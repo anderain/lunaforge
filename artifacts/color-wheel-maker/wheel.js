@@ -33,7 +33,12 @@ const VgaMode13hColorPalette = [
     0x2D412D, 0x2D4131, 0x2D4135, 0x2D413D, 0x2D4141, 0x2D3D41, 0x2D3541, 0x2D3141
 ];
 
-// 将颜色整数转 RGB
+/**
+ * 将十六进制颜色值转换为 RGB 结构。
+ * @param   {number} hex - 十六进制颜色值（例如 0xRRGGBB）。
+ * @returns {{r: number, g: number, b: number}} 
+ *          返回包含红、绿、蓝分量的对象。
+ */
 function hexToRgb(hex) {
     return {
         r: (hex >> 16) & 0xFF,
@@ -42,7 +47,15 @@ function hexToRgb(hex) {
     };
 }
 
-// 将 RGB 转 HSL
+/**
+ * 将 RGB 颜色转换为 HSL 颜色。
+ * @param   {{r: number, g: number, b: number}} rgb - RGB 颜色对象，
+ *          其中 r、g、b 为 0-255 的整数。
+ * @returns {{h: number, s: number, l: number}} 
+ *          返回 HSL 颜色对象，h 为色相（0-360），
+ *          s 和 l 为饱和度与亮度（0-1）。
+ * @note    当 RGB 三个通道值相等时，表示灰色，色相和饱和度将为 0。
+ */
 function rgbToHsl({ r, g, b }) {
     r /= 255;
     g /= 255;
@@ -68,12 +81,12 @@ function rgbToHsl({ r, g, b }) {
 
 /**
  * 创建一个扇形的 SVG path 字符串
- * @param {number} cx 圆心X
- * @param {number} cy 圆心Y
- * @param {number} r 半径
- * @param {number} startAngle 起始角度（单位：度）
- * @param {number} endAngle 结束角度（单位：度）
- * @param {string} fill 填充样式
+ * @param   {number} cx 圆心X
+ * @param   {number} cy 圆心Y
+ * @param   {number} r 半径
+ * @param   {number} startAngle 起始角度（单位：度）
+ * @param   {number} endAngle 结束角度（单位：度）
+ * @param   {string} fill 填充样式
  * @returns {string} SVG <path> 元素字符串
  */
 function createSector(cx, cy, r, startAngle, endAngle, fill) {
