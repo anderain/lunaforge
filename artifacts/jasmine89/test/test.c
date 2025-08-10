@@ -171,6 +171,7 @@ void performConfigTest() {
             TestReport.stringIsPassed[i] = 1;
         }
         strcpy(TestReport.stringActualGot[i], actual);
+        free(actual);
     }
 
     JasmineNode_Dispose(rootNode);
