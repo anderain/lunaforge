@@ -60,7 +60,7 @@ function validateConfig(config: ProjectConfig): void {
  * @return {boolean} 文件名是否有效
  */
 function isValidAssetFileName(file: string, ext: string) {
-  const regex = new RegExp(`^[a-zA-Z0-9_]{1,15}\.${ext}$`)
+  const regex = new RegExp(`^[a-zA-Z0-9_]{1,32}\.${ext}$`)
   return regex.test(file)
 }
 

@@ -7,7 +7,7 @@
     "build": "tsc",
     "package": "pkg . --out-path dist/executable --targets node18-win-x64",
     "prepackage": "npm run build",
-    "test": "npm run run -- D:/gadget-dev/workspace/moon-example-project/moon.project.json"
+    "test": "npm run run -- ../../moon-example-project/moon.project.json"
   },
   "bin": "dist/main.js",
   "devDependencies": {
