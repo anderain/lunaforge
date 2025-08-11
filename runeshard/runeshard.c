@@ -75,8 +75,10 @@ typedef struct {
 /* 输出 Sprite */
 typedef struct {
     int size;               /* 像素内容的字节长度 */
-    int hrz;                /* 水平方向 Sprite 数量 */
-    int vrt;                /* 垂直方向 Sprite 数量 */
+    int hrzCount;           /* 水平方向 Sprite 数量 */
+    int vrtCount;           /* 垂直方向 Sprite 数量 */
+    int hrzPadding;         /* 水平方向上填充了多少像素来补足 8 个pixel */
+    int vrtPadding;         /* 垂直方向上填充了多少像素来补足 8 个pixel */
     unsigned char raw[];    /* 已经编码过的 Sprite */
 } LunaBitmapResult;
 
@@ -356,9 +358,11 @@ LunaBitmapResult* convertRawBitmapToCode(const RawBitmap* bmp, const Metadata* m
     LunaBitmapResult* lunaResult = (LunaBitmapResult *)malloc(sizeof(LunaBitmapResult) + rawSize);
     unsigned char* pBuf = lunaResult->raw;
 
-    lunaResult->size = rawSize;
-    lunaResult->hrz = hrzCount;
-    lunaResult->vrt = vrtCount;
+    lunaResult->size        = rawSize;
+    lunaResult->hrzCount    = hrzCount;
+    lunaResult->vrtCount    = vrtCount;
+    lunaResult->hrzPadding  = lunaResult->hrzCount * 8 - bmp->width;
+    lunaResult->vrtPadding  = lunaResult->vrtCount * 8 - bmp->height;
 
     for (vrt = 0; vrt < vrtCount; ++vrt) {
         for (hrz = 0; hrz < hrzCount; ++hrz) {
@@ -613,8 +617,8 @@ int loadMetadata(const char* metaFilePath, const RawBitmap* bmp, Metadata* metad
  */
 void formatAsCCode(FILE* fp, const LunaBitmapResult* lunaResult, const Metadata* metadata, const char* destVarName) {
     const char* tabSpace = "    ";
-    int hrzCount = lunaResult->hrz;
-    int vrtCount = lunaResult->vrt;
+    int hrzCount = lunaResult->hrzCount;
+    int vrtCount = lunaResult->vrtCount;
     int hrz, vrt;
     int i, layer;
     const unsigned char* pRaw = lunaResult->raw;
@@ -623,6 +627,8 @@ void formatAsCCode(FILE* fp, const LunaBitmapResult* lunaResult, const Metadata*
     fprintf(fp, "const unsigned char %s[] = {\n", destVarName);
     /* 输出水平和垂直的 sprite 数量 */
     fprintf(fp, "%s/* hrzCount */ %d, /* vrtCount */ %d,\n", tabSpace, hrzCount, vrtCount);
+    /* 输出水平和垂直的 padding */
+    fprintf(fp, "%s/* hrzPad */ %d, /* vrtPad */ %d,\n", tabSpace, lunaResult->hrzPadding, lunaResult->vrtPadding);
 
     /* 输出调色板信息 */
     for (i = 0; i < 3; ++i) {
@@ -669,7 +675,9 @@ void formatAsJson(FILE* fp, const LunaBitmapResult* lunaResult, const Metadata* 
 
     fprintf(fp, "[");
     /* 输出尺寸 */
-    fprintf(fp, "%d,%d,", lunaResult->hrz, lunaResult->vrt);
+    fprintf(fp, "%d,%d,", lunaResult->hrzCount, lunaResult->vrtCount);
+    /* 输出 Padding */
+    fprintf(fp, "%d,%d,", lunaResult->hrzPadding, lunaResult->vrtPadding);
 
     /* 输出调色板 */
     for (i = 0; i < 3; ++i) {
@@ -696,8 +704,10 @@ void formatAsJson(FILE* fp, const LunaBitmapResult* lunaResult, const Metadata* 
  * @param metadata Sprite 元数据
  */
 void encodeToBinary(FILE* fp, const LunaBitmapResult* lunaResult, const Metadata* metadata) {
-    unsigned char hrzCount = lunaResult->hrz;
-    unsigned char vrtCount = lunaResult->vrt;
+    unsigned char hrzCount      = lunaResult->hrzCount,
+                  vrtCount      = lunaResult->vrtCount,
+                  hrzPadding    = lunaResult->hrzPadding,
+                  vrtPadding    = lunaResult->vrtPadding;
     int rawSize = hrzCount * vrtCount * 8 * 3;
     const char* strMagicHeader = "IM";
     int i;
@@ -705,7 +715,9 @@ void encodeToBinary(FILE* fp, const LunaBitmapResult* lunaResult, const Metadata
     fwrite(strMagicHeader, strlen(strMagicHeader), 1, fp);
     fwrite(&hrzCount, sizeof(hrzCount), 1, fp);
     fwrite(&vrtCount, sizeof(vrtCount), 1, fp);
-    
+    fwrite(&hrzPadding, sizeof(hrzPadding), 1, fp);
+    fwrite(&vrtPadding, sizeof(vrtPadding), 1, fp);
+
     for (i = 0; i < 3; ++i) {
         unsigned char colorIndex = metadata->colorIndex[i];
         fwrite(&colorIndex, sizeof(colorIndex), 1, fp);
