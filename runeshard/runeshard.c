@@ -13,7 +13,7 @@
 #include <string.h>
 #include <math.h>
 /* VGA 13H 模式的调色板对应的颜色值 */
-#include "../artifacts/color-palette/vga.h"
+#include "../artifacts/color-palette/vga_palette.h"
 
 /* .bmp 文件读取结果 */
 #define BMP_SUCCESS             0 /* 读取成功 */
