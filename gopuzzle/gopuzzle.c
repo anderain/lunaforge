@@ -65,7 +65,10 @@ void LunaMap_Dispose(LunaMap* pMap) {
     int i;
     /* 跳过第一个，释放其他 tile sprite */
     for (i = 1; i < pMap->numTilemap; ++i) {
-        Modi_DisposeLunaSprite(pMap->tilemap[i]);
+        LunaSprite* pSprite = pMap->tilemap[i];
+        if (pSprite) {
+            Modi_DisposeLunaSprite(pSprite);
+        }
     }
     free(pMap->tilemap);
     free(pMap->terrain);
@@ -118,7 +121,7 @@ void LunaMap_Draw(LunaMap* pMap, int cursorX, int cursorY) {
     Modi_PlotLine(curOffsetX, curOffsetY + HALF_TILE_HEIGHT, curOffsetX + HALF_TILE_WIDTH, curOffsetY, TILE_HIGHLIGHT_COLOR);
     Modi_PlotLine(curOffsetX, curOffsetY - HALF_TILE_HEIGHT, curOffsetX + HALF_TILE_WIDTH, curOffsetY, TILE_HIGHLIGHT_COLOR);
 
-}
+} 
 
 int Gopuzzle_Main() {
     int         keyCode;

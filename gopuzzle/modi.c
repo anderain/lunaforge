@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 #include "modi.h"
 #include "../artifacts/raster-fonts/hp100lx_6x8.h"
 #include "../artifacts/raster-fonts/tom_thumb_4x6.h"
@@ -138,8 +137,6 @@ ModiLoadResult Modi_LoadLunaSprite(const char *filePath, LunaSprite** ppLunaSpri
     int             spriteRawPartSize;
     LunaSprite*     pSprite;
 
-    assert(ppLunaSprite != NULL);
-
     *ppLunaSprite = NULL;
 
     if (!Gongshu_LoadFile(filePath, &fileRaw, &fileLength)) {
@@ -155,7 +152,7 @@ ModiLoadResult Modi_LoadLunaSprite(const char *filePath, LunaSprite** ppLunaSpri
     if (pFileContent->magicByte1 != 'I' || pFileContent->magicByte2 != 'M') {
         return MLR_INVALID_HEADER;
     }
-    /* 校验文件长度是不是合法*/
+    /* 校验文件长度是不是合法 */
     spriteRawPartSize = 8 * 3 * pFileContent->hrzCount * pFileContent->vrtCount;
     if (spriteRawPartSize + sizeof(LunaBmpContent) != fileLength) {
         return MLR_INVALID_SIZE;
@@ -177,6 +174,5 @@ ModiLoadResult Modi_LoadLunaSprite(const char *filePath, LunaSprite** ppLunaSpri
 }
 
 void Modi_DisposeLunaSprite (LunaSprite* pLunaSprite) {
-    assert(pLunaSprite != NULL);
     free(pLunaSprite);
 }
