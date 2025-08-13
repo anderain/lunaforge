@@ -260,7 +260,7 @@ void WG_ClearWhite() {
 void WG_SetPixel(int x, int y, unsigned char colorIndex) {
     int offset;
 
-    if (x < 0 || x >= wgConfig.width || y < 0 || y >= wgConfig.height);
+    if (x < 0 || x >= wgConfig.width || y < 0 || y >= wgConfig.height) return;
 
     offset = (y * wgConfig.width + x);
     pFrameBuffer[offset] = colorIndex;
