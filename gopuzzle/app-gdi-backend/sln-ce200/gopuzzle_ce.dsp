@@ -549,6 +549,145 @@ LINK32=link.exe
 # PROP Default_Filter ""
 # Begin Source File
 
+SOURCE=..\event_queue.c
+
+!IF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE MIPS) Release"
+
+DEP_CPP_EVENT=\
+	"..\..\..\artifacts\color-palette\vga_index.h"\
+	"..\..\gongshu.h"\
+	"..\event_queue.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE MIPS) Debug"
+
+DEP_CPP_EVENT=\
+	"..\..\..\artifacts\color-palette\vga_index.h"\
+	"..\..\gongshu.h"\
+	"..\event_queue.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE SH4) Release"
+
+DEP_CPP_EVENT=\
+	"..\..\..\artifacts\color-palette\vga_index.h"\
+	"..\..\gongshu.h"\
+	"..\event_queue.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE SH4) Debug"
+
+DEP_CPP_EVENT=\
+	"..\..\..\artifacts\color-palette\vga_index.h"\
+	"..\..\gongshu.h"\
+	"..\event_queue.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE SH3) Release"
+
+DEP_CPP_EVENT=\
+	"..\..\..\artifacts\color-palette\vga_index.h"\
+	"..\..\gongshu.h"\
+	"..\event_queue.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE SH3) Debug"
+
+DEP_CPP_EVENT=\
+	"..\..\..\artifacts\color-palette\vga_index.h"\
+	"..\..\gongshu.h"\
+	"..\event_queue.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE ARM) Release"
+
+DEP_CPP_EVENT=\
+	"..\..\..\artifacts\color-palette\vga_index.h"\
+	"..\..\gongshu.h"\
+	"..\event_queue.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE ARM) Debug"
+
+DEP_CPP_EVENT=\
+	"..\..\..\artifacts\color-palette\vga_index.h"\
+	"..\..\gongshu.h"\
+	"..\event_queue.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE MIPSFP) Release"
+
+DEP_CPP_EVENT=\
+	"..\..\..\artifacts\color-palette\vga_index.h"\
+	"..\..\gongshu.h"\
+	"..\event_queue.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE MIPSFP) Debug"
+
+DEP_CPP_EVENT=\
+	"..\..\..\artifacts\color-palette\vga_index.h"\
+	"..\..\gongshu.h"\
+	"..\event_queue.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE x86) Release"
+
+DEP_CPP_EVENT=\
+	"..\..\..\artifacts\color-palette\vga_index.h"\
+	"..\..\gongshu.h"\
+	"..\event_queue.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE x86) Debug"
+
+DEP_CPP_EVENT=\
+	"..\..\..\artifacts\color-palette\vga_index.h"\
+	"..\..\gongshu.h"\
+	"..\event_queue.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE x86em) Release"
+
+DEP_CPP_EVENT=\
+	"..\..\..\artifacts\color-palette\vga_index.h"\
+	"..\..\gongshu.h"\
+	"..\event_queue.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE x86em) Debug"
+
+DEP_CPP_EVENT=\
+	"..\..\..\artifacts\color-palette\vga_index.h"\
+	"..\..\gongshu.h"\
+	"..\event_queue.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE PPC) Release"
+
+DEP_CPP_EVENT=\
+	"..\..\..\artifacts\color-palette\vga_index.h"\
+	"..\..\gongshu.h"\
+	"..\event_queue.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE PPC) Debug"
+
+DEP_CPP_EVENT=\
+	"..\..\..\artifacts\color-palette\vga_index.h"\
+	"..\..\gongshu.h"\
+	"..\event_queue.h"\
+	
+
+!ENDIF 
+
+# End Source File
+# Begin Source File
+
+SOURCE=..\event_queue.h
+# End Source File
+# Begin Source File
+
 SOURCE=..\gongshu_gdi.c
 
 !IF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE MIPS) Release"
@@ -556,6 +695,8 @@ SOURCE=..\gongshu_gdi.c
 DEP_CPP_GONGS=\
 	"..\..\..\artifacts\color-palette\vga_index.h"\
 	"..\..\gongshu.h"\
+	"..\event_queue.h"\
+	"..\wrapper.h"\
 	
 
 !ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE MIPS) Debug"
@@ -605,6 +746,8 @@ DEP_CPP_GONGS=\
 DEP_CPP_GONGS=\
 	"..\..\..\artifacts\color-palette\vga_index.h"\
 	"..\..\gongshu.h"\
+	"..\event_queue.h"\
+	"..\wrapper.h"\
 	
 
 !ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE MIPSFP) Release"
@@ -675,6 +818,9 @@ SOURCE=..\win_main.c
 !IF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE MIPS) Release"
 
 DEP_CPP_WIN_M=\
+	"..\..\..\artifacts\color-palette\vga_index.h"\
+	"..\..\gongshu.h"\
+	"..\event_queue.h"\
 	"..\wrapper.h"\
 	
 
@@ -717,6 +863,9 @@ DEP_CPP_WIN_M=\
 !ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE ARM) Debug"
 
 DEP_CPP_WIN_M=\
+	"..\..\..\artifacts\color-palette\vga_index.h"\
+	"..\..\gongshu.h"\
+	"..\event_queue.h"\
 	"..\wrapper.h"\
 	
 

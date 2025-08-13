@@ -101,7 +101,7 @@ BOOL Gongshu_LoadFile(const char* filePath, unsigned char** pRaw, int* pLength) 
     }
     
     /* 分配内存 */
-    buffer = (unsigned char*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, dwFileSize);
+    buffer = (unsigned char*)malloc(dwFileSize);
     if (buffer == NULL) {
         CloseHandle(hFile);
         return FALSE;  /* 内存分配失败 */
@@ -110,7 +110,7 @@ BOOL Gongshu_LoadFile(const char* filePath, unsigned char** pRaw, int* pLength) 
     /* 读取文件内容 */
     if (!ReadFile(hFile, buffer, dwFileSize, &dwBytesRead, NULL) ||
         dwBytesRead != dwFileSize) {
-        HeapFree(GetProcessHeap(), 0, buffer);
+        free(buffer);
         CloseHandle(hFile);
         return FALSE;  /* 读取文件失败或读取字节数不匹配 */
     }
