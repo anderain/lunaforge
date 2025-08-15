@@ -17,6 +17,68 @@ int Modi_SetRunningFlag(BOOL flag) {
     return modiRunningFlag = flag;
 }
 
+void Modi_FillRect(int left, int top, int width, int height, unsigned char colorIndex) {
+    int screenWidth;
+    int screenHeight;
+    int right;
+    int bottom;
+    int x, y;
+
+    Gongshu_GetResolution(&screenWidth, &screenHeight);
+    if (left >= screenWidth) return;
+    if (top >= screenHeight) return;
+
+    right = left + width - 1;
+    bottom = top + height - 1;
+    if (right >= screenWidth) right = screenWidth - 1;
+    if (bottom >= screenHeight) bottom = screenHeight - 1;
+
+    for (y = top; y <= bottom; ++y) {
+        for (x = left; x <= right; ++x) {
+            Gongshu_SetPixel(x, y, colorIndex);
+        }
+    }
+}
+
+/* 2×2 遮罩模式表 */
+/* 1 表示此位置要画黑色，0 表示不画 */
+static const unsigned char DarkenMaskPatterns[5][2][2] = {
+    /* 0% 变暗 */ {
+        {0, 0}, {0, 0}
+    },
+    /* 25% 变暗 */ {
+        {1, 0}, {0, 0}
+    },
+    /* 50% 变暗 */ {
+        {1, 0}, {0, 1}
+    },
+    /* 75% 变暗 */ {
+        {1, 1}, {0, 1}
+    },
+    /* 100% 变暗 */ {
+        {1, 1}, {1, 1}
+    }
+};
+
+void Modi_ApplyDarkMask(int level, unsigned char colorIndex) {
+    int screenWidth, screenHeight;
+    int x, y;
+    const unsigned char (*mask)[2] = DarkenMaskPatterns[level];
+
+    Gongshu_GetResolution(&screenWidth, &screenHeight);
+
+    if (level < DARK_MASK_NONE) level = DARK_MASK_NONE;
+    if (level > DARK_MASK_FULL) level = DARK_MASK_FULL;
+
+    for (y = 0; y < screenHeight; ++y) {
+        for (x = 0; x < screenWidth; ++x) {
+            if (mask[y & 1][x & 1]) { /* 使用 y&1, x&1 获取2x2遮罩位置 */
+                Gongshu_SetPixel(x, y, colorIndex);
+            }
+        }
+    }
+}
+
 void Modi_PlotLine(int x0, int y0, int x1, int y1, unsigned char color) {
     int dx = ABS(x1 - x0), sx = x0 < x1 ? 1 : -1;
     int dy = -ABS(y1 - y0), sy = y0 < y1 ? 1 : -1;
@@ -53,9 +115,20 @@ void Modi_DrawOneBpp(const unsigned char *raw, int dx, int dy, int w, int h, BOO
     }
 }
 
-void Modi_DrawLunaSprite(const LunaSprite* pSprite, int dx, int dy, int spriteMode) {
+void Modi_DrawLunaSpriteInRange(
+    const LunaSprite* pSprite,
+    int dx, int dy,
+    int spriteMode,
+    int rangeHrzStart, int rangeHrzEnd,
+    int rangeVrtStart, int rangeVrtEnd
+) {
     int hrz, vrt, layer;
     unsigned char colorIndex[3];
+
+    if (rangeHrzStart < 0) rangeHrzStart = 0;
+    if (rangeHrzEnd >= pSprite->hrzCount) rangeHrzEnd = pSprite->hrzCount - 1;
+    if (rangeVrtStart < 0) rangeVrtStart = 0;
+    if (rangeVrtEnd >= pSprite->vrtCount) rangeVrtEnd = pSprite->vrtCount - 1;
 
     switch(spriteMode) {
     case SPRITE_MODE_BLACK_WHITE:
@@ -75,8 +148,8 @@ void Modi_DrawLunaSprite(const LunaSprite* pSprite, int dx, int dy, int spriteMo
         colorIndex[2] = pSprite->colorIndex[2];
     }
 
-    for (hrz = 0; hrz < pSprite->hrzCount; ++hrz) {
-        for (vrt = 0; vrt < pSprite->vrtCount; ++vrt) {
+    for (hrz = rangeHrzStart; hrz <= rangeHrzEnd; ++hrz) {
+        for (vrt = rangeVrtStart; vrt <= rangeVrtEnd; ++vrt) {
             const unsigned char* raw;
             int x = dx + (hrz << 3);
             int y = dy + (vrt << 3);
@@ -87,6 +160,10 @@ void Modi_DrawLunaSprite(const LunaSprite* pSprite, int dx, int dy, int spriteMo
             }
         }
     }
+}
+
+void Modi_DrawLunaSprite(const LunaSprite* pSprite, int dx, int dy, int spriteMode) {
+    Modi_DrawLunaSpriteInRange(pSprite, dx, dy, spriteMode, 0, pSprite->hrzCount - 1, 0, pSprite->vrtCount - 1);
 }
 
 void Modi_Print6x8(const char *str, int dx, int dy, BOOL rev, unsigned char colorIndex) {

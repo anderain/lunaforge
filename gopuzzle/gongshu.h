@@ -30,6 +30,8 @@
 #define GSE_KEY_CODE_RIGHT      0x25
 #define GSE_KEY_CODE_A          0x26
 #define GSE_KEY_CODE_B          0x27
+#define GSE_KEY_CODE_X          0x28
+#define GSE_KEY_CODE_Y          0x29
 
 #define GSE_MOUSE_BUTTON_NONE   0x40
 #define GSE_MOUSE_BUTTON_L      0x41

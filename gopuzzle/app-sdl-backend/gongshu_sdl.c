@@ -156,6 +156,10 @@ int Intl_MapKey(SDLKey sym) {
     case SDLK_DOWN:     return GSE_KEY_CODE_DOWN;
     case SDLK_LEFT:     return GSE_KEY_CODE_LEFT; 
     case SDLK_RIGHT:    return GSE_KEY_CODE_RIGHT;
+    case SDLK_z:        return GSE_KEY_CODE_A;
+    case SDLK_x:        return GSE_KEY_CODE_B;
+    case SDLK_a:        return GSE_KEY_CODE_X;
+    case SDLK_s:        return GSE_KEY_CODE_Y;
     default:
         return GSE_KEY_CODE_NONE;
     }

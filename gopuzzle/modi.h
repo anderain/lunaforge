@@ -37,16 +37,26 @@ typedef enum {
 /* 黑白灰度三种颜色 */
 #define SPRITE_MODE_BLACK_WHITE_GRAY    2
 
-int             Modi_GetRunningFlag     (void);
-int             Modi_SetRunningFlag     (BOOL flag);
-void            Modi_PlotLine           (int x0, int y0, int x1, int y1, unsigned char colorIndex);
-void            Modi_DrawOneBpp         (const unsigned char * raw, int dx, int dy, int w, int h, BOOL rev, unsigned char colorIndex);
-void            Modi_DrawLunaSprite     (const LunaSprite* pSprite, int dx, int dy, int spriteMode);
-void            Modi_Print6x8           (const char* str, int dx, int dy, BOOL rev, unsigned char colorIndex);
-void            Modi_Print4x6           (const char* str, int dx, int dy, BOOL rev, unsigned char colorIndex);
-int             Modi_WaitKey            (void);
-ModiLoadResult  Modi_LoadLunaSprite     (const char *filePath, LunaSprite** ppLunaSprite);
-void            Modi_DisposeLunaSprite  (LunaSprite* pLunaSprite);
+/* 变暗等级 */
+#define DARK_MASK_NONE     0  /* 0% 变暗 */
+#define DARK_MASK_LIGHT    1  /* 25% 变暗 */
+#define DARK_MASK_MEDIUM   2  /* 50% 变暗 */
+#define DARK_MASK_HEAVY    3  /* 75% 变暗 */
+#define DARK_MASK_FULL     4  /* 100% 变暗 */
+
+int             Modi_GetRunningFlag         (void);
+int             Modi_SetRunningFlag         (BOOL flag);
+void            Modi_FillRect               (int left, int top, int width, int height, unsigned char colorIndex);
+void            Modi_ApplyDarkMask          (int level, unsigned char colorIndex);
+void            Modi_PlotLine               (int x0, int y0, int x1, int y1, unsigned char colorIndex);
+void            Modi_DrawOneBpp             (const unsigned char * raw, int dx, int dy, int w, int h, BOOL rev, unsigned char colorIndex);
+void            Modi_DrawLunaSpriteInRange  (const LunaSprite* pSprite, int dx, int dy, int spriteMode, int rangeHrzStart, int rangeHrzEnd, int rangeVrtStart, int rangeVrtEnd);
+void            Modi_DrawLunaSprite         (const LunaSprite* pSprite, int dx, int dy, int spriteMode);
+void            Modi_Print6x8               (const char* str, int dx, int dy, BOOL rev, unsigned char colorIndex);
+void            Modi_Print4x6               (const char* str, int dx, int dy, BOOL rev, unsigned char colorIndex);
+int             Modi_WaitKey                (void);
+ModiLoadResult  Modi_LoadLunaSprite         (const char *filePath, LunaSprite** ppLunaSprite);
+void            Modi_DisposeLunaSprite      (LunaSprite* pLunaSprite);
 
 #define Modi_DrawLunaSprite8x8(raw, dx, dy, colorIndex) Modi_DrawOneBpp((raw), (dx), (dy), 8, 8, FALSE, (colorIndex))
 

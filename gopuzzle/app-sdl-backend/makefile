@@ -26,8 +26,8 @@ EXE			= gopuzzle.exe
 #====================================================
 # * 目标：可执行文件
 #====================================================
-all: main.o gopuzzle.o modi.o gongshu.o jasmine.o jasmine_utils.o
-	$(CC) main.o gopuzzle.o modi.o gongshu.o jasmine.o jasmine_utils.o $(LDFLAGS) -o $(EXE)
+all: main.o gopuzzle.o modi.o gongshu_sdl.o jasmine.o jasmine_utils.o
+	$(CC) main.o gopuzzle.o modi.o gongshu_sdl.o jasmine.o jasmine_utils.o $(LDFLAGS) -o $(EXE)
 
 #====================================================
 # * 目标：平台无关代码
@@ -44,8 +44,8 @@ modi.o:	$(COMMON_FOLDER)/modi.c $(COMMON_FOLDER)/modi.h $(COMMON_FOLDER)/gongshu
 main.o: main.c
 	$(CC) $(CFLAGS) main.c
 
-gongshu.o: gongshu.c $(COMMON_FOLDER)/gongshu.h
-	$(CC) $(CFLAGS) gongshu.c
+gongshu_sdl.o: gongshu_sdl.c $(COMMON_FOLDER)/gongshu.h
+	$(CC) $(CFLAGS) gongshu_sdl.c
 
 #====================================================
 # * 目标：通用库
