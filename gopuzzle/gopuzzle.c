@@ -344,6 +344,25 @@ void Gopuzzle_Redraw() {
     }
 }
 
+void LunaMap_RecursiveFilling(LunaMap* pLunaMap, int layer, int x, int y, TileIndex originalIndex, TileIndex replaceIndex) {
+    TileIndex idx;
+
+    if (x < 0 || y < 0 || x >= pLunaMap->w || y >= pLunaMap->h) {
+        return;
+    }
+
+    idx = MapElement(pLunaMap, layer, x, y);
+    if (idx != originalIndex || idx == replaceIndex) {
+        return;
+    }
+
+    MapElement(pLunaMap, layer, x, y) = replaceIndex;
+    LunaMap_RecursiveFilling(pLunaMap, layer, x - 1, y, originalIndex, replaceIndex);
+    LunaMap_RecursiveFilling(pLunaMap, layer, x, y -1, originalIndex, replaceIndex);
+    LunaMap_RecursiveFilling(pLunaMap, layer, x + 1, y, originalIndex, replaceIndex);
+    LunaMap_RecursiveFilling(pLunaMap, layer, x, y + 1, originalIndex, replaceIndex);
+}
+
 void Gopuzzle_HandleInput() {
     keyCode = Modi_WaitKey();
     switch (ui.state) {
@@ -355,8 +374,19 @@ void Gopuzzle_HandleInput() {
             case GSE_KEY_CODE_A: {
                 int actionId = MapMenuItems[ui.map.menuIndex].menuActionId;
                 switch (actionId) {
-                case UI_MENU_FILL:
+                case UI_MENU_FILL: {
+                    if (ui.map.layer < LAYER_VIEW_ONLY) {
+                        int x = ui.map.cursor.x;
+                        int y = ui.map.cursor.y;
+                        int layer = ui.map.layer;
+                        TileIndex originalIndex = MapElement(pLunaMap, layer, x, y);
+                        TileIndex replaceIndex = ui.map.tileIndex;
+                        printf("layer %d x = %d, y = %d\n", layer, x, y);
+                        LunaMap_RecursiveFilling(pLunaMap, layer, x, y, originalIndex, replaceIndex);
+                        ui.map.isMenuOpened = FALSE;
+                    }
                     break;
+                }
                 case UI_MENU_SETTINGS:
                     break;
                 case UI_MENU_SAVE:

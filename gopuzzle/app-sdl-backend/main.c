@@ -4,6 +4,6 @@
 int Gopuzzle_Main();
 
 int main(int argc, char *argv[]) {
-    Gongshu_SetAppPath(lunaFolderPath, "../../../moon-example-project/");
+    Gongshu_SetAppPath("../../../moon-example-project/");
     return Gopuzzle_Main();
 }
