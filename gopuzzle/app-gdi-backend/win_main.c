@@ -16,6 +16,7 @@ int                 vBufWidth, vBufHeight;
 MSG                 msg;
 BOOL                bLoop = TRUE;
 extern EventQueue   eventQueue;
+extern char         lunaFolderPath[];
 WrapperGraphConfig* pWgConfig;
 
 /* Foward declarations of functions included in this code module: */
@@ -34,6 +35,24 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
     HDC     hdc;
     BOOL    portraitMode;
     TCHAR   szErrBuf[200];
+
+    if (1) {
+        TCHAR szPathBuf[MAX_PATH];
+        int i;
+        GetModuleFileName(NULL, szPathBuf, MAX_PATH);
+        for (i = _tcslen(szPathBuf) - 1; i >= 0; --i) {
+            if (szPathBuf[i] == '\\' || szPathBuf[i] == '/') {
+                szPathBuf[i] = 0;
+                break;
+            }
+        }
+#ifdef UNICODE
+        w2c(szPathBuf, lunaFolderPath);
+#else
+        strcpy(lunaFolderPath, szPathBuf);
+#endif
+        strcpy(strchr(lunaFolderPath, 0), "\\cache\\");
+    }
 
     /* Initialize random function */
     srand(GetTickCount());
@@ -271,11 +290,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
         else if (wParam == 'D') {
             EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_DOWN, GSE_KEY_CODE_RIGHT, 0);
         }
-        else if (wParam == 'Z') {
+        else if (wParam == 'N') {
             EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_DOWN, GSE_KEY_CODE_A, 0);
         }
-        else if (wParam == 'X') {
+        else if (wParam == 'M') {
             EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_DOWN, GSE_KEY_CODE_B, 0);
+        }
+        else if (wParam == 'J') {
+            EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_DOWN, GSE_KEY_CODE_X, 0);
+        }
+        else if (wParam == 'K') {
+            EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_DOWN, GSE_KEY_CODE_Y, 0);
         }
         break;
     case WM_KEYUP:
@@ -291,11 +316,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
         else if (wParam == 'D') {
             EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_UP, GSE_KEY_CODE_RIGHT, 0);
         }
-        else if (wParam == 'Z') {
+        else if (wParam == 'N') {
             EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_UP, GSE_KEY_CODE_A, 0);
         }
-        else if (wParam == 'X') {
+        else if (wParam == 'M') {
             EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_UP, GSE_KEY_CODE_B, 0);
+        }
+        else if (wParam == 'J') {
+            EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_UP, GSE_KEY_CODE_X, 0);
+        }
+        else if (wParam == 'K') {
+            EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_UP, GSE_KEY_CODE_Y, 0);
         }
         break;
     case WM_CREATE: 
