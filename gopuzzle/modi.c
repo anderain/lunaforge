@@ -40,39 +40,17 @@ void Modi_FillRect(int left, int top, int width, int height, unsigned char color
     }
 }
 
-/* 2×2 遮罩模式表 */
-/* 1 表示此位置要画黑色，0 表示不画 */
-static const unsigned char DarkenMaskPatterns[5][2][2] = {
-    /* 0% 变暗 */ {
-        {0, 0}, {0, 0}
-    },
-    /* 25% 变暗 */ {
-        {1, 0}, {0, 0}
-    },
-    /* 50% 变暗 */ {
-        {1, 0}, {0, 1}
-    },
-    /* 75% 变暗 */ {
-        {1, 1}, {0, 1}
-    },
-    /* 100% 变暗 */ {
-        {1, 1}, {1, 1}
-    }
-};
-
-void Modi_ApplyDarkMask(int level, unsigned char colorIndex) {
+void Modi_ApplyDarkMask(int maskLevel, unsigned char colorIndex) {
     int screenWidth, screenHeight;
     int x, y;
-    const unsigned char (*mask)[2] = DarkenMaskPatterns[level];
 
     Gongshu_GetResolution(&screenWidth, &screenHeight);
 
-    if (level < DARK_MASK_NONE) level = DARK_MASK_NONE;
-    if (level > DARK_MASK_FULL) level = DARK_MASK_FULL;
-
     for (y = 0; y < screenHeight; ++y) {
+        int ybit = (y & 1) << 1;
         for (x = 0; x < screenWidth; ++x) {
-            if (mask[y & 1][x & 1]) { /* 使用 y&1, x&1 获取2x2遮罩位置 */
+            int bitIndex = (x & 1) | ybit;
+            if (maskLevel & (1 << bitIndex)) { 
                 Gongshu_SetPixel(x, y, colorIndex);
             }
         }
@@ -100,7 +78,7 @@ void Modi_PlotLine(int x0, int y0, int x1, int y1, unsigned char color) {
     }
 }
 
-void Modi_DrawOneBpp(const unsigned char *raw, int dx, int dy, int w, int h, BOOL rev, unsigned char colorIndex) {
+static void Modi_DrawOneBpp(const unsigned char *raw, int dx, int dy, int w, int h, BOOL rev, unsigned char colorIndex) {
     int pitch = (w >> 3) + (w % 8 ? 1 : 0);
     int x, y, dot;
     unsigned char eightPixels;
@@ -110,6 +88,62 @@ void Modi_DrawOneBpp(const unsigned char *raw, int dx, int dy, int w, int h, BOO
             dot = (eightPixels >> (7 - x % 8)) & 1;
             if (dot ^ rev) {
                 Gongshu_SetPixel(dx + x, dy + y, colorIndex);
+            }
+        }
+    }
+}
+
+static void Modi_DrawOneBppWithMask(const unsigned char *raw, int dx, int dy, int w, int h, BOOL rev, unsigned char colorIndex, int maskLevel) {
+    int pitch = (w >> 3) + (w % 8 ? 1 : 0);
+    int x, y, dot;
+    unsigned char eightPixels;
+
+    for (y = 0; y < h; ++y) {
+        int ybit = (y & 1) << 1;
+        for (x = 0; x < w; ++x) {
+            int bitIndex = (x & 1) | ybit;
+            int rx = dx + x;
+            int ry = dy + y;
+            eightPixels = *(raw + y * pitch + (x >> 3));
+            dot = (eightPixels >> (7 - x % 8)) & 1;
+            if ((dot ^ rev) && (maskLevel & (1 << bitIndex))) {
+                Gongshu_SetPixel(rx, ry, colorIndex);
+            }
+        }
+    }
+}
+
+void Modi_DrawLunaSpriteWithMask(const LunaSprite* pSprite, int dx, int dy, int spriteMode, int maskLevel) {
+    int hrz, vrt, layer;
+    unsigned char colorIndex[3];
+
+    switch(spriteMode) {
+    case SPRITE_MODE_BLACK_WHITE:
+        colorIndex[0] = VGA_COLOR_BLACK;
+        colorIndex[1] = VGA_COLOR_BRIGHT_WHITE;
+        colorIndex[2] = VGA_COLOR_BRIGHT_WHITE;
+        break;
+    case SPRITE_MODE_BLACK_WHITE_GRAY:
+        colorIndex[0] = VGA_COLOR_BLACK;
+        colorIndex[1] = VGA_COLOR_BRIGHT_WHITE;
+        colorIndex[2] = VGA_COLOR_WHITE;
+        break;
+    case SPRITE_MODE_NORMAL:
+    default:
+        colorIndex[0] = pSprite->colorIndex[0];
+        colorIndex[1] = pSprite->colorIndex[1];
+        colorIndex[2] = pSprite->colorIndex[2];
+    }
+
+    for (hrz = 0; hrz < pSprite->hrzCount; ++hrz) {
+        for (vrt = 0; vrt < pSprite->vrtCount; ++vrt) {
+            const unsigned char* raw;
+            int x = dx + (hrz << 3);
+            int y = dy + (vrt << 3);
+            int rawOffset = vrt * pSprite->hrzCount + hrz;
+            for (layer = 0; layer < 3; ++layer) {
+                raw = pSprite->spriteRaw + (rawOffset << 4) + (rawOffset << 3) + (layer << 3);
+                Modi_DrawLunaSprite8x8WithMask(raw, x, y, colorIndex[layer], maskLevel);
             }
         }
     }

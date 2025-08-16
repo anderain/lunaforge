@@ -9,6 +9,7 @@ typedef unsigned char TileIndex;
 #define LAYER_TERRAIN       0
 #define LAYER_LO_STRUCT     1
 #define LAYER_HI_STRUCT     2
+#define LAYER_VIEW_ONLY     3
 
 typedef struct {
     int             w;

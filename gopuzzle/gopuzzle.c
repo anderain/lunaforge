@@ -14,7 +14,7 @@
 #define UI_TILE_CELL_W          28
 #define UI_TILE_CELL_H          24
 
-static const char*  MapLayerName[]      = { "Terrain", "LoStruct", "HiStruct" };
+static const char*  MapLayerName[]      = { "Terrain", "LoStruct", "HiStruct", "View Only" };
 static const char*  StrMapMenuItems[]   = { "Go Back", "Save", "Settings", "Exit" };
 static const int    NumMapMenuItems     = sizeof(StrMapMenuItems) / sizeof(StrMapMenuItems[0]);
 
@@ -38,7 +38,7 @@ struct {
 } ui = {
     /* state    */ UI_STATE_MAP_EDIT,
     /* map      */ {
-        /* layer        */ LAYER_TERRAIN,
+        /* layer        */ LAYER_VIEW_ONLY,
         /* tileIndex    */ 0,
         /* isMenuOpend  */ FALSE,
         /* menuIndex    */ 0,
@@ -129,7 +129,7 @@ void LunaMap_Dispose(LunaMap* pMap) {
     free(pMap);
 }
 
-void LunaMap_DrawLayer(const LunaMap *pMap, int layerIndex, int startX, int startY) {
+void LunaMap_DrawLayer(const LunaMap *pMap, int layerIndex, int startX, int startY, int maskLevel) {
     int x, y, dx, dy;
     LunaSprite* pSprite;
     TileIndex tileIndex;
@@ -141,7 +141,7 @@ void LunaMap_DrawLayer(const LunaMap *pMap, int layerIndex, int startX, int star
             if (NULL == pSprite) continue;
             dx = startX + x * HALF_TILE_WIDTH - y * HALF_TILE_WIDTH - (pSprite->width - TILE_WIDTH) / 2;
             dy = startY + x * HALF_TILE_HEIGHT + y * HALF_TILE_HEIGHT + TILE_HEIGHT - pSprite->height;
-            Modi_DrawLunaSprite(pSprite, dx, dy, SPRITE_MODE_NORMAL);
+            Modi_DrawLunaSpriteWithMask(pSprite, dx, dy, SPRITE_MODE_NORMAL, maskLevel);
         }
     }
 }
@@ -159,11 +159,30 @@ void LunaMap_Draw(const LunaMap* pMap) {
     startX = screenHalfWidth - HALF_TILE_WIDTH - (ui.map.cursor.x * HALF_TILE_WIDTH - ui.map.cursor.y * HALF_TILE_WIDTH);
     startY = screenHalfHeight - HALF_TILE_HEIGHT - (ui.map.cursor.x * HALF_TILE_HEIGHT + ui.map.cursor.y * HALF_TILE_HEIGHT);
 
-    LunaMap_DrawLayer(pMap, LAYER_TERRAIN, startX, startY);
-    if (ui.map.layer == LAYER_LO_STRUCT) Modi_ApplyDarkMask(DARK_MASK_MEDIUM, VGA_COLOR_BLACK);
-    LunaMap_DrawLayer(pMap, LAYER_LO_STRUCT, startX, startY);
-    if (ui.map.layer == LAYER_HI_STRUCT) Modi_ApplyDarkMask(DARK_MASK_MEDIUM, VGA_COLOR_BLACK);
-    LunaMap_DrawLayer(pMap, LAYER_HI_STRUCT, startX, startY);
+    switch (ui.map.layer) {
+    case LAYER_TERRAIN:
+        LunaMap_DrawLayer(pMap, LAYER_TERRAIN, startX, startY, DARK_MASK_LEVEL_FULL);
+        LunaMap_DrawLayer(pMap, LAYER_LO_STRUCT, startX, startY, DARK_MASK_LEVEL_MEDIUM);
+        LunaMap_DrawLayer(pMap, LAYER_HI_STRUCT, startX, startY, DARK_MASK_LEVEL_MEDIUM);
+        break;
+    case LAYER_LO_STRUCT:
+        LunaMap_DrawLayer(pMap, LAYER_TERRAIN, startX, startY, DARK_MASK_LEVEL_FULL);
+        Modi_ApplyDarkMask(DARK_MASK_LEVEL_MEDIUM, VGA_COLOR_BLACK);
+        LunaMap_DrawLayer(pMap, LAYER_LO_STRUCT, startX, startY, DARK_MASK_LEVEL_FULL);
+        LunaMap_DrawLayer(pMap, LAYER_HI_STRUCT, startX, startY, DARK_MASK_LEVEL_MEDIUM);
+        break;
+    case LAYER_HI_STRUCT:
+        LunaMap_DrawLayer(pMap, LAYER_TERRAIN, startX, startY, DARK_MASK_LEVEL_FULL);
+        LunaMap_DrawLayer(pMap, LAYER_LO_STRUCT, startX, startY, DARK_MASK_LEVEL_FULL);
+        Modi_ApplyDarkMask(DARK_MASK_LEVEL_MEDIUM, VGA_COLOR_BLACK);
+        LunaMap_DrawLayer(pMap, LAYER_HI_STRUCT, startX, startY, DARK_MASK_LEVEL_FULL);
+        break;
+    case LAYER_VIEW_ONLY:
+        LunaMap_DrawLayer(pMap, LAYER_TERRAIN, startX, startY, DARK_MASK_LEVEL_FULL);
+        LunaMap_DrawLayer(pMap, LAYER_LO_STRUCT, startX, startY, DARK_MASK_LEVEL_FULL);
+        LunaMap_DrawLayer(pMap, LAYER_HI_STRUCT, startX, startY, DARK_MASK_LEVEL_FULL);
+        break;
+    }
 
     /* 绘制光标菱形 */
     curOffsetX = screenHalfWidth - 1;
@@ -289,7 +308,7 @@ void Gopuzzle_Redraw() {
         LunaMap_Draw(pLunaMap);
         Modi_FillRect(0, 0, screenWidth, 8, VGA_COLOR_CYAN);
         Modi_FillRect(0, screenHeight - 8, screenWidth, 8, VGA_COLOR_CYAN);
-        sprintf(szBuf, "Map Editor | Layer [%s]", MapLayerName[ui.map.layer]);
+        sprintf(szBuf, "Map Editor | Tile #%d | Layer [%s]", ui.map.tileIndex, MapLayerName[ui.map.layer]);
         Modi_Print6x8(szBuf, 0, 0, FALSE, VGA_COLOR_BRIGHT_WHITE);
         Modi_Print4x6("A: Set / B: Menu / X: Switch Layer / Y: Select Tile", 104, screenHeight - 7, FALSE, VGA_COLOR_BRIGHT_WHITE);
         sprintf(szBuf, "Cursor (%03d,%03d)", ui.map.cursor.x, ui.map.cursor.y);
@@ -337,12 +356,15 @@ void Gopuzzle_HandleInput() {
                 return;
             case GSE_KEY_CODE_X:
                 ui.map.layer++;
-                if (ui.map.layer > LAYER_HI_STRUCT) ui.map.layer = LAYER_TERRAIN;
+                if (ui.map.layer > LAYER_VIEW_ONLY) ui.map.layer = LAYER_TERRAIN;
                 return;
             case GSE_KEY_CODE_B:
                 ui.map.isMenuOpened = TRUE;
                 return;
             case GSE_KEY_CODE_A:
+                if (ui.map.layer == LAYER_VIEW_ONLY) {
+                    return;
+                }
                 MapElement(pLunaMap, ui.map.layer, ui.map.cursor.x, ui.map.cursor.y) = ui.map.tileIndex;
                 return;
             }
