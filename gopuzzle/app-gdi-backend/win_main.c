@@ -16,7 +16,6 @@ int                 vBufWidth, vBufHeight;
 MSG                 msg;
 BOOL                bLoop = TRUE;
 extern EventQueue   eventQueue;
-extern char         lunaFolderPath[];
 WrapperGraphConfig* pWgConfig;
 
 /* Foward declarations of functions included in this code module: */
@@ -38,6 +37,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
 
     if (1) {
         TCHAR szPathBuf[MAX_PATH];
+        char szCharBuf[MAX_PATH];
         int i;
         GetModuleFileName(NULL, szPathBuf, MAX_PATH);
         for (i = _tcslen(szPathBuf) - 1; i >= 0; --i) {
@@ -46,12 +46,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
                 break;
             }
         }
+        MessageBox(NULL, szPathBuf, _T("App Path"), MB_OK);
 #ifdef UNICODE
-        w2c(szPathBuf, lunaFolderPath);
+        w2c(szPathBuf, szCharBuf);
 #else
-        strcpy(lunaFolderPath, szPathBuf);
+        strcpy(szCharBuf, szPathBuf);
 #endif
-        strcpy(strchr(lunaFolderPath, 0), "\\cache\\");
+        Gongshu_SetAppPath(szCharBuf);
     }
 
     /* Initialize random function */

@@ -14,9 +14,25 @@
 #define UI_TILE_CELL_W          28
 #define UI_TILE_CELL_H          24
 
-static const char*  MapLayerName[]      = { "Terrain", "LoStruct", "HiStruct", "View Only" };
-static const char*  StrMapMenuItems[]   = { "Go Back", "Save", "Settings", "Exit" };
-static const int    NumMapMenuItems     = sizeof(StrMapMenuItems) / sizeof(StrMapMenuItems[0]);
+#define UI_MENU_FILL            1
+#define UI_MENU_SAVE            2
+#define UI_MENU_SETTINGS        3
+#define UI_MENU_QUIT            4
+
+
+static const char*  MapLayerName[] = { "Terrain", "LoStruct", "HiStruct", "View Only" };
+
+static const struct {
+    int menuActionId;
+    char* menuText;
+} MapMenuItems[] = {
+    { UI_MENU_FILL,     "Fill Area" },
+    { UI_MENU_SAVE,     "Save" },
+    { UI_MENU_SETTINGS, "Settings"},
+    { UI_MENU_QUIT,     "Quit" },
+};
+
+static const int NumMapMenuItems = sizeof(MapMenuItems) / sizeof(MapMenuItems[0]);
 
 struct {
     int state;
@@ -53,11 +69,10 @@ struct {
 int         keyCode;
 LunaMap*    pLunaMap;
 int         screenWidth, screenHeight;
-char        lunaFolderPath[100];
 
 ModiLoadResult TestLoadSprite(const char* path, LunaSprite** ppSprite) {
     char fullPath[200];
-    sprintf(fullPath, "%s%s", lunaFolderPath, path);
+    sprintf(fullPath, "%s\\cache\\%s", Gongshu_GetAppPath(), path);
     return Modi_LoadLunaSprite(fullPath, ppSprite);
 }
 
@@ -222,7 +237,7 @@ void Luna_DrawMapMenu() {
             Modi_FillRect(startX, y, MenuWidth, 8, ColorHighlight);
         }
         Modi_Print6x8(
-            StrMapMenuItems[i],
+            MapMenuItems[i].menuText,
             startX, y,
             FALSE,
             i == ui.map.menuIndex ? ColorPlain : ColorHighlight
@@ -337,6 +352,21 @@ void Gopuzzle_HandleInput() {
             switch (keyCode) {
             case GSE_KEY_CODE_UP:       ui.map.menuIndex--; break;
             case GSE_KEY_CODE_DOWN:     ui.map.menuIndex++; break;
+            case GSE_KEY_CODE_A: {
+                int actionId = MapMenuItems[ui.map.menuIndex].menuActionId;
+                switch (actionId) {
+                case UI_MENU_FILL:
+                    break;
+                case UI_MENU_SETTINGS:
+                    break;
+                case UI_MENU_SAVE:
+                    break;
+                case UI_MENU_QUIT:
+                    Modi_SetRunningFlag(FALSE);
+                    break;
+                }
+                break;
+            }
             case GSE_KEY_CODE_B:
                 ui.map.isMenuOpened = FALSE;
                 return;

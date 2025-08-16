@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include <assert.h>
 #include <SDL/SDL.h>
 #include "../gongshu.h"
@@ -12,6 +13,15 @@
 
 static SDL_Surface* sfScreen = NULL;
 static SDL_Surface* sfCanvas = NULL;
+static char         szAppPath[200] = "";
+
+void Gongshu_SetAppPath(const char *path) {
+    strcpy(szAppPath, path);
+}
+
+const char* Gongshu_GetAppPath(void) {
+    return szAppPath;
+}
 
 static void Intl_CreateCanvas(void) {
     Uint32 rmask, gmask, bmask, amask;

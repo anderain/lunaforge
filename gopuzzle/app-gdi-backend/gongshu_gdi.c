@@ -5,10 +5,19 @@
 extern HWND     hWndMain;
 EventQueue      eventQueue;
 extern MSG      msg;
+static char     szAppPath[200] = "";
 
 int Gongshu_Init(void) {
 	EventQueue_Init(&eventQueue);
 	return 1;
+}
+
+void Gongshu_SetAppPath(const char *path) {
+    strcpy(szAppPath, path);
+}
+
+const char* Gongshu_GetAppPath(void) {
+    return szAppPath;
 }
 
 void Gongshu_GetResolution(int* pWidth, int *pHeight) {

@@ -1,10 +1,9 @@
 #include <string.h>
-
-extern char lunaFolderPath[];
+#include "../gongshu.h"
 
 int Gopuzzle_Main();
 
 int main(int argc, char *argv[]) {
-    strcpy(lunaFolderPath, "../../../moon-example-project/cache/");
+    Gongshu_SetAppPath(lunaFolderPath, "../../../moon-example-project/");
     return Gopuzzle_Main();
 }

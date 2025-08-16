@@ -53,6 +53,8 @@ typedef struct {
 } Gongshu_Event;
 
 int             Gongshu_Init            (void);
+void            Gongshu_SetAppPath      (const char *path);
+const char*     Gongshu_GetAppPath      (void);
 void            Gongshu_GetResolution   (int* pWidth, int *pHeight);
 void            Gongshu_Flip            (void);
 void            Gongshu_Dispose         (void);
