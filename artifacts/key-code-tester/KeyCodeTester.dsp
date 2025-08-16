@@ -61,8 +61,9 @@ CFG=KeyCodeTester - Win32 (WCE MIPS) Debug
 # PROP Intermediate_Dir "WMIPSRel"
 # PROP Target_Dir ""
 CPP=clmips.exe
-# ADD BASE CPP /nologo /M$(CECrt) /W3 /GX- /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "MIPS" /D "_MIPS_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /QMRWCE /c
-# ADD CPP /nologo /M$(CECrt) /W3 /GX- /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "MIPS" /D "_MIPS_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /QMRWCE /c
+# ADD BASE CPP /nologo /M$(CECrt) /W3 /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "MIPS" /D "_MIPS_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /QMRWCE /c
+# ADD CPP /nologo /M$(CECrt) /W3 /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "MIPS" /D "_MIPS_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /QMRWCE /c
+# SUBTRACT CPP /YX /Yc /Yu
 RSC=rc.exe
 # ADD BASE RSC /l 0x804 /r /d "MIPS" /d "_MIPS_" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "NDEBUG"
 # ADD RSC /l 0x804 /r /d "MIPS" /d "_MIPS_" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "NDEBUG"
@@ -91,8 +92,9 @@ LINK32=link.exe
 # PROP Intermediate_Dir "WMIPSDbg"
 # PROP Target_Dir ""
 CPP=clmips.exe
-# ADD BASE CPP /nologo /M$(CECrtDebug) /W3 /GX- /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "MIPS" /D "_MIPS_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /QMRWCE /c
-# ADD CPP /nologo /M$(CECrtDebug) /W3 /GX- /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "MIPS" /D "_MIPS_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /QMRWCE /c
+# ADD BASE CPP /nologo /M$(CECrtDebug) /W3 /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "MIPS" /D "_MIPS_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /QMRWCE /c
+# ADD CPP /nologo /M$(CECrtDebug) /W3 /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "MIPS" /D "_MIPS_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /QMRWCE /c
+# SUBTRACT CPP /YX /Yc /Yu
 RSC=rc.exe
 # ADD BASE RSC /l 0x804 /r /d "MIPS" /d "_MIPS_" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "DEBUG"
 # ADD RSC /l 0x804 /r /d "MIPS" /d "_MIPS_" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "DEBUG"
@@ -121,8 +123,9 @@ LINK32=link.exe
 # PROP Intermediate_Dir "WCESH4Rel"
 # PROP Target_Dir ""
 CPP=shcl.exe
-# ADD BASE CPP /nologo /Qsh4 /MC /W3 /GX- /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "SHx" /D "SH4" /D "_SH4_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
-# ADD CPP /nologo /Qsh4 /MC /W3 /GX- /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "SHx" /D "SH4" /D "_SH4_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
+# ADD BASE CPP /nologo /Qsh4 /MC /W3 /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "SHx" /D "SH4" /D "_SH4_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
+# ADD CPP /nologo /Qsh4 /MC /W3 /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "SHx" /D "SH4" /D "_SH4_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /c
+# SUBTRACT CPP /YX /Yc /Yu
 RSC=rc.exe
 # ADD BASE RSC /l 0x804 /r /d "SHx" /d "SH4" /d "_SH4_" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "NDEBUG"
 # ADD RSC /l 0x804 /r /d "SHx" /d "SH4" /d "_SH4_" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "NDEBUG"
@@ -151,8 +154,9 @@ LINK32=link.exe
 # PROP Intermediate_Dir "WCESH4Dbg"
 # PROP Target_Dir ""
 CPP=shcl.exe
-# ADD BASE CPP /nologo /Qsh4 /MC /W3 /GX- /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "SHx" /D "SH4" /D "_SH4_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
-# ADD CPP /nologo /Qsh4 /MC /W3 /GX- /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "SHx" /D "SH4" /D "_SH4_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
+# ADD BASE CPP /nologo /Qsh4 /MC /W3 /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "SHx" /D "SH4" /D "_SH4_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
+# ADD CPP /nologo /Qsh4 /MC /W3 /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "SHx" /D "SH4" /D "_SH4_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /c
+# SUBTRACT CPP /YX /Yc /Yu
 RSC=rc.exe
 # ADD BASE RSC /l 0x804 /r /d "SHx" /d "SH4" /d "_SH4_" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "DEBUG"
 # ADD RSC /l 0x804 /r /d "SHx" /d "SH4" /d "_SH4_" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "DEBUG"
@@ -181,8 +185,9 @@ LINK32=link.exe
 # PROP Intermediate_Dir "WCESH3Rel"
 # PROP Target_Dir ""
 CPP=shcl.exe
-# ADD BASE CPP /nologo /M$(CECrt) /W3 /GX- /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "SHx" /D "SH3" /D "_SH3_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
-# ADD CPP /nologo /M$(CECrt) /W3 /GX- /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "SHx" /D "SH3" /D "_SH3_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
+# ADD BASE CPP /nologo /M$(CECrt) /W3 /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "SHx" /D "SH3" /D "_SH3_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
+# ADD CPP /nologo /M$(CECrt) /W3 /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "SHx" /D "SH3" /D "_SH3_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /c
+# SUBTRACT CPP /YX /Yc /Yu
 RSC=rc.exe
 # ADD BASE RSC /l 0x804 /r /d "SHx" /d "SH3" /d "_SH3_" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "NDEBUG"
 # ADD RSC /l 0x804 /r /d "SHx" /d "SH3" /d "_SH3_" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "NDEBUG"
@@ -211,8 +216,9 @@ LINK32=link.exe
 # PROP Intermediate_Dir "WCESH3Dbg"
 # PROP Target_Dir ""
 CPP=shcl.exe
-# ADD BASE CPP /nologo /M$(CECrtDebug) /W3 /GX- /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "SHx" /D "SH3" /D "_SH3_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
-# ADD CPP /nologo /M$(CECrtDebug) /W3 /GX- /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "SHx" /D "SH3" /D "_SH3_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
+# ADD BASE CPP /nologo /M$(CECrtDebug) /W3 /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "SHx" /D "SH3" /D "_SH3_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
+# ADD CPP /nologo /M$(CECrtDebug) /W3 /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "SHx" /D "SH3" /D "_SH3_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /c
+# SUBTRACT CPP /YX /Yc /Yu
 RSC=rc.exe
 # ADD BASE RSC /l 0x804 /r /d "SHx" /d "SH3" /d "_SH3_" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "DEBUG"
 # ADD RSC /l 0x804 /r /d "SHx" /d "SH3" /d "_SH3_" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "DEBUG"
@@ -241,8 +247,9 @@ LINK32=link.exe
 # PROP Intermediate_Dir "WCEARMRel"
 # PROP Target_Dir ""
 CPP=clarm.exe
-# ADD BASE CPP /nologo /MC /W3 /GX- /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "ARM" /D "_ARM_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
-# ADD CPP /nologo /MC /W3 /GX- /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "ARM" /D "_ARM_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
+# ADD BASE CPP /nologo /MC /W3 /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "ARM" /D "_ARM_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
+# ADD CPP /nologo /MC /W3 /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "ARM" /D "_ARM_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /c
+# SUBTRACT CPP /YX /Yc /Yu
 RSC=rc.exe
 # ADD BASE RSC /l 0x804 /r /d "ARM" /d "_ARM_" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "NDEBUG"
 # ADD RSC /l 0x804 /r /d "ARM" /d "_ARM_" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "NDEBUG"
@@ -271,8 +278,9 @@ LINK32=link.exe
 # PROP Intermediate_Dir "WCEARMDbg"
 # PROP Target_Dir ""
 CPP=clarm.exe
-# ADD BASE CPP /nologo /MC /W3 /GX- /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "ARM" /D "_ARM_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
-# ADD CPP /nologo /MC /W3 /GX- /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "ARM" /D "_ARM_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
+# ADD BASE CPP /nologo /MC /W3 /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "ARM" /D "_ARM_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
+# ADD CPP /nologo /MC /W3 /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "ARM" /D "_ARM_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /c
+# SUBTRACT CPP /YX /Yc /Yu
 RSC=rc.exe
 # ADD BASE RSC /l 0x804 /r /d "ARM" /d "_ARM_" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "DEBUG"
 # ADD RSC /l 0x804 /r /d "ARM" /d "_ARM_" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "DEBUG"
@@ -301,8 +309,9 @@ LINK32=link.exe
 # PROP Intermediate_Dir "WMIPSFPRel"
 # PROP Target_Dir ""
 CPP=clmips.exe
-# ADD BASE CPP /nologo /QMFWCE /MC /W3 /GX- /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "MIPS" /D "_MIPS_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
-# ADD CPP /nologo /QMFWCE /MC /W3 /GX- /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "MIPS" /D "_MIPS_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
+# ADD BASE CPP /nologo /QMFWCE /MC /W3 /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "MIPS" /D "_MIPS_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
+# ADD CPP /nologo /QMFWCE /MC /W3 /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "MIPS" /D "_MIPS_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /c
+# SUBTRACT CPP /YX /Yc /Yu
 RSC=rc.exe
 # ADD BASE RSC /l 0x804 /r /d "MIPS" /d "_MIPS_" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "NDEBUG"
 # ADD RSC /l 0x804 /r /d "MIPS" /d "_MIPS_" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "NDEBUG"
@@ -331,8 +340,9 @@ LINK32=link.exe
 # PROP Intermediate_Dir "WMIPSFPDbg"
 # PROP Target_Dir ""
 CPP=clmips.exe
-# ADD BASE CPP /nologo /QMFWCE /MC /W3 /GX- /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "MIPS" /D "_MIPS_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
-# ADD CPP /nologo /QMFWCE /MC /W3 /GX- /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "MIPS" /D "_MIPS_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
+# ADD BASE CPP /nologo /QMFWCE /MC /W3 /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "MIPS" /D "_MIPS_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
+# ADD CPP /nologo /QMFWCE /MC /W3 /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "MIPS" /D "_MIPS_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /c
+# SUBTRACT CPP /YX /Yc /Yu
 RSC=rc.exe
 # ADD BASE RSC /l 0x804 /r /d "MIPS" /d "_MIPS_" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "DEBUG"
 # ADD RSC /l 0x804 /r /d "MIPS" /d "_MIPS_" /d UNDER_CE=$(CEVersion) /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "UNICODE" /d "DEBUG"
@@ -361,8 +371,9 @@ LINK32=link.exe
 # PROP Intermediate_Dir "WCEX86Rel"
 # PROP Target_Dir ""
 CPP=cl.exe
-# ADD BASE CPP /nologo /ML /W3 /GX- /O2 /D "x86" /D "_i386_" /D "_x86_" /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "NDEBUG" /D "i_386_" /D "_MBCS" /Yu"stdafx.h" /Gs8192 /GF /c
-# ADD CPP /nologo /ML /W3 /GX- /O2 /D "x86" /D "_i386_" /D "_x86_" /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "NDEBUG" /D "i_386_" /D "_MBCS" /Yu"stdafx.h" /Gs8192 /GF /c
+# ADD BASE CPP /nologo /ML /W3 /O2 /D "x86" /D "_i386_" /D "_x86_" /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "NDEBUG" /D "i_386_" /D "_MBCS" /Yu"stdafx.h" /Gs8192 /GF /c
+# ADD CPP /nologo /ML /W3 /O2 /D "x86" /D "_i386_" /D "_x86_" /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "NDEBUG" /D "i_386_" /D "_MBCS" /Gs8192 /GF /c
+# SUBTRACT CPP /YX /Yc /Yu
 RSC=rc.exe
 # ADD BASE RSC /l 0x804 /r /d "x86" /d "_i386_" /d "_x86_" /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d UNDER_CE=$(CEVersion) /d "UNICODE" /d "NDEBUG"
 # ADD RSC /l 0x804 /r /d "x86" /d "_i386_" /d "_x86_" /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d UNDER_CE=$(CEVersion) /d "UNICODE" /d "NDEBUG"
@@ -391,8 +402,9 @@ LINK32=link.exe
 # PROP Intermediate_Dir "WCEX86Dbg"
 # PROP Target_Dir ""
 CPP=cl.exe
-# ADD BASE CPP /nologo /MLd /W3 /GX- /Zi /Od /D "x86" /D "_i386_" /D "_x86_" /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "DEBUG" /D "i_386_" /D "_MBCS" /Yu"stdafx.h" /Gs8192 /GF /c
-# ADD CPP /nologo /MLd /W3 /GX- /Zi /Od /D "x86" /D "_i386_" /D "_x86_" /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "DEBUG" /D "i_386_" /D "_MBCS" /Yu"stdafx.h" /Gs8192 /GF /c
+# ADD BASE CPP /nologo /MLd /W3 /Zi /Od /D "x86" /D "_i386_" /D "_x86_" /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "DEBUG" /D "i_386_" /D "_MBCS" /Yu"stdafx.h" /Gs8192 /GF /c
+# ADD CPP /nologo /MLd /W3 /Zi /Od /D "x86" /D "_i386_" /D "_x86_" /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "DEBUG" /D "i_386_" /D "_MBCS" /Gs8192 /GF /c
+# SUBTRACT CPP /YX /Yc /Yu
 RSC=rc.exe
 # ADD BASE RSC /l 0x804 /r /d "x86" /d "_i386_" /d "_x86_" /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d UNDER_CE=$(CEVersion) /d "UNICODE" /d "DEBUG"
 # ADD RSC /l 0x804 /r /d "x86" /d "_i386_" /d "_x86_" /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d UNDER_CE=$(CEVersion) /d "UNICODE" /d "DEBUG"
@@ -421,8 +433,9 @@ LINK32=link.exe
 # PROP Intermediate_Dir "x86emRel"
 # PROP Target_Dir ""
 CPP=cl.exe
-# ADD BASE CPP /nologo /ML /W3 /GX- /O2 /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_UNICODE" /D "WIN32" /D "STRICT" /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "_WIN32_WCE_EMULATION" /D "INTERNATIONAL" /D "USA" /D "INTLMSG_CODEPAGE" /D "NDEBUG" /D "x86" /D "i486" /D "_x86_" /D "_MBCS" /Yu"stdafx.h" /c
-# ADD CPP /nologo /ML /W3 /GX- /O2 /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_UNICODE" /D "WIN32" /D "STRICT" /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "_WIN32_WCE_EMULATION" /D "INTERNATIONAL" /D "USA" /D "INTLMSG_CODEPAGE" /D "NDEBUG" /D "x86" /D "i486" /D "_x86_" /D "_MBCS" /Yu"stdafx.h" /c
+# ADD BASE CPP /nologo /ML /W3 /O2 /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_UNICODE" /D "WIN32" /D "STRICT" /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "_WIN32_WCE_EMULATION" /D "INTERNATIONAL" /D "USA" /D "INTLMSG_CODEPAGE" /D "NDEBUG" /D "x86" /D "i486" /D "_x86_" /D "_MBCS" /Yu"stdafx.h" /c
+# ADD CPP /nologo /ML /W3 /O2 /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_UNICODE" /D "WIN32" /D "STRICT" /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "_WIN32_WCE_EMULATION" /D "INTERNATIONAL" /D "USA" /D "INTLMSG_CODEPAGE" /D "NDEBUG" /D "x86" /D "i486" /D "_x86_" /D "_MBCS" /c
+# SUBTRACT CPP /YX /Yc /Yu
 RSC=rc.exe
 # ADD BASE RSC /l 0x804 /d UNDER_CE=$(CEVersion) /d "UNICODE" /d "_UNICODE" /d "WIN32" /d "STRICT" /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "_WIN32_WCE_EMULATION" /d "INTERNATIONAL" /d "USA" /d "INTLMSG_CODEPAGE" /d "NDEBUG"
 # ADD RSC /l 0x804 /d UNDER_CE=$(CEVersion) /d "UNICODE" /d "_UNICODE" /d "WIN32" /d "STRICT" /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "_WIN32_WCE_EMULATION" /d "INTERNATIONAL" /d "USA" /d "INTLMSG_CODEPAGE" /d "NDEBUG"
@@ -433,8 +446,8 @@ BSC32=bscmake.exe
 # ADD BASE BSC32 /nologo
 # ADD BSC32 /nologo
 LINK32=link.exe
-# ADD BASE LINK32 $(CEx86Corelibc) commctrl.lib coredll.lib /nologo /stack:0x10000,0x1000 /entry:"" /subsystem:windows /machine:I386 /nodefaultlib:"$(CENoDefaultLib)" /windowsce:emulation
-# ADD LINK32 $(CEx86Corelibc) commctrl.lib coredll.lib /nologo /stack:0x10000,0x1000 /entry:"" /subsystem:windows /machine:I386 /nodefaultlib:"$(CENoDefaultLib)" /windowsce:emulation
+# ADD BASE LINK32 $(CEx86Corelibc) commctrl.lib coredll.lib /nologo /stack:0x10000,0x1000 /subsystem:windows /machine:I386 /nodefaultlib:"$(CENoDefaultLib)" /windowsce:emulation
+# ADD LINK32 $(CEx86Corelibc) commctrl.lib coredll.lib /nologo /stack:0x10000,0x1000 /subsystem:windows /machine:I386 /nodefaultlib:"$(CENoDefaultLib)" /windowsce:emulation
 
 !ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE x86em) Debug"
 
@@ -449,8 +462,9 @@ LINK32=link.exe
 # PROP Intermediate_Dir "x86emDbg"
 # PROP Target_Dir ""
 CPP=cl.exe
-# ADD BASE CPP /nologo /MLd /W3 /Gm /GX- /Zi /Od /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_UNICODE" /D "WIN32" /D "STRICT" /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "_WIN32_WCE_EMULATION" /D "INTERNATIONAL" /D "USA" /D "INTLMSG_CODEPAGE" /D "_DEBUG" /D "x86" /D "i486" /D "_x86_" /D "_MBCS" /Yu"stdafx.h" /c
-# ADD CPP /nologo /MLd /W3 /Gm /GX- /Zi /Od /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_UNICODE" /D "WIN32" /D "STRICT" /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "_WIN32_WCE_EMULATION" /D "INTERNATIONAL" /D "USA" /D "INTLMSG_CODEPAGE" /D "_DEBUG" /D "x86" /D "i486" /D "_x86_" /D "_MBCS" /Yu"stdafx.h" /c
+# ADD BASE CPP /nologo /MLd /W3 /Gm /Zi /Od /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_UNICODE" /D "WIN32" /D "STRICT" /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "_WIN32_WCE_EMULATION" /D "INTERNATIONAL" /D "USA" /D "INTLMSG_CODEPAGE" /D "_DEBUG" /D "x86" /D "i486" /D "_x86_" /D "_MBCS" /Yu"stdafx.h" /c
+# ADD CPP /nologo /MLd /W3 /Gm /Zi /Od /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_UNICODE" /D "WIN32" /D "STRICT" /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "_WIN32_WCE_EMULATION" /D "INTERNATIONAL" /D "USA" /D "INTLMSG_CODEPAGE" /D "_DEBUG" /D "x86" /D "i486" /D "_x86_" /D "_MBCS" /c
+# SUBTRACT CPP /YX /Yc /Yu
 RSC=rc.exe
 # ADD BASE RSC /l 0x804 /d UNDER_CE=$(CEVersion) /d "UNICODE" /d "_UNICODE" /d "WIN32" /d "STRICT" /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "_WIN32_WCE_EMULATION" /d "INTERNATIONAL" /d "USA" /d "INTLMSG_CODEPAGE" /d "_DEBUG" /d "x86" /d "i486" /d "_x86_"
 # ADD RSC /l 0x804 /d UNDER_CE=$(CEVersion) /d "UNICODE" /d "_UNICODE" /d "WIN32" /d "STRICT" /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d "_WIN32_WCE_EMULATION" /d "INTERNATIONAL" /d "USA" /d "INTLMSG_CODEPAGE" /d "_DEBUG" /d "x86" /d "i486" /d "_x86_"
@@ -461,8 +475,8 @@ BSC32=bscmake.exe
 # ADD BASE BSC32 /nologo
 # ADD BSC32 /nologo
 LINK32=link.exe
-# ADD BASE LINK32 $(CEx86Corelibc) commctrl.lib coredll.lib /nologo /stack:0x10000,0x1000 /entry:"" /subsystem:windows /debug /machine:I386 /nodefaultlib:"$(CENoDefaultLib)" /windowsce:emulation
-# ADD LINK32 $(CEx86Corelibc) commctrl.lib coredll.lib /nologo /stack:0x10000,0x1000 /entry:"" /subsystem:windows /debug /machine:I386 /nodefaultlib:"$(CENoDefaultLib)" /windowsce:emulation
+# ADD BASE LINK32 $(CEx86Corelibc) commctrl.lib coredll.lib /nologo /stack:0x10000,0x1000 /subsystem:windows /debug /machine:I386 /nodefaultlib:"$(CENoDefaultLib)" /windowsce:emulation
+# ADD LINK32 $(CEx86Corelibc) commctrl.lib coredll.lib /nologo /stack:0x10000,0x1000 /subsystem:windows /debug /machine:I386 /nodefaultlib:"$(CENoDefaultLib)" /windowsce:emulation
 
 !ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE PPC) Release"
 
@@ -477,8 +491,9 @@ LINK32=link.exe
 # PROP Intermediate_Dir "WCEPPCRel"
 # PROP Target_Dir ""
 CPP=clppc.exe
-# ADD BASE CPP /nologo /M$(CECrt) /W3 /GX- /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "PPC" /D "_PPC_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
-# ADD CPP /nologo /M$(CECrt) /W3 /GX- /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "PPC" /D "_PPC_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
+# ADD BASE CPP /nologo /M$(CECrt) /W3 /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "PPC" /D "_PPC_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
+# ADD CPP /nologo /M$(CECrt) /W3 /O2 /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "NDEBUG" /D "PPC" /D "_PPC_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /c
+# SUBTRACT CPP /YX /Yc /Yu
 RSC=rc.exe
 # ADD BASE RSC /l 0x804 /r /d "ppc" /d "_ppc_" /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d UNDER_CE=$(CEVersion) /d "UNICODE" /d "NDEBUG"
 # ADD RSC /l 0x804 /r /d "ppc" /d "_ppc_" /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d UNDER_CE=$(CEVersion) /d "UNICODE" /d "NDEBUG"
@@ -507,8 +522,9 @@ LINK32=link.exe
 # PROP Intermediate_Dir "WCEPPCDbg"
 # PROP Target_Dir ""
 CPP=clppc.exe
-# ADD BASE CPP /nologo /M$(CECrtDebug) /W3 /GX- /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "PPC" /D "_PPC_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
-# ADD CPP /nologo /M$(CECrtDebug) /W3 /GX- /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "PPC" /D "_PPC_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
+# ADD BASE CPP /nologo /M$(CECrtDebug) /W3 /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "PPC" /D "_PPC_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /Yu"stdafx.h" /c
+# ADD CPP /nologo /M$(CECrtDebug) /W3 /Zi /Od /D _WIN32_WCE=$(CEVersion) /D "$(CEConfigName)" /D "DEBUG" /D "PPC" /D "_PPC_" /D UNDER_CE=$(CEVersion) /D "UNICODE" /D "_MBCS" /c
+# SUBTRACT CPP /YX /Yc /Yu
 RSC=rc.exe
 # ADD BASE RSC /l 0x804 /r /d "ppc" /d "_ppc_" /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d UNDER_CE=$(CEVersion) /d "UNICODE" /d "DEBUG"
 # ADD RSC /l 0x804 /r /d "ppc" /d "_ppc_" /d _WIN32_WCE=$(CEVersion) /d "$(CEConfigName)" /d UNDER_CE=$(CEVersion) /d "UNICODE" /d "DEBUG"
@@ -549,126 +565,7 @@ LINK32=link.exe
 # PROP Default_Filter "cpp;c;cxx;rc;def;r;odl;idl;hpj;bat"
 # Begin Source File
 
-SOURCE=.\KeyCodeTester.cpp
-
-!IF  "$(CFG)" == "KeyCodeTester - Win32 (WCE MIPS) Release"
-
-DEP_CPP_KEYCO=\
-	".\KeyCodeTester.h"\
-	".\StdAfx.h"\
-	
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE MIPS) Debug"
-
-DEP_CPP_KEYCO=\
-	".\KeyCodeTester.h"\
-	".\StdAfx.h"\
-	
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE SH4) Release"
-
-DEP_CPP_KEYCO=\
-	".\KeyCodeTester.h"\
-	".\StdAfx.h"\
-	
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE SH4) Debug"
-
-DEP_CPP_KEYCO=\
-	".\KeyCodeTester.h"\
-	".\StdAfx.h"\
-	
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE SH3) Release"
-
-DEP_CPP_KEYCO=\
-	".\KeyCodeTester.h"\
-	".\StdAfx.h"\
-	
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE SH3) Debug"
-
-DEP_CPP_KEYCO=\
-	".\KeyCodeTester.h"\
-	".\StdAfx.h"\
-	
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE ARM) Release"
-
-DEP_CPP_KEYCO=\
-	".\KeyCodeTester.h"\
-	".\StdAfx.h"\
-	
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE ARM) Debug"
-
-DEP_CPP_KEYCO=\
-	".\KeyCodeTester.h"\
-	".\StdAfx.h"\
-	
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE MIPSFP) Release"
-
-DEP_CPP_KEYCO=\
-	".\KeyCodeTester.h"\
-	".\StdAfx.h"\
-	
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE MIPSFP) Debug"
-
-DEP_CPP_KEYCO=\
-	".\KeyCodeTester.h"\
-	".\StdAfx.h"\
-	
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE x86) Release"
-
-DEP_CPP_KEYCO=\
-	".\KeyCodeTester.h"\
-	".\StdAfx.h"\
-	
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE x86) Debug"
-
-DEP_CPP_KEYCO=\
-	".\KeyCodeTester.h"\
-	".\StdAfx.h"\
-	
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE x86em) Release"
-
-DEP_CPP_KEYCO=\
-	".\KeyCodeTester.h"\
-	".\StdAfx.h"\
-	
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE x86em) Debug"
-
-DEP_CPP_KEYCO=\
-	".\KeyCodeTester.h"\
-	".\StdAfx.h"\
-	
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE PPC) Release"
-
-DEP_CPP_KEYCO=\
-	".\KeyCodeTester.h"\
-	".\StdAfx.h"\
-	
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE PPC) Debug"
-
-DEP_CPP_KEYCO=\
-	".\KeyCodeTester.h"\
-	".\StdAfx.h"\
-	
-
-!ENDIF 
-
-# End Source File
-# Begin Source File
-
-SOURCE=.\KeyCodeTester.rc
+SOURCE=.\KeyCodeTester.c
 
 !IF  "$(CFG)" == "KeyCodeTester - Win32 (WCE MIPS) Release"
 
@@ -701,127 +598,6 @@ SOURCE=.\KeyCodeTester.rc
 !ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE PPC) Release"
 
 !ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE PPC) Debug"
-
-!ENDIF 
-
-# End Source File
-# Begin Source File
-
-SOURCE=.\StdAfx.cpp
-
-!IF  "$(CFG)" == "KeyCodeTester - Win32 (WCE MIPS) Release"
-
-DEP_CPP_STDAF=\
-	".\StdAfx.h"\
-	
-# ADD CPP /Yc"stdafx.h"
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE MIPS) Debug"
-
-DEP_CPP_STDAF=\
-	".\StdAfx.h"\
-	
-# ADD CPP /Yc"stdafx.h"
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE SH4) Release"
-
-DEP_CPP_STDAF=\
-	".\StdAfx.h"\
-	
-# ADD CPP /Yc"stdafx.h"
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE SH4) Debug"
-
-DEP_CPP_STDAF=\
-	".\StdAfx.h"\
-	
-# ADD CPP /Yc"stdafx.h"
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE SH3) Release"
-
-DEP_CPP_STDAF=\
-	".\StdAfx.h"\
-	
-# ADD CPP /Yc"stdafx.h"
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE SH3) Debug"
-
-DEP_CPP_STDAF=\
-	".\StdAfx.h"\
-	
-# ADD CPP /Yc"stdafx.h"
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE ARM) Release"
-
-DEP_CPP_STDAF=\
-	".\StdAfx.h"\
-	
-# ADD CPP /Yc"stdafx.h"
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE ARM) Debug"
-
-DEP_CPP_STDAF=\
-	".\StdAfx.h"\
-	
-# ADD CPP /Yc"stdafx.h"
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE MIPSFP) Release"
-
-DEP_CPP_STDAF=\
-	".\StdAfx.h"\
-	
-# ADD BASE CPP /QMFWCE
-# ADD CPP /QMFWCE /Yc"stdafx.h"
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE MIPSFP) Debug"
-
-DEP_CPP_STDAF=\
-	".\StdAfx.h"\
-	
-# ADD BASE CPP /QMFWCE
-# ADD CPP /QMFWCE /Yc"stdafx.h"
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE x86) Release"
-
-DEP_CPP_STDAF=\
-	".\StdAfx.h"\
-	
-# ADD CPP /Yc"stdafx.h"
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE x86) Debug"
-
-DEP_CPP_STDAF=\
-	".\StdAfx.h"\
-	
-# ADD CPP /Yc"stdafx.h"
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE x86em) Release"
-
-DEP_CPP_STDAF=\
-	".\StdAfx.h"\
-	
-# ADD CPP /Yc"stdafx.h"
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE x86em) Debug"
-
-DEP_CPP_STDAF=\
-	".\StdAfx.h"\
-	
-# ADD CPP /Yc"stdafx.h"
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE PPC) Release"
-
-DEP_CPP_STDAF=\
-	".\StdAfx.h"\
-	
-# ADD CPP /Yc"stdafx.h"
-
-!ELSEIF  "$(CFG)" == "KeyCodeTester - Win32 (WCE PPC) Debug"
-
-DEP_CPP_STDAF=\
-	".\StdAfx.h"\
-	
-# ADD CPP /Yc"stdafx.h"
 
 !ENDIF 
 
@@ -830,18 +606,6 @@ DEP_CPP_STDAF=\
 # Begin Group "Header Files"
 
 # PROP Default_Filter "h;hpp;hxx;hm;inl"
-# Begin Source File
-
-SOURCE=.\KeyCodeTester.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\resource.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\StdAfx.h
-# End Source File
 # End Group
 # Begin Group "Resource Files"
 
