@@ -739,6 +739,8 @@ DEP_CPP_GONGS=\
 DEP_CPP_GONGS=\
 	"..\..\..\artifacts\color-palette\vga_index.h"\
 	"..\..\gongshu.h"\
+	"..\event_queue.h"\
+	"..\wrapper.h"\
 	
 
 !ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE ARM) Debug"
@@ -792,6 +794,8 @@ DEP_CPP_GONGS=\
 DEP_CPP_GONGS=\
 	"..\..\..\artifacts\color-palette\vga_index.h"\
 	"..\..\gongshu.h"\
+	"..\event_queue.h"\
+	"..\wrapper.h"\
 	
 
 !ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE PPC) Release"
@@ -819,6 +823,7 @@ SOURCE=..\win_main.c
 
 DEP_CPP_WIN_M=\
 	"..\..\..\artifacts\color-palette\vga_index.h"\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
 	"..\..\gongshu.h"\
 	"..\event_queue.h"\
 	"..\wrapper.h"\
@@ -857,6 +862,10 @@ DEP_CPP_WIN_M=\
 !ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE ARM) Release"
 
 DEP_CPP_WIN_M=\
+	"..\..\..\artifacts\color-palette\vga_index.h"\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	"..\..\gongshu.h"\
+	"..\event_queue.h"\
 	"..\wrapper.h"\
 	
 
@@ -905,6 +914,10 @@ DEP_CPP_WIN_M=\
 !ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE x86em) Debug"
 
 DEP_CPP_WIN_M=\
+	"..\..\..\artifacts\color-palette\vga_index.h"\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	"..\..\gongshu.h"\
+	"..\event_queue.h"\
 	"..\wrapper.h"\
 	
 
@@ -1514,6 +1527,220 @@ DEP_CPP_MODI_=\
 # Begin Source File
 
 SOURCE=..\..\modi.h
+# End Source File
+# End Group
+# Begin Group "Jasmin89"
+
+# PROP Default_Filter ""
+# Begin Source File
+
+SOURCE=..\..\..\artifacts\jasmine89\jasmine.c
+
+!IF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE MIPS) Release"
+
+DEP_CPP_JASMI=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE MIPS) Debug"
+
+DEP_CPP_JASMI=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE SH4) Release"
+
+DEP_CPP_JASMI=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE SH4) Debug"
+
+DEP_CPP_JASMI=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE SH3) Release"
+
+DEP_CPP_JASMI=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE SH3) Debug"
+
+DEP_CPP_JASMI=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE ARM) Release"
+
+DEP_CPP_JASMI=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE ARM) Debug"
+
+DEP_CPP_JASMI=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE MIPSFP) Release"
+
+DEP_CPP_JASMI=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE MIPSFP) Debug"
+
+DEP_CPP_JASMI=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE x86) Release"
+
+DEP_CPP_JASMI=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE x86) Debug"
+
+DEP_CPP_JASMI=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE x86em) Release"
+
+DEP_CPP_JASMI=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE x86em) Debug"
+
+DEP_CPP_JASMI=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE PPC) Release"
+
+DEP_CPP_JASMI=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE PPC) Debug"
+
+DEP_CPP_JASMI=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ENDIF 
+
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\..\artifacts\jasmine89\jasmine.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\..\artifacts\jasmine89\jasmine_utils.c
+
+!IF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE MIPS) Release"
+
+DEP_CPP_JASMIN=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE MIPS) Debug"
+
+DEP_CPP_JASMIN=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE SH4) Release"
+
+DEP_CPP_JASMIN=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE SH4) Debug"
+
+DEP_CPP_JASMIN=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE SH3) Release"
+
+DEP_CPP_JASMIN=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE SH3) Debug"
+
+DEP_CPP_JASMIN=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE ARM) Release"
+
+DEP_CPP_JASMIN=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE ARM) Debug"
+
+DEP_CPP_JASMIN=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE MIPSFP) Release"
+
+DEP_CPP_JASMIN=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE MIPSFP) Debug"
+
+DEP_CPP_JASMIN=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE x86) Release"
+
+DEP_CPP_JASMIN=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE x86) Debug"
+
+DEP_CPP_JASMIN=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE x86em) Release"
+
+DEP_CPP_JASMIN=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE x86em) Debug"
+
+DEP_CPP_JASMIN=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE PPC) Release"
+
+DEP_CPP_JASMIN=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE PPC) Debug"
+
+DEP_CPP_JASMIN=\
+	"..\..\..\artifacts\jasmine89\jasmine.h"\
+	
+
+!ENDIF 
+
 # End Source File
 # End Group
 # End Target

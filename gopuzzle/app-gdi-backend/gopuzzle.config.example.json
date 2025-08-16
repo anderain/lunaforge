@@ -1,0 +1,15 @@
+{
+  "win": {
+    "landAutoDetect": true,
+    "keyCode": {
+      "up": 38,
+      "down": 40,
+      "left": 37,
+      "right": 39,
+      "a": 90,
+      "b": 88,
+      "x": 65,
+      "y": 83
+    }
+  }
+}

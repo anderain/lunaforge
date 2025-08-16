@@ -1,7 +1,10 @@
 #include <windows.h>
+#include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include "wrapper.h"
 #include "../gongshu.h"
+#include "../../artifacts/jasmine89/jasmine.h"
 #include "event_queue.h"
 
 #define APP_NAME "Gopuzzle"
@@ -27,6 +30,20 @@ void                FlushWindow             (HDC, LPRECT);
 int                 Gopuzzle_Main           ();
 int                 Modi_SetRunningFlag     (BOOL flag);
 
+struct {
+    BOOL landAutoDetect;
+    struct {
+        unsigned int up;
+        unsigned int down;
+        unsigned int left;
+        unsigned int right;
+        unsigned int a, b, x, y;
+    } keyCode;
+} appWin32Config = {
+    TRUE,
+    { 'W', 'S', 'A', 'D', 'N', 'M', 'J', 'K' }
+};
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine,int nCmdShow) {
     int     videoMode;
     RECT    clientRect;
@@ -35,7 +52,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
     BOOL    portraitMode;
     TCHAR   szErrBuf[200];
 
-    if (1) {
+    /* Get app path */
+    {
         TCHAR szPathBuf[MAX_PATH];
         char szCharBuf[MAX_PATH];
         int i;
@@ -53,6 +71,57 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
         strcpy(szCharBuf, szPathBuf);
 #endif
         Gongshu_SetAppPath(szCharBuf);
+    }
+    /* Load json config */
+    {
+        char* szFileContent;
+        int length;
+        char szJsonFilePath[200];
+        TCHAR errMsg[200];
+
+        sprintf(szJsonFilePath, "%s\\gopuzzle.config.json", Gongshu_GetAppPath());
+
+        if (Gongshu_LoadFile(szJsonFilePath, &szFileContent, &length)) {
+            JasmineNode*    rootNode    = NULL;
+            JasmineParser*  parser      = NULL;
+            char*           szJson      = NULL;
+
+            /* Convert binary to zero-terminated string */
+            szJson = (char *)malloc(length + 1);
+            memset(szJson, 0, length + 1);
+            memcpy(szJson, szFileContent, length);
+            if (szFileContent) free(szFileContent);
+
+            rootNode = Jasmine_Parse(szJson, &parser);
+            
+            if (parser->errorCode == JASMINE_ERROR_NO_ERROR) {
+                appWin32Config.landAutoDetect   = JasmineConfig_LoadInteger(rootNode, "win.landAutoDetect", TRUE);
+                appWin32Config.keyCode.up       = JasmineConfig_LoadInteger(rootNode, "win.keyCode.up",     'W');
+                appWin32Config.keyCode.down     = JasmineConfig_LoadInteger(rootNode, "win.keyCode.down",   'S');
+                appWin32Config.keyCode.left     = JasmineConfig_LoadInteger(rootNode, "win.keyCode.left",   'A');
+                appWin32Config.keyCode.right    = JasmineConfig_LoadInteger(rootNode, "win.keyCode.right",  'D');
+                appWin32Config.keyCode.a        = JasmineConfig_LoadInteger(rootNode, "win.keyCode.a",      'N');
+                appWin32Config.keyCode.b        = JasmineConfig_LoadInteger(rootNode, "win.keyCode.b",      'M');
+                appWin32Config.keyCode.x        = JasmineConfig_LoadInteger(rootNode, "win.keyCode.x",      'J');
+                appWin32Config.keyCode.y        = JasmineConfig_LoadInteger(rootNode, "win.keyCode.y",      'K');
+                MessageBox(NULL, _T("JSON config loaded"), _T("Success"), MB_OK);
+            }
+            else {
+#ifdef UNICODE
+                c2w(parser->errorString, errMsg);
+#else
+                strcpy(errMsg, parser->errorString);
+#endif
+                MessageBox(NULL, errMsg, _T("Error"), MB_OK);
+            }
+
+            if (rootNode) JasmineNode_Dispose(rootNode);
+            if (parser) JasmineParser_Dispose(parser);
+            if (szJson) free(szJson);
+        }
+        else {
+            MessageBox(NULL, _T("Failed to read config file"), _T("Error"), MB_OK);
+        }
     }
 
     /* Initialize random function */
@@ -76,6 +145,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
     portraitMode = PORTRAIT_MODE_NO;
     if (IS_WIN_CE && vBufHeight > vBufWidth) {
         portraitMode = PORTRAIT_MODE_LEFT;
+    }
+
+    if (!appWin32Config.landAutoDetect) {
+        portraitMode = PORTRAIT_MODE_NO;
     }
 
     /* Initialize video buffer */
@@ -279,54 +352,54 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
                 InvalidateRect(hWnd, NULL, TRUE);
             }
         }
-        else if (wParam == 'W') {
+        else if (wParam == appWin32Config.keyCode.up) {
             EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_DOWN, GSE_KEY_CODE_UP, 0);
         }
-        else if (wParam == 'S') {
+        else if (wParam == appWin32Config.keyCode.down) {
             EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_DOWN, GSE_KEY_CODE_DOWN, 0);
         }
-        else if (wParam == 'A') {
+        else if (wParam == appWin32Config.keyCode.left) {
             EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_DOWN, GSE_KEY_CODE_LEFT, 0);
         }
-        else if (wParam == 'D') {
+        else if (wParam == appWin32Config.keyCode.right) {
             EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_DOWN, GSE_KEY_CODE_RIGHT, 0);
         }
-        else if (wParam == 'N') {
+        else if (wParam == appWin32Config.keyCode.a) {
             EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_DOWN, GSE_KEY_CODE_A, 0);
         }
-        else if (wParam == 'M') {
+        else if (wParam == appWin32Config.keyCode.b) {
             EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_DOWN, GSE_KEY_CODE_B, 0);
         }
-        else if (wParam == 'J') {
+        else if (wParam == appWin32Config.keyCode.x) {
             EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_DOWN, GSE_KEY_CODE_X, 0);
         }
-        else if (wParam == 'K') {
+        else if (wParam == appWin32Config.keyCode.y) {
             EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_DOWN, GSE_KEY_CODE_Y, 0);
         }
         break;
     case WM_KEYUP:
-        if (wParam == 'W') {
+        if (wParam == appWin32Config.keyCode.up) {
             EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_UP, GSE_KEY_CODE_UP, 0);
         }
-        else if (wParam == 'S') {
+        else if (wParam == appWin32Config.keyCode.down) {
             EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_UP, GSE_KEY_CODE_DOWN, 0);
         }
-        else if (wParam == 'A') {
+        else if (wParam == appWin32Config.keyCode.left) {
             EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_UP, GSE_KEY_CODE_LEFT, 0);
         }
-        else if (wParam == 'D') {
+        else if (wParam == appWin32Config.keyCode.right) {
             EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_UP, GSE_KEY_CODE_RIGHT, 0);
         }
-        else if (wParam == 'N') {
+        else if (wParam == appWin32Config.keyCode.a) {
             EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_UP, GSE_KEY_CODE_A, 0);
         }
-        else if (wParam == 'M') {
+        else if (wParam == appWin32Config.keyCode.b) {
             EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_UP, GSE_KEY_CODE_B, 0);
         }
-        else if (wParam == 'J') {
+        else if (wParam == appWin32Config.keyCode.x) {
             EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_UP, GSE_KEY_CODE_X, 0);
         }
-        else if (wParam == 'K') {
+        else if (wParam == appWin32Config.keyCode.y) {
             EventQueue_Enqueue(&eventQueue, GSE_TYPE_KEY_UP, GSE_KEY_CODE_Y, 0);
         }
         break;

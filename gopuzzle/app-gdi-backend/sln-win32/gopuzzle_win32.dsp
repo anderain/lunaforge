@@ -142,5 +142,21 @@ SOURCE=..\..\modi.c
 SOURCE=..\..\modi.h
 # End Source File
 # End Group
+# Begin Group "Jasmine89"
+
+# PROP Default_Filter ""
+# Begin Source File
+
+SOURCE=..\..\..\artifacts\jasmine89\jasmine.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\..\artifacts\jasmine89\jasmine.h
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\..\artifacts\jasmine89\jasmine_utils.c
+# End Source File
+# End Group
 # End Target
 # End Project
