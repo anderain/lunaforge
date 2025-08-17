@@ -17,22 +17,24 @@
 #define UI_MENU_FILL            1
 #define UI_MENU_LAYER           2
 #define UI_MENU_TILE            3
-#define UI_MENU_SAVE            4
-#define UI_MENU_SETTINGS        5
-#define UI_MENU_QUIT            6
+#define UI_MENU_SPRITE_MODE     4
+#define UI_MENU_SAVE            5
+#define UI_MENU_SETTINGS        6
+#define UI_MENU_QUIT            7
 
 static const char* MapLayerName[] = { "Terrain", "LoStruct", "HiStruct", "View Only", "Passability" };
-
+static const char* SpriteModeName[] = { "VGA Color", "Monochrome", "Grayscale" };
 static const struct {
     int menuActionId;
     char* menuText;
 } MapMenuItems[] = {
-    { UI_MENU_FILL,     "Fill Area" },
-    { UI_MENU_LAYER,    "Layer"     },
-    { UI_MENU_TILE,     "Tile"      },
-    { UI_MENU_SAVE,     "Save"      },
-    { UI_MENU_SETTINGS, "Settings"  },
-    { UI_MENU_QUIT,     "Quit"      }
+    { UI_MENU_FILL,         "Fill Area" },
+    { UI_MENU_LAYER,        "Layer"     },
+    { UI_MENU_TILE,         "Tile"      },
+    { UI_MENU_SPRITE_MODE,  "Sprite"    } ,
+    { UI_MENU_SAVE,         "Save"      },
+    { UI_MENU_SETTINGS,     "Settings"  },
+    { UI_MENU_QUIT,         "Quit"      }
 };
 
 static const int NumMapMenuItems = sizeof(MapMenuItems) / sizeof(MapMenuItems[0]);
@@ -48,6 +50,7 @@ struct {
             int x;
             int y;
         } cursor;
+        int spriteMode;
     } map;
     struct {
         int tileIndex;
@@ -61,7 +64,8 @@ struct {
         /* tileIndex    */ 0,
         /* isMenuOpend  */ FALSE,
         /* menuIndex    */ 0,
-        /* cursor       */ { 0, 0 }
+        /* cursor       */ { 0, 0 },
+        /* spriteMode   */ SPRITE_MODE_NORMAL
     },
     /* tile     */ {
         /* tileIndex    */ 0,
@@ -83,7 +87,7 @@ LunaMap* LunaMap_CreateTest() {
     LunaMap*        pMap;
     LunaSprite*     pSprite;
     int             w = 20, h = 20;
-    int             numTile = 7;
+    int             numTile = 8;
     int             mapByteSize = w * h * sizeof(TileIndex);
 
     pMap = (LunaMap *)malloc(sizeof(LunaMap));
@@ -128,6 +132,8 @@ LunaMap* LunaMap_CreateTest() {
     pMap->tile[5] = pSprite;
     TestLoadSprite("inn_screen2", &pSprite);
     pMap->tile[6] = pSprite;
+    TestLoadSprite("inn_bed0", &pSprite);
+    pMap->tile[7] = pSprite;
 
     return pMap;
 }
@@ -161,7 +167,7 @@ void LunaMap_DrawLayer(const LunaMap *pMap, int layerIndex, int startX, int star
             if (NULL == pSprite) continue;
             dx = startX + x * HALF_TILE_WIDTH - y * HALF_TILE_WIDTH - (pSprite->width - TILE_WIDTH) / 2;
             dy = startY + x * HALF_TILE_HEIGHT + y * HALF_TILE_HEIGHT + TILE_HEIGHT - pSprite->height;
-            Modi_DrawLunaSpriteWithMask(pSprite, dx, dy, SPRITE_MODE_NORMAL, maskLevel);
+            Modi_DrawLunaSpriteWithMask(pSprite, dx, dy, ui.map.spriteMode, maskLevel);
         }
     }
 }
@@ -263,6 +269,15 @@ void Luna_DrawMapMenu() {
             break;
         case UI_MENU_TILE:
             sprintf(szBuf, "%s          \x11[%03d]\x10", MapMenuItems[i].menuText, ui.map.tileIndex);
+            Modi_Print6x8(
+                (const uchar *)szBuf,
+                left, top,
+                FALSE,
+                i == ui.map.menuIndex ? ColorPlain : ColorHighlight
+            );
+            break;
+        case UI_MENU_SPRITE_MODE:
+            sprintf(szBuf, "%s \x11[%10s]\x10", MapMenuItems[i].menuText, SpriteModeName[ui.map.spriteMode]);
             Modi_Print6x8(
                 (const uchar *)szBuf,
                 left, top,
@@ -439,6 +454,10 @@ void Gopuzzle_HandleInput() {
                         ui.map.tileIndex = pLunaMap->numTile - 1;
                     }
                 }
+                else if (actionId == UI_MENU_SPRITE_MODE) {
+                    ui.map.spriteMode--;
+                    if (ui.map.spriteMode < SPRITE_MODE_NORMAL) ui.map.spriteMode = SPRITE_MODE_BLACK_WHITE_GRAY;
+                }
                 break;
             case GSE_KEY_CODE_RIGHT:
                 if (actionId == UI_MENU_LAYER) {
@@ -450,6 +469,10 @@ void Gopuzzle_HandleInput() {
                     if (ui.map.tileIndex >= pLunaMap->numTile) {
                         ui.map.tileIndex = 0;
                     }
+                }
+                else if (actionId == UI_MENU_SPRITE_MODE) {
+                    ui.map.spriteMode++;
+                    if (ui.map.spriteMode > SPRITE_MODE_BLACK_WHITE_GRAY) ui.map.spriteMode = SPRITE_MODE_NORMAL;
                 }
                 break;
             case GSE_KEY_CODE_A: {
