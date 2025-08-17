@@ -19,15 +19,14 @@
 #define UI_MENU_SETTINGS        3
 #define UI_MENU_QUIT            4
 
-
-static const char*  MapLayerName[] = { "Terrain", "LoStruct", "HiStruct", "View Only" };
+static const char* MapLayerName[] = { "Terrain", "LoStruct", "HiStruct", "View Only" };
 
 static const struct {
     int menuActionId;
     char* menuText;
 } MapMenuItems[] = {
-    { UI_MENU_FILL,     "Fill Area" },
-    { UI_MENU_SAVE,     "Save" },
+    { UI_MENU_FILL,     "Fill Area\x10" },
+    { UI_MENU_SAVE,     "Save\x11" },
     { UI_MENU_SETTINGS, "Settings"},
     { UI_MENU_QUIT,     "Quit" },
 };
@@ -80,7 +79,7 @@ LunaMap* LunaMap_CreateTest() {
     LunaMap*        pMap;
     LunaSprite*     pSprite;
     int             w = 20, h = 20;
-    int             numTilemap = 6;
+    int             numTilemap = 7;
     int             mapByteSize = w * h * sizeof(TileIndex);
 
     pMap = (LunaMap *)malloc(sizeof(LunaMap));
@@ -123,6 +122,8 @@ LunaMap* LunaMap_CreateTest() {
     pMap->tilemap[4] = pSprite;
     TestLoadSprite("inn_chair0", &pSprite);
     pMap->tilemap[5] = pSprite;
+    TestLoadSprite("inn_screen2", &pSprite);
+    pMap->tilemap[6] = pSprite;
 
     return pMap;
 }
@@ -229,7 +230,7 @@ void Luna_DrawMapMenu() {
         ColorPlain
     );
 
-    Modi_Print6x8(StrMapHeader, startX, startY, TRUE, ColorHighlight);
+    Modi_Print6x8((const uchar *)StrMapHeader, startX, startY, TRUE, ColorHighlight);
 
     for (i = 0; i < NumMapMenuItems; ++i) {
         int y = startY + (i + 1) * 8;
@@ -237,7 +238,7 @@ void Luna_DrawMapMenu() {
             Modi_FillRect(startX, y, MenuWidth, 8, ColorHighlight);
         }
         Modi_Print6x8(
-            MapMenuItems[i].menuText,
+            (const uchar *)MapMenuItems[i].menuText,
             startX, y,
             FALSE,
             i == ui.map.menuIndex ? ColorPlain : ColorHighlight
@@ -301,7 +302,7 @@ void Luna_DrawTileSet(const LunaMap* pLunaMap) {
         sprintf(szBuf, "Tile #%d", ui.tile.tileIndex);
         x = UI_TILESET_START_X + UI_TILESET_CLIENT_W;
         y = UI_TILESET_START_Y;
-        Modi_Print6x8(szBuf, x, y, FALSE, VGA_COLOR_BRIGHT_WHITE);
+        Modi_Print6x8((const uchar *)szBuf, x, y, FALSE, VGA_COLOR_BRIGHT_WHITE);
         Modi_DrawLunaSprite(
             pLunaMap->tilemap[ui.tile.tileIndex],
             x + 2, y + 10,
@@ -309,7 +310,7 @@ void Luna_DrawTileSet(const LunaMap* pLunaMap) {
         );
     }
     else {
-        Modi_Print6x8("No Tile", UI_TILESET_START_X + UI_TILESET_CLIENT_W, UI_TILESET_START_Y, TRUE, VGA_COLOR_BRIGHT_WHITE);
+        Modi_Print6x8((const uchar *)"No Tile", UI_TILESET_START_X + UI_TILESET_CLIENT_W, UI_TILESET_START_Y, TRUE, VGA_COLOR_BRIGHT_WHITE);
     }
 }
 
@@ -324,18 +325,18 @@ void Gopuzzle_Redraw() {
         Modi_FillRect(0, 0, screenWidth, 8, VGA_COLOR_CYAN);
         Modi_FillRect(0, screenHeight - 8, screenWidth, 8, VGA_COLOR_CYAN);
         sprintf(szBuf, "Map Editor | Tile #%d | Layer [%s]", ui.map.tileIndex, MapLayerName[ui.map.layer]);
-        Modi_Print6x8(szBuf, 0, 0, FALSE, VGA_COLOR_BRIGHT_WHITE);
+        Modi_Print6x8((const uchar *)szBuf, 0, 0, FALSE, VGA_COLOR_BRIGHT_WHITE);
         Modi_Print4x6("A: Set / B: Menu / X: Switch Layer / Y: Select Tile", 104, screenHeight - 7, FALSE, VGA_COLOR_BRIGHT_WHITE);
         sprintf(szBuf, "Cursor (%03d,%03d)", ui.map.cursor.x, ui.map.cursor.y);
-        Modi_Print6x8(szBuf, 0, screenHeight - 8, FALSE, VGA_COLOR_BRIGHT_WHITE);
+        Modi_Print6x8((const uchar *)szBuf, 0, screenHeight - 8, FALSE, VGA_COLOR_BRIGHT_WHITE);
         Luna_DrawMapMenu();
         break;
     case UI_STATE_TILE_SELECT:
         Modi_FillRect(0, 0, screenWidth, 8, VGA_COLOR_CYAN);
         Modi_FillRect(0, screenHeight - 8, screenWidth, 8, VGA_COLOR_CYAN);
-        Modi_Print6x8("Select Tile", 0, 0, FALSE, VGA_COLOR_BRIGHT_WHITE);
+        Modi_Print6x8((const uchar *)"Select Tile", 0, 0, FALSE, VGA_COLOR_BRIGHT_WHITE);
         sprintf(szBuf, "Set Tile (%03d)", ui.tile.tileIndex);
-        Modi_Print6x8(szBuf, 0, screenHeight - 8, FALSE, VGA_COLOR_BRIGHT_WHITE);
+        Modi_Print6x8((const uchar *)szBuf, 0, screenHeight - 8, FALSE, VGA_COLOR_BRIGHT_WHITE);
         Modi_Print4x6("A: Confirm / B: Map Editor", 120, screenHeight - 7, FALSE, VGA_COLOR_BRIGHT_WHITE);
         Luna_DrawTileSet(pLunaMap);
         break;
@@ -358,7 +359,7 @@ void LunaMap_RecursiveFilling(LunaMap* pLunaMap, int layer, int x, int y, TileIn
 
     MapElement(pLunaMap, layer, x, y) = replaceIndex;
     LunaMap_RecursiveFilling(pLunaMap, layer, x - 1, y, originalIndex, replaceIndex);
-    LunaMap_RecursiveFilling(pLunaMap, layer, x, y -1, originalIndex, replaceIndex);
+    LunaMap_RecursiveFilling(pLunaMap, layer, x, y - 1, originalIndex, replaceIndex);
     LunaMap_RecursiveFilling(pLunaMap, layer, x + 1, y, originalIndex, replaceIndex);
     LunaMap_RecursiveFilling(pLunaMap, layer, x, y + 1, originalIndex, replaceIndex);
 }

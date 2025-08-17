@@ -60,6 +60,7 @@ typedef enum {
     oo */
 #define DARK_MASK_LEVEL_FULL    0xF
 
+typedef unsigned char uchar;
 
 int             Modi_GetRunningFlag         (void);
 int             Modi_SetRunningFlag         (BOOL flag);
@@ -69,7 +70,7 @@ void            Modi_PlotLine               (int x0, int y0, int x1, int y1, uns
 void            Modi_DrawLunaSpriteInRange  (const LunaSprite* pSprite, int dx, int dy, int spriteMode, int rangeHrzStart, int rangeHrzEnd, int rangeVrtStart, int rangeVrtEnd);
 void            Modi_DrawLunaSprite         (const LunaSprite* pSprite, int dx, int dy, int spriteMode);
 void            Modi_DrawLunaSpriteWithMask (const LunaSprite* pSprite, int dx, int dy, int spriteMode, int maskLevel);
-void            Modi_Print6x8               (const char* str, int dx, int dy, BOOL rev, unsigned char colorIndex);
+void            Modi_Print6x8               (const uchar* str, int dx, int dy, BOOL rev, unsigned char colorIndex);
 void            Modi_Print4x6               (const char* str, int dx, int dy, BOOL rev, unsigned char colorIndex);
 int             Modi_WaitKey                (void);
 ModiLoadResult  Modi_LoadLunaSprite         (const char *filePath, LunaSprite** ppLunaSprite);

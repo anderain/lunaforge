@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "modi.h"
-#include "../artifacts/raster-fonts/hp100lx_6x8.h"
+#include "../artifacts/raster-fonts/hybird_6x8.h"
 #include "../artifacts/raster-fonts/tom_thumb_4x6.h"
 
 #define ABS(v) ((v) < 0 ? -(v) : (v))
@@ -200,15 +200,15 @@ void Modi_DrawLunaSprite(const LunaSprite* pSprite, int dx, int dy, int spriteMo
     Modi_DrawLunaSpriteInRange(pSprite, dx, dy, spriteMode, 0, pSprite->hrzCount - 1, 0, pSprite->vrtCount - 1);
 }
 
-void Modi_Print6x8(const char *str, int dx, int dy, BOOL rev, unsigned char colorIndex) {
+void Modi_Print6x8(const uchar* str, int dx, int dy, BOOL rev, unsigned char colorIndex) {
     int i, offset;
     char c;
     for (i = 0; str[i]; ++i, dx += 6) {
         c = str[i];
-        if (c < FONT_HP100LX_6x8_START || c > FONT_HP100LX_6x8_END)
+        if (c < FONT_HYBIRD_6x8_START || c > FONT_HYBIRD_6x8_END)
             continue;
-        offset = c - FONT_HP100LX_6x8_START;
-        Modi_DrawOneBpp(FONT_HP100LX_6x8 + (offset << 3), dx, dy, 6, 8, rev, colorIndex);
+        offset = c - FONT_HYBIRD_6x8_START;
+        Modi_DrawOneBpp(FONT_HYBIRD_6x8 + (offset << 3), dx, dy, 6, 8, rev, colorIndex);
     }
 }
 
@@ -219,7 +219,7 @@ void Modi_Print4x6(const char *str, int dx, int dy, BOOL rev, unsigned char colo
         c = str[i];
         if (c < FONT_TOM_THUMB_4x6_START || c > FONT_TOM_THUMB_4x6_END)
             continue;
-        offset = c - FONT_HP100LX_6x8_START;
+        offset = c - FONT_TOM_THUMB_4x6_START;
         Modi_DrawOneBpp(FONT_TOM_THUMB_4x6 + ((offset << 2) + (offset << 1)), dx, dy, 4, 6, rev, colorIndex);
     }
 }
