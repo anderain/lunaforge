@@ -40,21 +40,37 @@ void Modi_FillRect(int left, int top, int width, int height, unsigned char color
     }
 }
 
-void Modi_ApplyDarkMask(int maskLevel, unsigned char colorIndex) {
-    int screenWidth, screenHeight;
+void Modi_FillRectWithMask(int left, int top, int width, int height, unsigned char colorIndex, int maskLevel) {
+    int screenWidth;
+    int screenHeight;
+    int right;
+    int bottom;
     int x, y;
 
     Gongshu_GetResolution(&screenWidth, &screenHeight);
+    if (left >= screenWidth) return;
+    if (top >= screenHeight) return;
 
-    for (y = 0; y < screenHeight; ++y) {
+    right = left + width - 1;
+    bottom = top + height - 1;
+    if (right >= screenWidth) right = screenWidth - 1;
+    if (bottom >= screenHeight) bottom = screenHeight - 1;
+
+    for (y = top; y <= bottom; ++y) {
         int ybit = (y & 1) << 1;
-        for (x = 0; x < screenWidth; ++x) {
+        for (x = left; x <= right; ++x) {
             int bitIndex = (x & 1) | ybit;
-            if (maskLevel & (1 << bitIndex)) { 
+            if (maskLevel & (1 << bitIndex)) {
                 Gongshu_SetPixel(x, y, colorIndex);
             }
         }
     }
+}
+
+void Modi_ApplyDarkMask(int maskLevel, unsigned char colorIndex) {
+    int screenWidth, screenHeight;
+    Gongshu_GetResolution(&screenWidth, &screenHeight);
+    Modi_FillRectWithMask(0, 0, screenWidth, screenHeight, colorIndex, maskLevel);
 }
 
 void Modi_PlotLine(int x0, int y0, int x1, int y1, unsigned char color) {

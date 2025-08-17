@@ -15,20 +15,24 @@
 #define UI_TILE_CELL_H          24
 
 #define UI_MENU_FILL            1
-#define UI_MENU_SAVE            2
-#define UI_MENU_SETTINGS        3
-#define UI_MENU_QUIT            4
+#define UI_MENU_LAYER           2
+#define UI_MENU_TILE            3
+#define UI_MENU_SAVE            4
+#define UI_MENU_SETTINGS        5
+#define UI_MENU_QUIT            6
 
-static const char* MapLayerName[] = { "Terrain", "LoStruct", "HiStruct", "View Only" };
+static const char* MapLayerName[] = { "Terrain", "LoStruct", "HiStruct", "View Only", "Passability" };
 
 static const struct {
     int menuActionId;
     char* menuText;
 } MapMenuItems[] = {
-    { UI_MENU_FILL,     "Fill Area\x10" },
-    { UI_MENU_SAVE,     "Save\x11" },
-    { UI_MENU_SETTINGS, "Settings"},
-    { UI_MENU_QUIT,     "Quit" },
+    { UI_MENU_FILL,     "Fill Area" },
+    { UI_MENU_LAYER,    "Layer"     },
+    { UI_MENU_TILE,     "Tile"      },
+    { UI_MENU_SAVE,     "Save"      },
+    { UI_MENU_SETTINGS, "Settings"  },
+    { UI_MENU_QUIT,     "Quit"      }
 };
 
 static const int NumMapMenuItems = sizeof(MapMenuItems) / sizeof(MapMenuItems[0]);
@@ -79,14 +83,14 @@ LunaMap* LunaMap_CreateTest() {
     LunaMap*        pMap;
     LunaSprite*     pSprite;
     int             w = 20, h = 20;
-    int             numTilemap = 7;
+    int             numTile = 7;
     int             mapByteSize = w * h * sizeof(TileIndex);
 
     pMap = (LunaMap *)malloc(sizeof(LunaMap));
     pMap->w = w;
     pMap->h = h;
-    pMap->numTilemap                = numTilemap;
-    pMap->tilemap                   = (LunaSprite **)malloc(numTilemap * sizeof(LunaSprite*));
+    pMap->numTile                   = numTile;
+    pMap->tile                      = (LunaSprite **)malloc(numTile * sizeof(LunaSprite*));
     pMap->layer[LAYER_TERRAIN]      = (TileIndex *)malloc(mapByteSize);
     pMap->layer[LAYER_LO_STRUCT]    = (TileIndex *)malloc(mapByteSize);
     pMap->layer[LAYER_HI_STRUCT]    = (TileIndex *)malloc(mapByteSize);
@@ -110,20 +114,20 @@ LunaMap* LunaMap_CreateTest() {
 
     MapElement(pMap, LAYER_LO_STRUCT, 8, 3) = 5;
 
-    pMap->tilemap[0] = NULL; /* tilemap[0] 用永远是 0 */
+    pMap->tile[0] = NULL; /* tile[0] 用永远是 0 */
 
     TestLoadSprite("inn_wdnflr0", &pSprite);
-    pMap->tilemap[1] = pSprite;
+    pMap->tile[1] = pSprite;
     TestLoadSprite("inn_screen0", &pSprite);
-    pMap->tilemap[2] = pSprite;
+    pMap->tile[2] = pSprite;
     TestLoadSprite("inn_screen1", &pSprite);
-    pMap->tilemap[3] = pSprite;
+    pMap->tile[3] = pSprite;
     TestLoadSprite("inn_wood0", &pSprite);
-    pMap->tilemap[4] = pSprite;
+    pMap->tile[4] = pSprite;
     TestLoadSprite("inn_chair0", &pSprite);
-    pMap->tilemap[5] = pSprite;
+    pMap->tile[5] = pSprite;
     TestLoadSprite("inn_screen2", &pSprite);
-    pMap->tilemap[6] = pSprite;
+    pMap->tile[6] = pSprite;
 
     return pMap;
 }
@@ -131,13 +135,13 @@ LunaMap* LunaMap_CreateTest() {
 void LunaMap_Dispose(LunaMap* pMap) {
     int i;
     /* 跳过第一个，释放其他 tile sprite */
-    for (i = 1; i < pMap->numTilemap; ++i) {
-        LunaSprite* pSprite = pMap->tilemap[i];
+    for (i = 1; i < pMap->numTile; ++i) {
+        LunaSprite* pSprite = pMap->tile[i];
         if (pSprite) {
             Modi_DisposeLunaSprite(pSprite);
         }
     }
-    free(pMap->tilemap);
+    free(pMap->tile);
     /* 释放所有layer */
     for (i = LAYER_TERRAIN; i <= LAYER_HI_STRUCT; ++i) {
          free(pMap->layer[i]);
@@ -153,7 +157,7 @@ void LunaMap_DrawLayer(const LunaMap *pMap, int layerIndex, int startX, int star
         for (x = 0; x < pMap->w; ++x) {
             tileIndex = MapElement(pMap, layerIndex, x, y);
             if (tileIndex == 0) continue;
-            pSprite = pMap->tilemap[tileIndex];
+            pSprite = pMap->tile[tileIndex];
             if (NULL == pSprite) continue;
             dx = startX + x * HALF_TILE_WIDTH - y * HALF_TILE_WIDTH - (pSprite->width - TILE_WIDTH) / 2;
             dy = startY + x * HALF_TILE_HEIGHT + y * HALF_TILE_HEIGHT + TILE_HEIGHT - pSprite->height;
@@ -198,6 +202,12 @@ void LunaMap_Draw(const LunaMap* pMap) {
         LunaMap_DrawLayer(pMap, LAYER_LO_STRUCT, startX, startY, DARK_MASK_LEVEL_FULL);
         LunaMap_DrawLayer(pMap, LAYER_HI_STRUCT, startX, startY, DARK_MASK_LEVEL_FULL);
         break;
+    case LAYER_PASSABILITY:
+        LunaMap_DrawLayer(pMap, LAYER_TERRAIN, startX, startY, DARK_MASK_LEVEL_FULL);
+        LunaMap_DrawLayer(pMap, LAYER_LO_STRUCT, startX, startY, DARK_MASK_LEVEL_FULL);
+        LunaMap_DrawLayer(pMap, LAYER_HI_STRUCT, startX, startY, DARK_MASK_LEVEL_FULL);
+        /* TODO: Draw passability here */
+        break;
     }
 
     /* 绘制光标菱形 */
@@ -209,40 +219,84 @@ void LunaMap_Draw(const LunaMap* pMap) {
     curOffsetY = screenHalfHeight - 1;
     Modi_PlotLine(curOffsetX, curOffsetY + HALF_TILE_HEIGHT, curOffsetX + HALF_TILE_WIDTH, curOffsetY, TILE_HIGHLIGHT_COLOR);
     Modi_PlotLine(curOffsetX, curOffsetY - HALF_TILE_HEIGHT, curOffsetX + HALF_TILE_WIDTH, curOffsetY, TILE_HIGHLIGHT_COLOR);
-
 }
 
 void Luna_DrawMapMenu() {
-    int startX = 8, startY = 16;
-    int i;
-    static const char StrMapHeader[] = "---Map Menu---";
-    static const unsigned char ColorPlain = VGA_COLOR_BRIGHT_WHITE;
-    static const unsigned char ColorHighlight = VGA_COLOR_GREEN;
+    static const char StrMapHeader[] = "       Map Menu       ";
+    static const uchar ColorPlain = VGA_COLOR_CYAN;
+    static const uchar ColorHighlight = VGA_COLOR_BRIGHT_WHITE;
+    static const int itemHeight = 12;
     static const int MenuWidth = (sizeof(StrMapHeader) - 1) / sizeof(StrMapHeader[0]) * 6;
+    int startX = (screenWidth - MenuWidth) / 2, startY = 16, i, actionId;
+    char szBuf[50];
 
     if (!ui.map.isMenuOpened) {
         return;
     }
 
-    Modi_FillRect(
-        startX, startY,
-        MenuWidth, (NumMapMenuItems + 1) * 8,
-        ColorPlain
-    );
+    /* Shadow and box */
+    Modi_FillRect(startX + 2, startY + 2, MenuWidth, (NumMapMenuItems + 1) * itemHeight, 0xc3);
+    Modi_FillRect(startX, startY, MenuWidth, (NumMapMenuItems + 1) * itemHeight, ColorPlain);
 
-    Modi_Print6x8((const uchar *)StrMapHeader, startX, startY, TRUE, ColorHighlight);
+    /* Header */
+    Modi_FillRect(startX, startY, MenuWidth, itemHeight, VGA_COLOR_LIGHT_CYAN);
+    Modi_Print6x8((const uchar *)StrMapHeader, startX, startY + 2, FALSE, VGA_COLOR_BLACK);
 
     for (i = 0; i < NumMapMenuItems; ++i) {
-        int y = startY + (i + 1) * 8;
+        int top = startY + (i + 1) * itemHeight;
+        int left = startX;
+        actionId = MapMenuItems[i].menuActionId;
         if (i == ui.map.menuIndex) {
-            Modi_FillRect(startX, y, MenuWidth, 8, ColorHighlight);
+            Modi_FillRect(left, top, MenuWidth, itemHeight, ColorHighlight);
         }
-        Modi_Print6x8(
-            (const uchar *)MapMenuItems[i].menuText,
-            startX, y,
-            FALSE,
-            i == ui.map.menuIndex ? ColorPlain : ColorHighlight
-        );
+        top += 2;
+        left += 3;
+        switch (actionId) {
+        case UI_MENU_LAYER:
+            sprintf(szBuf, "%s \x11[%11s]\x10", MapMenuItems[i].menuText, MapLayerName[ui.map.layer]);
+            Modi_Print6x8(
+                (const uchar *)szBuf,
+                left, top,
+                FALSE,
+                i == ui.map.menuIndex ? ColorPlain : ColorHighlight
+            );
+            break;
+        case UI_MENU_TILE:
+            sprintf(szBuf, "%s          \x11[%03d]\x10", MapMenuItems[i].menuText, ui.map.tileIndex);
+            Modi_Print6x8(
+                (const uchar *)szBuf,
+                left, top,
+                FALSE,
+                i == ui.map.menuIndex ? ColorPlain : ColorHighlight
+            );
+            break;
+        default:
+            Modi_Print6x8(
+                (const uchar *)MapMenuItems[i].menuText,
+                left, top,
+                FALSE,
+                i == ui.map.menuIndex ? ColorPlain : ColorHighlight
+            );
+        }
+    }
+
+    actionId = MapMenuItems[ui.map.menuIndex].menuActionId;
+    if (actionId == UI_MENU_TILE) {
+        int left = startX + MenuWidth + 4;
+        int top = startY;
+        if (ui.map.tileIndex == 0) {
+            Modi_Print6x8((const uchar*) "No Tile", left, top, TRUE, VGA_COLOR_BRIGHT_WHITE);
+        }
+        else {
+            LunaSprite* pSprite = pLunaMap->tile[ui.map.tileIndex];
+            Modi_FillRect(left, top, pSprite->width + 2, pSprite->height + 2, VGA_COLOR_BRIGHT_WHITE);
+            Modi_FillRectWithMask(left, top, pSprite->width + 2, pSprite->height + 2, VGA_COLOR_WHITE, DARK_MASK_LEVEL_MEDIUM);
+            Modi_DrawLunaSprite(
+                pSprite,
+                left + 1, top + 1,
+                SPRITE_MODE_NORMAL
+            );
+        }
     }
 }
 
@@ -265,7 +319,7 @@ void Luna_DrawTileSet(const LunaMap* pLunaMap) {
     endIndex = endRow * ui.tile.colSize - 1;
 
     if (startIndex < 0) startIndex = 0;
-    if (endIndex >= pLunaMap->numTilemap) endIndex = pLunaMap->numTilemap - 1;
+    if (endIndex >= pLunaMap->numTile) endIndex = pLunaMap->numTile - 1;
 
 #if 0
     Modi_PlotLine(UI_TILESET_START_X, UI_TILESET_START_Y, UI_TILESET_START_X + UI_TILESET_CLIENT_W, UI_TILESET_START_Y, VGA_COLOR_LIGHT_BLUE);
@@ -291,7 +345,7 @@ void Luna_DrawTileSet(const LunaMap* pLunaMap) {
         Modi_Print4x6(szBuf, x + 1, y + 1, TRUE, VGA_COLOR_CYAN);
         if (i == 0) continue;
         Modi_DrawLunaSpriteInRange(
-            pLunaMap->tilemap[i],
+            pLunaMap->tile[i],
             x + 1, y + 7,
             SPRITE_MODE_NORMAL,
             0, 2, 0, 1
@@ -299,15 +353,16 @@ void Luna_DrawTileSet(const LunaMap* pLunaMap) {
     }
 
     if (ui.tile.tileIndex != 0) {
+        LunaSprite* pSprite = pLunaMap->tile[ui.tile.tileIndex];
         sprintf(szBuf, "Tile #%d", ui.tile.tileIndex);
         x = UI_TILESET_START_X + UI_TILESET_CLIENT_W;
         y = UI_TILESET_START_Y;
         Modi_Print6x8((const uchar *)szBuf, x, y, FALSE, VGA_COLOR_BRIGHT_WHITE);
-        Modi_DrawLunaSprite(
-            pLunaMap->tilemap[ui.tile.tileIndex],
-            x + 2, y + 10,
-            SPRITE_MODE_NORMAL
-        );
+        x += 2;
+        y += 10;
+        Modi_FillRect(x, y, pSprite->width + 2, pSprite->height + 2, VGA_COLOR_BRIGHT_WHITE);
+        Modi_FillRectWithMask(x, y, pSprite->width + 2, pSprite->height + 2, VGA_COLOR_WHITE, DARK_MASK_LEVEL_MEDIUM);
+        Modi_DrawLunaSprite(pSprite, x + 1, y + 1, SPRITE_MODE_NORMAL);
     }
     else {
         Modi_Print6x8((const uchar *)"No Tile", UI_TILESET_START_X + UI_TILESET_CLIENT_W, UI_TILESET_START_Y, TRUE, VGA_COLOR_BRIGHT_WHITE);
@@ -369,20 +424,43 @@ void Gopuzzle_HandleInput() {
     switch (ui.state) {
     case UI_STATE_MAP_EDIT: 
         if (ui.map.isMenuOpened) {
+            int actionId = MapMenuItems[ui.map.menuIndex].menuActionId;
             switch (keyCode) {
             case GSE_KEY_CODE_UP:       ui.map.menuIndex--; break;
             case GSE_KEY_CODE_DOWN:     ui.map.menuIndex++; break;
+            case GSE_KEY_CODE_LEFT:
+                if (actionId == UI_MENU_LAYER) {
+                    ui.map.layer--;
+                    if (ui.map.layer < LAYER_LOOP_MIN) ui.map.layer = LAYER_LOOP_MAX;
+                }
+                else if (actionId == UI_MENU_TILE) {
+                    ui.map.tileIndex--;
+                    if (ui.map.tileIndex < 0) {
+                        ui.map.tileIndex = pLunaMap->numTile - 1;
+                    }
+                }
+                break;
+            case GSE_KEY_CODE_RIGHT:
+                if (actionId == UI_MENU_LAYER) {
+                    ui.map.layer++;
+                    if (ui.map.layer > LAYER_LOOP_MAX) ui.map.layer = LAYER_LOOP_MIN;
+                }
+                else if (actionId == UI_MENU_TILE) {
+                    ui.map.tileIndex++;
+                    if (ui.map.tileIndex >= pLunaMap->numTile) {
+                        ui.map.tileIndex = 0;
+                    }
+                }
+                break;
             case GSE_KEY_CODE_A: {
-                int actionId = MapMenuItems[ui.map.menuIndex].menuActionId;
                 switch (actionId) {
                 case UI_MENU_FILL: {
-                    if (ui.map.layer < LAYER_VIEW_ONLY) {
+                    if (isLayerEditable(ui.map.layer)) {
                         int x = ui.map.cursor.x;
                         int y = ui.map.cursor.y;
                         int layer = ui.map.layer;
                         TileIndex originalIndex = MapElement(pLunaMap, layer, x, y);
                         TileIndex replaceIndex = ui.map.tileIndex;
-                        printf("layer %d x = %d, y = %d\n", layer, x, y);
                         LunaMap_RecursiveFilling(pLunaMap, layer, x, y, originalIndex, replaceIndex);
                         ui.map.isMenuOpened = FALSE;
                     }
@@ -417,16 +495,15 @@ void Gopuzzle_HandleInput() {
                 return;
             case GSE_KEY_CODE_X:
                 ui.map.layer++;
-                if (ui.map.layer > LAYER_VIEW_ONLY) ui.map.layer = LAYER_TERRAIN;
+                if (ui.map.layer > LAYER_LOOP_MAX) ui.map.layer = LAYER_LOOP_MIN;
                 return;
             case GSE_KEY_CODE_B:
                 ui.map.isMenuOpened = TRUE;
                 return;
             case GSE_KEY_CODE_A:
-                if (ui.map.layer == LAYER_VIEW_ONLY) {
-                    return;
+                if (isLayerEditable(ui.map.layer)) {
+                    MapElement(pLunaMap, ui.map.layer, ui.map.cursor.x, ui.map.cursor.y) = ui.map.tileIndex;
                 }
-                MapElement(pLunaMap, ui.map.layer, ui.map.cursor.x, ui.map.cursor.y) = ui.map.tileIndex;
                 return;
             }
             if (ui.map.cursor.x < 0) ui.map.cursor.x = pLunaMap->w - 1;
@@ -450,8 +527,8 @@ void Gopuzzle_HandleInput() {
             ui.state = UI_STATE_MAP_EDIT;
             return;
         }
-        if (ui.tile.tileIndex < 0) ui.tile.tileIndex = pLunaMap->numTilemap - 1;
-        if (ui.tile.tileIndex >= pLunaMap->numTilemap) ui.tile.tileIndex = 0;
+        if (ui.tile.tileIndex < 0) ui.tile.tileIndex = pLunaMap->numTile - 1;
+        if (ui.tile.tileIndex >= pLunaMap->numTile) ui.tile.tileIndex = 0;
         break;
     case UI_STATE_SETTING:
         break;

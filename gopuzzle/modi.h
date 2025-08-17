@@ -65,6 +65,7 @@ typedef unsigned char uchar;
 int             Modi_GetRunningFlag         (void);
 int             Modi_SetRunningFlag         (BOOL flag);
 void            Modi_FillRect               (int left, int top, int width, int height, unsigned char colorIndex);
+void            Modi_FillRectWithMask       (int left, int top, int width, int height, unsigned char colorIndex, int maskLevel);
 void            Modi_ApplyDarkMask          (int level, unsigned char colorIndex);
 void            Modi_PlotLine               (int x0, int y0, int x1, int y1, unsigned char colorIndex);
 void            Modi_DrawLunaSpriteInRange  (const LunaSprite* pSprite, int dx, int dy, int spriteMode, int rangeHrzStart, int rangeHrzEnd, int rangeVrtStart, int rangeVrtEnd);

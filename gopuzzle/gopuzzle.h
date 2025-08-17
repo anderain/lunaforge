@@ -10,12 +10,17 @@ typedef unsigned char TileIndex;
 #define LAYER_LO_STRUCT     1
 #define LAYER_HI_STRUCT     2
 #define LAYER_VIEW_ONLY     3
+#define LAYER_PASSABILITY   4
+#define LAYER_LOOP_MIN      LAYER_TERRAIN
+#define LAYER_LOOP_MAX      LAYER_PASSABILITY
+
+#define isLayerEditable(layer)  ((layer) == LAYER_TERRAIN || (layer) == LAYER_LO_STRUCT || (layer) == LAYER_HI_STRUCT)
 
 typedef struct {
     int             w;
     int             h;
-    int             numTilemap;
-    LunaSprite**    tilemap;
+    int             numTile;
+    LunaSprite**    tile;
     TileIndex*      layer[3];
 } LunaMap;
 
