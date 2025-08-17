@@ -33,6 +33,8 @@ int                 Modi_SetRunningFlag     (BOOL flag);
 struct {
     BOOL landAutoDetect;
     struct {
+        unsigned int forceExit;
+        unsigned int portFlip;
         unsigned int up;
         unsigned int down;
         unsigned int left;
@@ -64,7 +66,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
                 break;
             }
         }
-        MessageBox(NULL, szPathBuf, _T("App Path"), MB_OK);
 #ifdef UNICODE
         w2c(szPathBuf, szCharBuf);
 #else
@@ -72,6 +73,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
 #endif
         Gongshu_SetAppPath(szCharBuf);
     }
+
+    /* Initialize random function */
+    srand(GetTickCount());
+
+    /* Perform application initialization: */
+    if (!InitInstance (hInstance, nCmdShow)) {
+        return FALSE;
+    }
+
     /* Load json config */
     {
         char* szFileContent;
@@ -95,16 +105,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
             rootNode = Jasmine_Parse(szJson, &parser);
             
             if (parser->errorCode == JASMINE_ERROR_NO_ERROR) {
-                appWin32Config.landAutoDetect   = JasmineConfig_LoadInteger(rootNode, "win.landAutoDetect", TRUE);
-                appWin32Config.keyCode.up       = JasmineConfig_LoadInteger(rootNode, "win.keyCode.up",     'W');
-                appWin32Config.keyCode.down     = JasmineConfig_LoadInteger(rootNode, "win.keyCode.down",   'S');
-                appWin32Config.keyCode.left     = JasmineConfig_LoadInteger(rootNode, "win.keyCode.left",   'A');
-                appWin32Config.keyCode.right    = JasmineConfig_LoadInteger(rootNode, "win.keyCode.right",  'D');
-                appWin32Config.keyCode.a        = JasmineConfig_LoadInteger(rootNode, "win.keyCode.a",      'N');
-                appWin32Config.keyCode.b        = JasmineConfig_LoadInteger(rootNode, "win.keyCode.b",      'M');
-                appWin32Config.keyCode.x        = JasmineConfig_LoadInteger(rootNode, "win.keyCode.x",      'J');
-                appWin32Config.keyCode.y        = JasmineConfig_LoadInteger(rootNode, "win.keyCode.y",      'K');
-                MessageBox(NULL, _T("JSON config loaded"), _T("Success"), MB_OK);
+                appWin32Config.landAutoDetect   = JasmineConfig_LoadInteger(rootNode, "win.landAutoDetect",     TRUE);
+                appWin32Config.keyCode.forceExit= JasmineConfig_LoadInteger(rootNode, "win.keyCode.forceExit",  VK_TAB);
+                appWin32Config.keyCode.portFlip = JasmineConfig_LoadInteger(rootNode, "win.keyCode.portFlip",   'F');
+                appWin32Config.keyCode.up       = JasmineConfig_LoadInteger(rootNode, "win.keyCode.up",         'W');
+                appWin32Config.keyCode.down     = JasmineConfig_LoadInteger(rootNode, "win.keyCode.down",       'S');
+                appWin32Config.keyCode.left     = JasmineConfig_LoadInteger(rootNode, "win.keyCode.left",       'A');
+                appWin32Config.keyCode.right    = JasmineConfig_LoadInteger(rootNode, "win.keyCode.right",      'D');
+                appWin32Config.keyCode.a        = JasmineConfig_LoadInteger(rootNode, "win.keyCode.a",          'N');
+                appWin32Config.keyCode.b        = JasmineConfig_LoadInteger(rootNode, "win.keyCode.b",          'M');
+                appWin32Config.keyCode.x        = JasmineConfig_LoadInteger(rootNode, "win.keyCode.x",          'J');
+                appWin32Config.keyCode.y        = JasmineConfig_LoadInteger(rootNode, "win.keyCode.y",          'K');
             }
             else {
 #ifdef UNICODE
@@ -112,7 +123,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
 #else
                 strcpy(errMsg, parser->errorString);
 #endif
-                MessageBox(NULL, errMsg, _T("Error"), MB_OK);
+                MessageBox(hWndMain, errMsg, _T("Error"), MB_OK);
             }
 
             if (rootNode) JasmineNode_Dispose(rootNode);
@@ -120,16 +131,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
             if (szJson) free(szJson);
         }
         else {
-            MessageBox(NULL, _T("Failed to read config file"), _T("Error"), MB_OK);
+            MessageBox(hWndMain, _T("Failed to read config file"), _T("Error"), MB_OK);
         }
-    }
-
-    /* Initialize random function */
-    srand(GetTickCount());
-
-    /* Perform application initialization: */
-    if (!InitInstance (hInstance, nCmdShow)) {
-        return FALSE;
     }
 
     hdc = GetDC(hWndMain);
@@ -336,11 +339,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
     }
     case WM_KEYDOWN:
         /* Force Exit */
-        if (wParam == VK_TAB || wParam == VK_ESCAPE) {
+        if (wParam == appWin32Config.keyCode.forceExit) {
             ConfirmExit();
         }
         /* Toggle portrait mode */
-        else if (wParam == VK_DOWN) {
+        else if (wParam == appWin32Config.keyCode.portFlip) {
             if (pWgConfig->portraitMode == PORTRAIT_MODE_LEFT) {
                 pWgConfig->portraitMode = PORTRAIT_MODE_RIGHT;
                 WG_SelectPutDisp();
