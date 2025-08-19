@@ -158,5 +158,17 @@ SOURCE=..\..\..\artifacts\jasmine89\jasmine.h
 SOURCE=..\..\..\artifacts\jasmine89\jasmine_utils.c
 # End Source File
 # End Group
+# Begin Group "Salvia89"
+
+# PROP Default_Filter ""
+# Begin Source File
+
+SOURCE=..\..\..\artifacts\salvia89\salvia.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\..\artifacts\salvia89\salvia.h
+# End Source File
+# End Group
 # End Target
 # End Project

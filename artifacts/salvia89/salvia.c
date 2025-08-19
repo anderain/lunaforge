@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
@@ -167,7 +166,7 @@ static char*    Salvia_ItoaWithPadding      (int iNum, char* pStrBuf, int iBase,
             }
             break;
         case STATE_LENGTH:
-            /* TODO: 实现长度修饰符读取*/
+            /* TODO: 实现长度修饰符读取 */
             iState = STATE_SPECIFIER;
             break;
         case STATE_SPECIFIER:

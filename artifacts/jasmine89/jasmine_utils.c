@@ -1,8 +1,10 @@
-#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
 #include "jasmine.h"
+#include "../salvia89/salvia.h"
+
+#define sprintf Salvia_Format
 
 const char* JASMINE_NODE_TYPE_NAME[] = {
     "NULL", "OBJECT", "ARRAY", "STRING", "NUMBER", "BOOLEAN"

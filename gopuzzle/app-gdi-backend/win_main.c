@@ -1,11 +1,13 @@
 #include <windows.h>
-#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include "wrapper.h"
 #include "../gongshu.h"
 #include "../../artifacts/jasmine89/jasmine.h"
+#include "../../artifacts/salvia89/salvia.h"
 #include "event_queue.h"
+
+#define sprintf Salvia_Format
 
 #define APP_NAME "Gopuzzle"
 

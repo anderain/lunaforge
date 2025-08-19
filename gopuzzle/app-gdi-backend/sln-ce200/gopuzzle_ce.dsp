@@ -1365,137 +1365,163 @@ SOURCE=..\..\modi.c
 
 DEP_CPP_MODI_=\
 	"..\..\..\artifacts\color-palette\vga_index.h"\
-	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	"..\..\..\artifacts\raster-fonts\tom_thumb_4x6.h"\
 	"..\..\gongshu.h"\
 	"..\..\modi.h"\
+	
+NODEP_CPP_MODI_=\
+	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	
 
 !ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE MIPS) Debug"
 
 DEP_CPP_MODI_=\
 	"..\..\..\artifacts\color-palette\vga_index.h"\
-	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	"..\..\..\artifacts\raster-fonts\tom_thumb_4x6.h"\
 	"..\..\gongshu.h"\
 	"..\..\modi.h"\
+	
+NODEP_CPP_MODI_=\
+	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	
 
 !ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE SH4) Release"
 
 DEP_CPP_MODI_=\
 	"..\..\..\artifacts\color-palette\vga_index.h"\
-	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	"..\..\..\artifacts\raster-fonts\tom_thumb_4x6.h"\
 	"..\..\gongshu.h"\
 	"..\..\modi.h"\
+	
+NODEP_CPP_MODI_=\
+	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	
 
 !ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE SH4) Debug"
 
 DEP_CPP_MODI_=\
 	"..\..\..\artifacts\color-palette\vga_index.h"\
-	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	"..\..\..\artifacts\raster-fonts\tom_thumb_4x6.h"\
 	"..\..\gongshu.h"\
 	"..\..\modi.h"\
+	
+NODEP_CPP_MODI_=\
+	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	
 
 !ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE SH3) Release"
 
 DEP_CPP_MODI_=\
 	"..\..\..\artifacts\color-palette\vga_index.h"\
-	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	"..\..\..\artifacts\raster-fonts\tom_thumb_4x6.h"\
 	"..\..\gongshu.h"\
 	"..\..\modi.h"\
+	
+NODEP_CPP_MODI_=\
+	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	
 
 !ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE SH3) Debug"
 
 DEP_CPP_MODI_=\
 	"..\..\..\artifacts\color-palette\vga_index.h"\
-	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	"..\..\..\artifacts\raster-fonts\tom_thumb_4x6.h"\
 	"..\..\gongshu.h"\
 	"..\..\modi.h"\
+	
+NODEP_CPP_MODI_=\
+	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	
 
 !ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE ARM) Release"
 
 DEP_CPP_MODI_=\
 	"..\..\..\artifacts\color-palette\vga_index.h"\
-	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	"..\..\..\artifacts\raster-fonts\tom_thumb_4x6.h"\
 	"..\..\gongshu.h"\
 	"..\..\modi.h"\
+	
+NODEP_CPP_MODI_=\
+	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	
 
 !ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE ARM) Debug"
 
 DEP_CPP_MODI_=\
 	"..\..\..\artifacts\color-palette\vga_index.h"\
-	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	"..\..\..\artifacts\raster-fonts\tom_thumb_4x6.h"\
 	"..\..\gongshu.h"\
 	"..\..\modi.h"\
+	
+NODEP_CPP_MODI_=\
+	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	
 
 !ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE MIPSFP) Release"
 
 DEP_CPP_MODI_=\
 	"..\..\..\artifacts\color-palette\vga_index.h"\
-	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	"..\..\..\artifacts\raster-fonts\tom_thumb_4x6.h"\
 	"..\..\gongshu.h"\
 	"..\..\modi.h"\
+	
+NODEP_CPP_MODI_=\
+	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	
 
 !ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE MIPSFP) Debug"
 
 DEP_CPP_MODI_=\
 	"..\..\..\artifacts\color-palette\vga_index.h"\
-	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	"..\..\..\artifacts\raster-fonts\tom_thumb_4x6.h"\
 	"..\..\gongshu.h"\
 	"..\..\modi.h"\
+	
+NODEP_CPP_MODI_=\
+	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	
 
 !ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE x86) Release"
 
 DEP_CPP_MODI_=\
 	"..\..\..\artifacts\color-palette\vga_index.h"\
-	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	"..\..\..\artifacts\raster-fonts\tom_thumb_4x6.h"\
 	"..\..\gongshu.h"\
 	"..\..\modi.h"\
+	
+NODEP_CPP_MODI_=\
+	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	
 
 !ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE x86) Debug"
 
 DEP_CPP_MODI_=\
 	"..\..\..\artifacts\color-palette\vga_index.h"\
-	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	"..\..\..\artifacts\raster-fonts\tom_thumb_4x6.h"\
 	"..\..\gongshu.h"\
 	"..\..\modi.h"\
+	
+NODEP_CPP_MODI_=\
+	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	
 
 !ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE x86em) Release"
 
 DEP_CPP_MODI_=\
 	"..\..\..\artifacts\color-palette\vga_index.h"\
-	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	"..\..\..\artifacts\raster-fonts\tom_thumb_4x6.h"\
 	"..\..\gongshu.h"\
 	"..\..\modi.h"\
+	
+NODEP_CPP_MODI_=\
+	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	
 
 !ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE x86em) Debug"
 
 DEP_CPP_MODI_=\
 	"..\..\..\artifacts\color-palette\vga_index.h"\
-	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
+	"..\..\..\artifacts\raster-fonts\hybird_6x8.h"\
 	"..\..\..\artifacts\raster-fonts\tom_thumb_4x6.h"\
 	"..\..\gongshu.h"\
 	"..\..\modi.h"\
@@ -1505,20 +1531,24 @@ DEP_CPP_MODI_=\
 
 DEP_CPP_MODI_=\
 	"..\..\..\artifacts\color-palette\vga_index.h"\
-	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	"..\..\..\artifacts\raster-fonts\tom_thumb_4x6.h"\
 	"..\..\gongshu.h"\
 	"..\..\modi.h"\
+	
+NODEP_CPP_MODI_=\
+	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	
 
 !ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE PPC) Debug"
 
 DEP_CPP_MODI_=\
 	"..\..\..\artifacts\color-palette\vga_index.h"\
-	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	"..\..\..\artifacts\raster-fonts\tom_thumb_4x6.h"\
 	"..\..\gongshu.h"\
 	"..\..\modi.h"\
+	
+NODEP_CPP_MODI_=\
+	"..\..\..\artifacts\raster-fonts\hp100lx_6x8.h"\
 	
 
 !ENDIF 
@@ -1726,6 +1756,9 @@ DEP_CPP_JASMIN=\
 DEP_CPP_JASMIN=\
 	"..\..\..\artifacts\jasmine89\jasmine.h"\
 	
+NODEP_CPP_JASMIN=\
+	"..\..\..\artifacts\salvia.h"\
+	
 
 !ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE PPC) Release"
 
@@ -1741,6 +1774,117 @@ DEP_CPP_JASMIN=\
 
 !ENDIF 
 
+# End Source File
+# End Group
+# Begin Group "Salvia89"
+
+# PROP Default_Filter ""
+# Begin Source File
+
+SOURCE=..\..\..\artifacts\salvia89\salvia.c
+
+!IF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE MIPS) Release"
+
+DEP_CPP_SALVI=\
+	"..\..\..\artifacts\salvia89\salvia.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE MIPS) Debug"
+
+DEP_CPP_SALVI=\
+	"..\..\..\artifacts\salvia89\salvia.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE SH4) Release"
+
+DEP_CPP_SALVI=\
+	"..\..\..\artifacts\salvia89\salvia.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE SH4) Debug"
+
+DEP_CPP_SALVI=\
+	"..\..\..\artifacts\salvia89\salvia.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE SH3) Release"
+
+DEP_CPP_SALVI=\
+	"..\..\..\artifacts\salvia89\salvia.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE SH3) Debug"
+
+DEP_CPP_SALVI=\
+	"..\..\..\artifacts\salvia89\salvia.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE ARM) Release"
+
+DEP_CPP_SALVI=\
+	"..\..\..\artifacts\salvia89\salvia.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE ARM) Debug"
+
+DEP_CPP_SALVI=\
+	"..\..\..\artifacts\salvia89\salvia.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE MIPSFP) Release"
+
+DEP_CPP_SALVI=\
+	"..\..\..\artifacts\salvia89\salvia.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE MIPSFP) Debug"
+
+DEP_CPP_SALVI=\
+	"..\..\..\artifacts\salvia89\salvia.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE x86) Release"
+
+DEP_CPP_SALVI=\
+	"..\..\..\artifacts\salvia89\salvia.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE x86) Debug"
+
+DEP_CPP_SALVI=\
+	"..\..\..\artifacts\salvia89\salvia.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE x86em) Release"
+
+DEP_CPP_SALVI=\
+	"..\..\..\artifacts\salvia89\salvia.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE x86em) Debug"
+
+DEP_CPP_SALVI=\
+	"..\..\..\artifacts\salvia89\salvia.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE PPC) Release"
+
+DEP_CPP_SALVI=\
+	"..\..\..\artifacts\salvia89\salvia.h"\
+	
+
+!ELSEIF  "$(CFG)" == "gopuzzle_ce - Win32 (WCE PPC) Debug"
+
+DEP_CPP_SALVI=\
+	"..\..\..\artifacts\salvia89\salvia.h"\
+	
+
+!ENDIF 
+
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\..\artifacts\salvia89\salvia.h
 # End Source File
 # End Group
 # End Target
