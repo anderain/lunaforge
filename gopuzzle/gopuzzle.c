@@ -1,7 +1,7 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "gopuzzle.h"
+#include "../artifacts/salvia89/salvia.h"
 
 #define UI_STATE_MAP_EDIT       0
 #define UI_STATE_TILE_SELECT    1
@@ -79,7 +79,7 @@ int         screenWidth, screenHeight;
 
 ModiLoadResult TestLoadSprite(const char* path, LunaSprite** ppSprite) {
     char fullPath[200];
-    sprintf(fullPath, "%s\\cache\\%s", Gongshu_GetAppPath(), path);
+    Salvia_Format(fullPath, "%s\\cache\\%s", Gongshu_GetAppPath(), path);
     return Modi_LoadLunaSprite(fullPath, ppSprite);
 }
 
@@ -87,7 +87,7 @@ LunaMap* LunaMap_CreateTest() {
     LunaMap*        pMap;
     LunaSprite*     pSprite;
     int             w = 20, h = 20;
-    int             numTile = 8;
+    int             numTile = 13;
     int             mapByteSize = w * h * sizeof(TileIndex);
 
     pMap = (LunaMap *)malloc(sizeof(LunaMap));
@@ -132,9 +132,18 @@ LunaMap* LunaMap_CreateTest() {
     pMap->tile[5] = pSprite;
     TestLoadSprite("inn_screen2", &pSprite);
     pMap->tile[6] = pSprite;
-    TestLoadSprite("inn_bed0", &pSprite);
+    TestLoadSprite("inn_bed_lt", &pSprite);
     pMap->tile[7] = pSprite;
-
+    TestLoadSprite("inn_bed_lc", &pSprite);
+    pMap->tile[8] = pSprite;
+    TestLoadSprite("inn_bed_lb", &pSprite);
+    pMap->tile[9] = pSprite;
+    TestLoadSprite("inn_bed_rt", &pSprite);
+    pMap->tile[10] = pSprite;
+    TestLoadSprite("inn_bed_rc", &pSprite);
+    pMap->tile[11] = pSprite;
+    TestLoadSprite("inn_bed_rb", &pSprite);
+    pMap->tile[12] = pSprite;
     return pMap;
 }
 
@@ -259,7 +268,7 @@ void Luna_DrawMapMenu() {
         left += 3;
         switch (actionId) {
         case UI_MENU_LAYER:
-            sprintf(szBuf, "%s \x11[%11s]\x10", MapMenuItems[i].menuText, MapLayerName[ui.map.layer]);
+            Salvia_Format(szBuf, "%s \x11[%11s]\x10", MapMenuItems[i].menuText, MapLayerName[ui.map.layer]);
             Modi_Print6x8(
                 (const uchar *)szBuf,
                 left, top,
@@ -268,7 +277,7 @@ void Luna_DrawMapMenu() {
             );
             break;
         case UI_MENU_TILE:
-            sprintf(szBuf, "%s          \x11[%03d]\x10", MapMenuItems[i].menuText, ui.map.tileIndex);
+            Salvia_Format(szBuf, "%s          \x11[%03d]\x10", MapMenuItems[i].menuText, ui.map.tileIndex);
             Modi_Print6x8(
                 (const uchar *)szBuf,
                 left, top,
@@ -277,7 +286,7 @@ void Luna_DrawMapMenu() {
             );
             break;
         case UI_MENU_SPRITE_MODE:
-            sprintf(szBuf, "%s \x11[%10s]\x10", MapMenuItems[i].menuText, SpriteModeName[ui.map.spriteMode]);
+            Salvia_Format(szBuf, "%s \x11[%10s]\x10", MapMenuItems[i].menuText, SpriteModeName[ui.map.spriteMode]);
             Modi_Print6x8(
                 (const uchar *)szBuf,
                 left, top,
@@ -354,7 +363,7 @@ void Luna_DrawTileSet(const LunaMap* pLunaMap) {
 
     for (i = startIndex; i <= endIndex; ++i) {
         offset = i - startIndex;
-        sprintf(szBuf, "%03d", i);
+        Salvia_Format(szBuf, "%03d", i);
         x = UI_TILESET_START_X + (offset % ui.tile.colSize) * UI_TILE_CELL_W;
         y = UI_TILESET_START_Y + (offset / ui.tile.colSize) * UI_TILE_CELL_H;
         Modi_Print4x6(szBuf, x + 1, y + 1, TRUE, VGA_COLOR_CYAN);
@@ -369,7 +378,7 @@ void Luna_DrawTileSet(const LunaMap* pLunaMap) {
 
     if (ui.tile.tileIndex != 0) {
         LunaSprite* pSprite = pLunaMap->tile[ui.tile.tileIndex];
-        sprintf(szBuf, "Tile #%d", ui.tile.tileIndex);
+        Salvia_Format(szBuf, "Tile #%d", ui.tile.tileIndex);
         x = UI_TILESET_START_X + UI_TILESET_CLIENT_W;
         y = UI_TILESET_START_Y;
         Modi_Print6x8((const uchar *)szBuf, x, y, FALSE, VGA_COLOR_BRIGHT_WHITE);
@@ -394,10 +403,10 @@ void Gopuzzle_Redraw() {
         LunaMap_Draw(pLunaMap);
         Modi_FillRect(0, 0, screenWidth, 8, VGA_COLOR_CYAN);
         Modi_FillRect(0, screenHeight - 8, screenWidth, 8, VGA_COLOR_CYAN);
-        sprintf(szBuf, "Map Editor | Tile #%d | Layer [%s]", ui.map.tileIndex, MapLayerName[ui.map.layer]);
+        Salvia_Format(szBuf, "Map Editor | Tile #%d | Layer [%s]", ui.map.tileIndex, MapLayerName[ui.map.layer]);
         Modi_Print6x8((const uchar *)szBuf, 0, 0, FALSE, VGA_COLOR_BRIGHT_WHITE);
         Modi_Print4x6("A: Set / B: Menu / X: Switch Layer / Y: Select Tile", 104, screenHeight - 7, FALSE, VGA_COLOR_BRIGHT_WHITE);
-        sprintf(szBuf, "Cursor (%03d,%03d)", ui.map.cursor.x, ui.map.cursor.y);
+        Salvia_Format(szBuf, "Cursor (%03d,%03d)", ui.map.cursor.x, ui.map.cursor.y);
         Modi_Print6x8((const uchar *)szBuf, 0, screenHeight - 8, FALSE, VGA_COLOR_BRIGHT_WHITE);
         Luna_DrawMapMenu();
         break;
@@ -405,7 +414,7 @@ void Gopuzzle_Redraw() {
         Modi_FillRect(0, 0, screenWidth, 8, VGA_COLOR_CYAN);
         Modi_FillRect(0, screenHeight - 8, screenWidth, 8, VGA_COLOR_CYAN);
         Modi_Print6x8((const uchar *)"Select Tile", 0, 0, FALSE, VGA_COLOR_BRIGHT_WHITE);
-        sprintf(szBuf, "Set Tile (%03d)", ui.tile.tileIndex);
+        Salvia_Format(szBuf, "Set Tile (%03d)", ui.tile.tileIndex);
         Modi_Print6x8((const uchar *)szBuf, 0, screenHeight - 8, FALSE, VGA_COLOR_BRIGHT_WHITE);
         Modi_Print4x6("A: Confirm / B: Map Editor", 120, screenHeight - 7, FALSE, VGA_COLOR_BRIGHT_WHITE);
         Luna_DrawTileSet(pLunaMap);
@@ -560,7 +569,6 @@ void Gopuzzle_HandleInput() {
 
 int Gopuzzle_Main() {
     if (!Gongshu_Init()) {
-        fprintf(stderr, "Failed to initialize Graphics\n");
         return -1;
     }
 

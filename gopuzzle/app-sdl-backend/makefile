@@ -9,6 +9,7 @@
 COMMON_FOLDER	= ..
 SDL_FOLDER		= ../../../sdl12
 JASMINE_FOLDER	= ../../artifacts/jasmine89
+SALVIA_FOLDER	= ../../artifacts/salvia89
 
 #====================================================
 # * 编译器相关配置
@@ -26,8 +27,8 @@ EXE			= gopuzzle.exe
 #====================================================
 # * 目标：可执行文件
 #====================================================
-all: main.o gopuzzle.o modi.o gongshu_sdl.o jasmine.o jasmine_utils.o
-	$(CC) main.o gopuzzle.o modi.o gongshu_sdl.o jasmine.o jasmine_utils.o $(LDFLAGS) -o $(EXE)
+all: main.o gopuzzle.o modi.o gongshu_sdl.o jasmine.o jasmine_utils.o salvia.o
+	$(CC) main.o gopuzzle.o modi.o gongshu_sdl.o jasmine.o jasmine_utils.o salvia.o $(LDFLAGS) -o $(EXE)
 
 #====================================================
 # * 目标：平台无关代码
@@ -50,11 +51,14 @@ gongshu_sdl.o: gongshu_sdl.c $(COMMON_FOLDER)/gongshu.h
 #====================================================
 # * 目标：通用库
 #====================================================
-jasmine.o: $(JASMINE_FOLDER)/jasmine.c
+jasmine.o: $(JASMINE_FOLDER)/jasmine.c $(JASMINE_FOLDER)/jasmine.h
 	$(CC) $(CFLAGS) $(JASMINE_FOLDER)/jasmine.c -o jasmine.o
 
-jasmine_utils.o: $(JASMINE_FOLDER)/jasmine_utils.c
+jasmine_utils.o: $(JASMINE_FOLDER)/jasmine_utils.c $(JASMINE_FOLDER)/jasmine.h
 	$(CC) $(CFLAGS) $(JASMINE_FOLDER)/jasmine_utils.c -o jasmine_utils.o
+
+salvia.o: $(SALVIA_FOLDER)/salvia.c $(SALVIA_FOLDER)/salvia.h
+	$(CC) $(CFLAGS) $(SALVIA_FOLDER)/salvia.c -o salvia.o
 
 #====================================================
 # * 清理
