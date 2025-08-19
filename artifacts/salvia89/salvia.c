@@ -226,6 +226,17 @@ static char*    Salvia_ItoaWithPadding      (int iNum, char* pStrBuf, int iBase,
                 );
                 break;
             case 'c':   /* 字符 */
+                szTempBuf[0] = (char)(va_arg(args, int));
+                szTempBuf[1] = '\0';
+                pCurBuf = Salvia_WriteString(
+                    pCurBuf,
+                    szTempBuf,
+                    /* (formatSpec.uFlags & FLAG_ZERO_PADDING) ? '0' : ' ', */
+                    ' ', /* 与 GCC ANSI 标准保持一致，不使用 0 填充 */
+                    formatSpec.iPrecision,
+                    formatSpec.iMinWidth,
+                    (formatSpec.uFlags & FLAG_LEFT_JUSTIFY) ? 1 : 0
+                );
                 break;
             case '%':   /* 百分号本身 */
                 *pCurBuf++ = '%';

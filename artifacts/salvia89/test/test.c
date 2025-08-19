@@ -51,6 +51,23 @@ struct {
 
 int NumStrCases = sizeof(StrCases) / sizeof(StrCases[0]);
 
+struct {
+    const char* szFormat;
+    char cValue;
+} CharCases[] = {
+    { "|%c|",       'A'  },
+    { "|%5c|",      'A'  },
+    { "|%-5c|",     'A'  },
+    { "|%05c|",     'A'  },
+    { "|%.3c|",     'A'  },
+    { "|%5.3c|",    'A'  },
+    { "|%c|",       ' '  },
+    { "|%c|",       '\0' },
+    { "|%5c|",      '\0' }
+};
+
+int NumCharCases = sizeof(CharCases) / sizeof(CharCases[0]);
+
 void testIntCases() {
     char strSalviaBuf[100];
     char strStdBuf[100];
@@ -95,8 +112,31 @@ void testStrCases() {
     }
 }
 
+void testCharCases() {
+    char strSalviaBuf[100];
+    char strStdBuf[100];
+    int i;
+    int bIsPassed;
+
+    for (i = 0; i < NumCharCases; ++i) {
+        Salvia_Format(strSalviaBuf, CharCases[i].szFormat, CharCases[i].cValue);
+        sprintf(strStdBuf, CharCases[i].szFormat, CharCases[i].cValue);
+        bIsPassed = strcmp(strSalviaBuf, strStdBuf) == 0;
+        printf("%s[%s]%s Case %d, format = \"%s\"\n",
+            bIsPassed ? KGRN : KRED,
+            bIsPassed ? "Passed" : "Failed",
+            KNRM,
+            i + 1,
+            CharCases[i].szFormat
+        );
+        printf("    Salvia = %s\n", strSalviaBuf);
+        printf("    stdio  = %s\n", strStdBuf);
+    }
+}
+
 int main(int argc, char* argv[]) {
     testIntCases();
     testStrCases();
+    testCharCases();
     return 0;
 }

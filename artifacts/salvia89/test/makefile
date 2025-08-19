@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -c -Wall # -ansi
+CFLAGS = -c -Wall -ansi
 LDFLAGS =
 EXE = salvia_test.exe
 
