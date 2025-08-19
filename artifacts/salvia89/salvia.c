@@ -6,37 +6,46 @@
 
 #define NUM_STR_MAX 100
 
+/**
+ * @brief 格式解析状态枚举
+ */
 enum {
-    STATE_PLAIN = 0,
-    STATE_FLAGS,
-    STATE_WIDTH,
-    STATE_PRECISION,
-    STATE_LENGTH,
-    STATE_SPECIFIER
+    STATE_PLAIN = 0,      /** < 普通文本状态 */
+    STATE_FLAGS,          /** < 标志符解析状态   */
+    STATE_WIDTH,          /** < 宽度解析状态 */
+    STATE_PRECISION,      /** < 精度解析状态 */
+    STATE_LENGTH,         /** < 长度修饰符解析状态 */
+    STATE_SPECIFIER       /** < 类型说明符解析状态 */
 } ReaderState;
 
+/**
+ * @brief 格式化标志位枚举
+ */
 enum {
-    FLAG_NONE           = 0,
-    FLAG_LEFT_JUSTIFY   = 1,
-    FLAG_FORCE_SIGN     = 2,
-    FLAG_SPACE_PADDING  = 4,
-    FLAG_ZERO_PADDING   = 8
+    FLAG_NONE           = 0,   /** < 无标志 */
+    FLAG_LEFT_JUSTIFY   = 1,   /** < 左对齐标志(-) */
+    FLAG_FORCE_SIGN     = 2,   /** < 强制显示正号标志(+) */
+    FLAG_SPACE_PADDING  = 4,   /** < 正数前加空格标志( ) */
+    FLAG_ZERO_PADDING   = 8    /** < 使用零填充标志(0) */
 } Flags;
 
-/*
- * 与 C 语言的 printf 的格式化标志保持一致
- * %[uFlags][width][.iPrecision][cLength]specifier
+/** 
+ * @brief 格式说明符结构体
+ * 
+ * @details 与C语言的printf格式化标志保持一致:
+ * %[flags][width][.precision][length]specifier
  */
 typedef struct {
-    unsigned int    uFlags;
-    int             iMinWidth;
-    int             iPrecision;
-    char            cLength;
+    unsigned int    uFlags;     /** < 标志位组合 */
+    int             iMinWidth;  /** < 最小字段宽度 */
+    int             iPrecision; /** < 精度(对于数字是小数位数，字符串是最大字符数) */
+    char            cLength;    /** < 长度修饰符(h/l/L等) */
 } FormatSpec;
 
-#define         Salvia_StrLen               strlen
-#define         Salvia_StrCpy               strcpy
-#define         Salvia_IsDigit(c)           ((c) >= '0' && (c) <= '9')
+#define Salvia_StrLen               strlen                          /** < 字符串长度计算宏 */
+#define Salvia_StrCpy               strcpy                          /** < 字符串复制宏 */
+#define Salvia_IsDigit(c)           ((c) >= '0' && (c) <= '9')      /** < 判断是否为数字字符 */
+
 static void     Salvia_ClearFormatSpec      (FormatSpec* pFormatSpec);
 static char*    Salvia_WriteString          (char* szBuf, const char* szSource, char cPadding, int iMaxWrite, int iWidth, int bIsLeftAlign);
 static int      Salvia_Atoi                 (const char* pSource);
@@ -52,7 +61,21 @@ static char*    Salvia_ItoaWithPadding      (int iNum, char* pStrBuf, int iBase,
             iState = STATE_PLAIN;                   \
         } NULL
 
-int Salvia_Format(char* szBuf, const char* szFormat, ...) {
+/**
+ * @brief 格式化输出字符串(类似printf)
+ * 
+ * @param szBuf 目标缓冲区，用于存储格式化后的字符串
+ * @param szFormat 格式化字符串
+ * @param ... 可变参数，根据格式字符串需要传入相应参数
+ * @return int 返回写入的字符数(不包括结尾的'\0')
+ * 
+ * @details
+ * 支持以下格式说明符:
+ * - %d: 十进制整数
+ * - %s: 字符串
+ * - %c: 字符
+ */
+ int Salvia_Format(char* szBuf, const char* szFormat, ...) {
     char*       pCurBuf = szBuf;        /* 当前写入位置 */
     const char* pCurFormat = szFormat;  /* 当前读取位置 */
     const char* pLastFormatStart;       /* 最后一个格式化符号的开始处 */
@@ -195,7 +218,8 @@ int Salvia_Format(char* szBuf, const char* szFormat, ...) {
                 pCurBuf = Salvia_WriteString(
                     pCurBuf,
                     va_arg(args, const char *),
-                    (formatSpec.uFlags & FLAG_ZERO_PADDING) ? '0' : ' ',
+                    /* (formatSpec.uFlags & FLAG_ZERO_PADDING) ? '0' : ' ', */
+                    ' ', /* 与 GCC ANSI 标准保持一致，不使用 0 填充 */
                     formatSpec.iPrecision,
                     formatSpec.iMinWidth,
                     (formatSpec.uFlags & FLAG_LEFT_JUSTIFY) ? 1 : 0
@@ -244,6 +268,21 @@ int Salvia_Format(char* szBuf, const char* szFormat, ...) {
     return pCurBuf - szBuf;
 }
 
+/**
+ * @brief 将字符串写入缓冲区，支持对齐和填充
+ * 
+ * @param szBuf 目标缓冲区
+ * @param szSource 源字符串 
+ * @param cPadding 填充字符
+ * @param iMaxWrite 最大写入字符数(-1表示无限制)
+ * @param iWidth 字段总宽度
+ * @param bIsLeftAlign 是否左对齐(1=左对齐，0=右对齐)
+ * @return char* 返回写入后的缓冲区位置
+ * 
+ * @details
+ * 该函数会根据指定的宽度和对齐方式，在写入字符串前后添加填充字符。
+ * 如果源字符串长度超过iMaxWrite，则会被截断。
+ */
 static char* Salvia_WriteString(char* szBuf, const char* szSource, char cPadding, int iMaxWrite, int iWidth, int bIsLeftAlign) {
     int iStrLength = Salvia_StrLen(szSource);
     int iLengthToWrite;
@@ -281,6 +320,15 @@ static char* Salvia_WriteString(char* szBuf, const char* szSource, char cPadding
     return szBuf;
 }
 
+/**
+ * @brief 初始化/清除格式说明符结构体
+ * @param pFormatSpec 要初始化的格式说明符指针
+ * @details 将所有字段设置为默认值:
+ * - uFlags: FLAG_NONE | FLAG_SPACE_PADDING
+ * - iMinWidth: 0
+ * - iPrecision: -1
+ * - cLength: 0
+ */
 static void Salvia_ClearFormatSpec(FormatSpec* pFormatSpec) {
     pFormatSpec->uFlags         = FLAG_NONE | FLAG_SPACE_PADDING;
     pFormatSpec->iMinWidth      = 0;
@@ -288,6 +336,11 @@ static void Salvia_ClearFormatSpec(FormatSpec* pFormatSpec) {
     pFormatSpec->cLength        = 0;
 }
 
+/**
+ * @brief 字符串转整数的实现
+ * @param pSource 源字符串
+ * @return 转换后的整数值
+ */
 static int Salvia_Atoi(const char* pSource) {
     int result = 0;
     while (*pSource != '\0' && Salvia_IsDigit(*pSource)) {
@@ -308,7 +361,17 @@ static void Salvia_ItoaReverse(char* pStrBuf, int iLength) {
         iEnd--;
     }
 }
- 
+
+/**
+ * @brief 带填充和符号的整数转字符串
+ * @param iNum 要转换的整数
+ * @param pStrBuf 目标缓冲区
+ * @param iBase 进制(2-36)
+ * @param bUppercase 是否大写字母(16进制时有效)
+ * @param bForceSign 是否强制显示正号
+ * @param iMinDigit 最小数字位数(不够时补零)
+ * @return 返回目标缓冲区指针
+ */
 static int Salvia_ItoaNoSign(int iNum, char* pStrBuf, int iBase, int bUppercase) {
     int i = 0;
     int bIsNegative = 0;
@@ -338,6 +401,24 @@ static int Salvia_ItoaNoSign(int iNum, char* pStrBuf, int iBase, int bUppercase)
     return bIsNegative;
 }
 
+/**
+ * @brief 带填充和符号的整数到字符串转换
+ * 
+ * @param iNum 要转换的整数
+ * @param pStrBuf 存放结果的缓冲区
+ * @param iBase 进制(2-36)
+ * @param bUppercase 是否使用大写字母(16进制时有效)
+ * @param bForceSign 是否强制显示正号
+ * @param iMinDigit 最小数字位数(不足时补零)
+ * @return char* 返回结果缓冲区指针
+ * 
+ * @details
+ * 该函数会:
+ * 1. 处理数字的符号(负号或强制正号)
+ * 2. 根据需要添加前导零以达到最小位数
+ * 3. 支持2到36进制的转换
+ * 4. 对于16进制可指定大小写格式
+ */
 static char* Salvia_ItoaWithPadding(int iNum, char* pStrBuf, int iBase, int bUppercase, int bForceSign, int iMinDigit) {
     char    szBuf[NUM_STR_MAX];
     char*   pCurBuf = pStrBuf;
