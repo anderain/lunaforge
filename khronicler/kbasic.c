@@ -74,7 +74,7 @@ const char* DBG_TOKEN_NAME[] = {
 typedef struct tagExprNode {
     int     type;
     int     param; /* 只在 type 是 TOKEN_OPR 的时候才有意义 */
-    char    content[KB_CONTEXT_STRING_BUFFER_MAX];
+    char    content[KB_TOKEN_LENGTH_MAX * 2];
     int     numChild;
     struct tagExprNode **children;
 } ExprNode;
@@ -174,7 +174,7 @@ Token* nextToken(Analyzer *_self) {
 
     firstChar = *_self->eptr;
 
-    /* 操作符 */
+    /* 运算符 */
     switch (firstChar) {
     case '+':   case '-':   case '*':   case '/':   case '^':
     case '%':   case '=':   case '!':   case '\\':
@@ -558,9 +558,14 @@ ExprNode * enNew(const int type, const char *content, int numChild) {
     StringCopy(node->content, KB_CONTEXT_STRING_BUFFER_MAX, content);
 
     node->numChild = numChild;
-    node->children = (ExprNode **)malloc(numChild * (sizeof(ExprNode *)));
-    for (i = 0; i < node->numChild; ++i) {
-        node->children[i] = NULL;
+    if (node->numChild > 0) {
+        node->children = (ExprNode **)malloc(numChild * (sizeof(ExprNode *)));
+        for (i = 0; i < node->numChild; ++i) {
+            node->children[i] = NULL;
+        }
+    }
+    else {
+        node->children = NULL;
     }
 
     return node;
@@ -586,80 +591,145 @@ ExprNode * enCreateOperatorNot(const Token * token) {
     return newNode;
 }
 
-void enDestroy(ExprNode *node) {
+void enDestroy(ExprNode* node) {
     int i;
 
     if (node == NULL) return;
 
-    for (i = 0; i < node->numChild; ++i) {
-        if (node->children[i]) free(node->children[i]);
+    if (node->children) {
+        for (i = 0; i < node->numChild; ++i) {
+            if (node->children[i]) free(node->children[i]);
+        }
+        free(node->children);
     }
-    free(node->children);
 
     free(node);
 }
 
-ExprNode* buildExprTree(Analyzer *_self);
-
-ExprNode* buildTryNext(Analyzer *_self, ExprNode *leftNode) {
-    Token *token = nextToken(_self);
-
-    if (token->type == TOKEN_OPR) {
-        ExprNode *oprNode = enCreateByToken(token, 2);
-        ExprNode *rightNode = buildExprTree(_self);
-
-        exprNodeLeftChild(oprNode) = leftNode;
-        exprNodeRightChild(oprNode) = rightNode;
-
-        return oprNode;
-    }
-    else {
-        rewindToken(_self);
-        return leftNode;
-    }
-
-    return NULL;
+void enDestroyVoidPtr(void* ptr) {
+    enDestroy((ExprNode *)ptr);
 }
 
-ExprNode* buildExprTree(Analyzer *_self) {
+void buildAstTryOperand(Analyzer *pAnalyzer, Vlist* pStackOperand, Vlist* pStackOperator);
+
+void buildAstHandleBinaryOperator(Vlist* pStackOperand, Vlist* pStackOperator) {
+    if (pStackOperator->size <= 0) {
+        return;
+    }
+    ExprNode* enTop = (ExprNode *)vlPopBack(pStackOperator);
+    /* 运算数出栈2个、作为运算符节点的子节点 */
+    enTop->children[1] = (ExprNode *)vlPopBack(pStackOperand);
+    enTop->children[0] = (ExprNode *)vlPopBack(pStackOperand);
+    /* 运算符节（计算结果）点入运算数栈 */
+    vlPushBack(pStackOperand, enTop);
+}
+
+void buildAstTryOperator(Analyzer* pAnalyzer, Vlist* pStackOperand, Vlist* pStackOperator) {
+    Token *token = nextToken(pAnalyzer);
+    if (token->type == TOKEN_OPR) {
+        /* 创建运算符节点 */
+        ExprNode* oprNode = enCreateByToken(token, 2);
+        int currentPriority = OPERATOR_META[oprNode->param].priority;
+
+        /* 检查现有的运算符堆栈，检查优先级 */
+        while (pStackOperator->size > 0) {
+            ExprNode *enTop = (ExprNode *)vlPeek(pStackOperator);
+            /* 如果不是运算符，退出 */
+            if (enTop->type != TOKEN_OPR) {
+                break;
+            }
+            int topPriority = OPERATOR_META[enTop->param].priority;
+            /* 如果栈顶的优先级较高 */
+            if (topPriority >= currentPriority) {
+                buildAstHandleBinaryOperator(pStackOperand, pStackOperator);
+            }
+            else {
+                break;
+            }
+        }
+        /* 本运算符节点入运算符栈 */
+        vlPushBack(pStackOperator, oprNode);
+        /* 右操作数入栈 */
+        buildAstTryOperand(pAnalyzer, pStackOperand, pStackOperator);
+    }
+    else {
+        rewindToken(pAnalyzer);
+    }
+}
+
+void buildAstTryOperand(Analyzer *pAnalyzer, Vlist* pStackOperand, Vlist* pStackOperator) {
     Token *token;
 
-    token = nextToken(_self);
-    /* printf("token = %s,%s\n", DBG_TOKEN_NAME[token->type], token->content); */
-    if (token->type == TOKEN_ID || token->type == TOKEN_NUM || token->type == TOKEN_STR) {
-        ExprNode *leftNode = enCreateByToken(token, 0);
-        return buildTryNext(_self, leftNode);
-    }
-    /* 一元操作符：取负 */
-    else if (token->type == TOKEN_OPR && StringEqual("-", token->content)) {
-        ExprNode* oprNode = enCreateOperatorNegative(token); /* enCreateByToken(token, 1); */ 
-        exprNodeLeftChild(oprNode) = buildExprTree(_self);
-        return buildTryNext(_self, oprNode);
-    }
-    /* 一元操作符：逻辑非 */
-    else if (token->type == TOKEN_OPR && StringEqual("!", token->content)) {
-        ExprNode* oprNode = enCreateOperatorNot(token); 
-        exprNodeLeftChild(oprNode) = buildExprTree(_self);
-        return buildTryNext(_self, oprNode);
-    }
-    else if (token->type == TOKEN_FNC) {
-        char *funcName = StringDump(token->content);
-        ExprNode *funcNode = NULL;
-        ExprNode *childBuf[100];
-        int numChild = 0, i;
+    token = nextToken(pAnalyzer);
 
-        token = nextToken(_self);
+    /* 变量名 / 数字 / 字符串 */
+    if (token->type == TOKEN_ID || token->type == TOKEN_NUM || token->type == TOKEN_STR) {
+        /* 直接入运算数栈 */
+        vlPushBack(pStackOperand, enCreateByToken(token, 0));
+        /* 尝试下一个 token 是否是运算符 */
+        buildAstTryOperator(pAnalyzer, pStackOperand, pStackOperator);
+    }
+    /* 一元运算符：取负 */
+    else if (token->type == TOKEN_OPR && StringEqual("-", token->content)) {
+        /* 创建负号节点但是不入栈 */
+        ExprNode* enOprNeg = enCreateOperatorNegative(token);
+        /* 负号后续的运算数入栈 */
+        buildAstTryOperand(pAnalyzer, pStackOperand, pStackOperator);
+        /* 后续运算数出栈，作为负号节点的子节点 */
+        enOprNeg->children[0] = (ExprNode *)vlPopBack(pStackOperand);
+        /* 负号节点入运算数栈 */
+        vlPushBack(pStackOperand, enOprNeg);
+        /* 尝试下一个 token 是否是运算符 */
+        buildAstTryOperator(pAnalyzer, pStackOperand, pStackOperator);
+    }
+    /* 一元运算符：逻辑非 */
+    else if (token->type == TOKEN_OPR && StringEqual("!", token->content)) {
+        /* 创建逻辑非节点但是不入栈 */
+        ExprNode* enOprNot = enCreateOperatorNot(token);
+        /* 逻辑非后续的运算数入栈 */
+        buildAstTryOperand(pAnalyzer, pStackOperand, pStackOperator);
+        /* 后续运算数出栈，作为逻辑非节点的子节点 */
+        enOprNot->children[0] = (ExprNode *)vlPopBack(pStackOperand);
+        /* 逻辑非节点入运算数栈 */
+        vlPushBack(pStackOperand, enOprNot);
+        /* 尝试下一个 token 是否是运算符 */
+        buildAstTryOperator(pAnalyzer, pStackOperand, pStackOperator);
+    }
+    /* 函数调用 */
+    else if (token->type == TOKEN_FNC) {
+        char*       funcName = StringDump(token->content);
+        ExprNode*   funcNode = NULL;
+        /* 入栈占位用的函数节点 */
+        ExprNode*   funcNodePlaceholder;
+        int         numArgs = 0;
+        int         i;
+
+        /* 生成一个占位用的函数节点并且入栈 */
+        funcNodePlaceholder = enNew(TOKEN_FNC, "FUNC_PH", 0);
+        vlPushBack(pStackOperator, funcNodePlaceholder);
+    
+        token = nextToken(pAnalyzer);
         if (token->type == TOKEN_BKT && *token->content == ')') {
             /* 没有参数 */
         } else {
             /* 至少一个参数 */
-            rewindToken(_self);
+            rewindToken(pAnalyzer);
             while (1) {
-                ExprNode *child = buildExprTree(_self);
-
-                childBuf[numChild++] = child;
-
-                token = nextToken(_self);
+                /* 运算数入栈 */
+                buildAstTryOperand(pAnalyzer, pStackOperand, pStackOperator);
+                /* 处理函数参数表达式 */
+                while (pStackOperator->size > 0) {
+                    ExprNode* enTop = (ExprNode *)vlPeek(pStackOperator);
+                    /* 遇到占位符就退出 */
+                    if (enTop == funcNodePlaceholder) {
+                        break;
+                    }
+                    /* 处理运算符 */
+                    buildAstHandleBinaryOperator(pStackOperand, pStackOperator);
+                }
+                numArgs++;
+                /* 检查是否函数参数结束 */
+                token = nextToken(pAnalyzer);
                 if (token->type == TOKEN_CMA) {
                     continue;
                 }
@@ -668,25 +738,71 @@ ExprNode* buildExprTree(Analyzer *_self) {
                 }
             }
         }
+        /* 弹出并销毁占位符 */
+        vlPopBack(pStackOperator);
+        enDestroy(funcNodePlaceholder);
 
-
-        funcNode = enNew(TOKEN_FNC, funcName, numChild);
-        for (i = 0; i < numChild; ++i) {
-            funcNode->children[i] = childBuf[i];
-        }
+        /* 把子节点放入函数节点下 */
+        funcNode = enNew(TOKEN_FNC, funcName, numArgs);
         free(funcName);
-
-        return buildTryNext(_self, funcNode);
+        for (i = 0; i < numArgs; ++i) {
+            funcNode->children[numArgs - 1 - i] = (ExprNode *)vlPopBack(pStackOperand);
+        }
+        /* 函数节点入运算数栈 */
+        vlPushBack(pStackOperand, funcNode);
+        free(funcName);
+        /* 尝试下一个 token 是否是运算符 */
+        buildAstTryOperator(pAnalyzer, pStackOperand, pStackOperator);
     }
+    /* 括号 */
     else if (token->type == TOKEN_BKT && *token->content == '(') {
-        ExprNode *bktNode = enNew(TOKEN_BKT, "()", 1);
-        bktNode->children[0] = buildExprTree(_self);
-        nextToken(_self); /* 忽略最后的 ')' */ 
+        ExprNode* bktNode = enNew(TOKEN_BKT, "()", 1);
+        /* 括号节点入操作符栈 */
+        vlPushBack(pStackOperator, bktNode);
+        /* 构建括号内的表达式 */
+        buildAstTryOperand(pAnalyzer, pStackOperand, pStackOperator);
+        /* 忽略最后的右括号 */
+        nextToken(pAnalyzer);
+        /* 处理合并括号中的表达式 */
+        while (pStackOperator->size > 0) {
+            ExprNode *enTop = (ExprNode *)vlPeek(pStackOperator);
+            /* 遇到当前括号节点，弹出了所有的内容了，结束 */
+            if (enTop == bktNode) {
+                vlPopBack(pStackOperator);
+                break;
+            }
+            /* 处理运算符 */
+            buildAstHandleBinaryOperator(pStackOperand, pStackOperator);
+        }
+        /* 括号内表达式出栈，作为括号节点的子节点 */
+        bktNode->children[0] = (ExprNode *)vlPopBack(pStackOperand);
+        /* 括号节点入表达式栈 */
+        vlPushBack(pStackOperand, bktNode);
+        /* 尝试下一个 token 是否是运算符 */
+        buildAstTryOperator(pAnalyzer, pStackOperand, pStackOperator);
+    }
+}
 
-        return buildTryNext(_self, bktNode);
+ExprNode* buildExpressionAbstractSyntaxTree(Analyzer *pAnalyzer) {
+    Vlist*      pStackOperand;  /* ExprNode */
+    Vlist*      pStackOperator; /* ExprNode */
+    ExprNode*   enExprRoot;
+    
+    pStackOperand = vlNewList();
+    pStackOperator = vlNewList();
+    buildAstTryOperand(pAnalyzer, pStackOperand, pStackOperator);
+
+    /* 检查运算符堆栈，如果不为空就弹出所有 */
+    while (pStackOperator->size > 0) {
+        buildAstHandleBinaryOperator(pStackOperand, pStackOperator);
     }
 
-    return NULL;
+    enExprRoot = (ExprNode *)vlPopBack(pStackOperand);
+
+    vlDestroy(pStackOperand, enDestroyVoidPtr);
+    vlDestroy(pStackOperator, enDestroyVoidPtr);
+
+    return enExprRoot;
 }
 
 void travelExpr(ExprNode *en, int tab) {
@@ -1302,7 +1418,7 @@ int compileExprTree(KbContext *context, ExprNode *node, KbBuildError *errorRet) 
             vlPushBack(context->commandList, opCommandCreateBuiltInFunction(targetFunc->funcId));
         }
     }
-    /* 操作符 */
+    /* 运算符 */
     else if (node->type == TOKEN_OPR) {
         vlPushBack(context->commandList, opCommandCreateOperator(node->param));
     }
@@ -1909,8 +2025,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
     /* if 语句 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_IF, token->content)) {        
         /* 编译表达式 */
-        exprRoot = buildExprTree(&analyzer);
-        sortExpr(&exprRoot);
+        exprRoot = buildExpressionAbstractSyntaxTree(&analyzer);
         ret = compileExprTree(context, exprRoot, errorRet);
         if (!ret) {
             compileLineReturn(0);
@@ -1969,8 +2084,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         prevLabel->pos = context->commandList->size;
 
         /* 编译表达式 */
-        exprRoot = buildExprTree(&analyzer);
-        sortExpr(&exprRoot);
+        exprRoot = buildExpressionAbstractSyntaxTree(&analyzer);
         ret = compileExprTree(context, exprRoot, errorRet);
         if (!ret) {
             compileLineReturn(0);
@@ -2018,8 +2132,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         labelStart = contextCtrlGetLabel(context, pCfItem->iLabelNext);
         labelStart->pos = context->commandList->size;
         /* 编译表达式 */
-        exprRoot = buildExprTree(&analyzer);
-        sortExpr(&exprRoot);
+        exprRoot = buildExpressionAbstractSyntaxTree(&analyzer);
         ret = compileExprTree(context, exprRoot, errorRet);
         if (!ret) {
             compileLineReturn(0);
@@ -2124,8 +2237,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
     /* return 语句 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_RETURN, token->content)) {
         /* 编译表达式 */
-        exprRoot = buildExprTree(&analyzer);
-        sortExpr(&exprRoot);
+        exprRoot = buildExpressionAbstractSyntaxTree(&analyzer);
         ret = compileExprTree(context, exprRoot, errorRet);
         if (!ret) {
             compileLineReturn(0);
@@ -2199,8 +2311,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         token = nextToken(&analyzer);
         /* 赋值 = */
         if (token->type == TOKEN_OPR && StringEqual("=", token->content)) {
-            exprRoot = buildExprTree(&analyzer);
-            sortExpr(&exprRoot);
+            exprRoot = buildExpressionAbstractSyntaxTree(&analyzer);
             ret = compileExprTree(context, exprRoot, errorRet);
             if (!ret) {
                 compileLineReturn(0);
@@ -2247,8 +2358,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
                 return 0;
             }
             /* 编译表达式 */
-            exprRoot = buildExprTree(&analyzer);
-            sortExpr(&exprRoot);
+            exprRoot = buildExpressionAbstractSyntaxTree(&analyzer);
             ret = compileExprTree(context, exprRoot, errorRet);
             if (!ret) {
                 compileLineReturn(0);
@@ -2267,8 +2377,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
             /* 解析器回到开始位置 */
             resetToken(&analyzer);
             /* 编译表达式 */
-            exprRoot = buildExprTree(&analyzer);
-            sortExpr(&exprRoot);
+            exprRoot = buildExpressionAbstractSyntaxTree(&analyzer);
             ret = compileExprTree(context, exprRoot, errorRet);
             if (!ret) {
                 compileLineReturn(0);
@@ -2283,8 +2392,7 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         /* 解析器回到开始位置 */
         resetToken(&analyzer);
         /* 编译表达式 */
-        exprRoot = buildExprTree(&analyzer);
-        sortExpr(&exprRoot);
+        exprRoot = buildExpressionAbstractSyntaxTree(&analyzer);
         ret = compileExprTree(context, exprRoot, errorRet);
         if (!ret) {
             compileLineReturn(0);
