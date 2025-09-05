@@ -896,7 +896,7 @@ void printAsHtml(FILE* fp) {
         "td{padding:4px 4px}"
         "th{color:#fff;background:linear-gradient(#14509a,#5d93d5);padding:8px 4px;background: -ms-linear-gradient(top,#14509a 0%,#5d93d5 100%)}"
         "pre{text-align:left;margin: 0;font-family:\"Consolas\",\"Monaco\",\"Lucida Console\",\"Courier New\",monospace;font-size:12px;line-height:1.25;tab-size:4}"
-        "pre.kbcode{color:#1E1E1E;background-color:#fff}"
+        "pre.kbcode{color:#1E1E1E;background-color:#fff;white-space:pre-wrap;word-wrap:break-word;}"
         ".kbcode .tk-num{color:#098658}"
         ".kbcode .tk-id{color:#495057}"
         ".kbcode .tk-opr{color:#9D7E14}"
