@@ -877,6 +877,9 @@ int kbFormatBuildError(const KbBuildError *errorVal, char *strBuffer, int strLen
     case KBE_UNDEFINED_LABEL:
         Salvia_Format(strBuffer, "Undefined variable: \"%s\"", errorVal->message);
         break;
+    case KBE_GOTO_CROSS_SCOPE:
+        Salvia_Format(strBuffer, "Goto statement cannot jump to label \"%s\" defined in a different scope", errorVal->message);
+        break;
     case KBE_INCOMPLETE_CTRL_FLOW:
         Salvia_Format(strBuffer, "Incomplete control flow, missing 'end'.");
         break;
@@ -1070,6 +1073,7 @@ KbContextLabel* contextAddLabel(const KbContext *context, const char * labelName
 
     label->type = labelType;
     label->pos = 0;
+    label->funcScope = NULL;
     StringCopy(label->name, KB_TOKEN_LENGTH_MAX, labelName);
 
     vlPushBack(context->labelList, label);
@@ -1865,8 +1869,9 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
     }
     /* 用户自己写的 label */
     else if (token->type == TOKEN_LABEL) {
-        char labelName[KB_TOKEN_LENGTH_MAX];
-    
+        char            labelName[KB_TOKEN_LENGTH_MAX];
+        KbContextLabel* label;
+
         token = nextToken(&analyzer);
         if (token->type != TOKEN_ID) {
             compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid label name.");
@@ -1884,9 +1889,12 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
             compileLineReturnWithError(KBE_ID_TOO_LONG, labelName);
         }
         /* 添加新标签 */
-        if (!contextAddLabel(context, labelName, KBL_USER)) {
+        label = contextAddLabel(context, labelName, KBL_USER);
+        if (!label) {
             compileLineReturnWithError(KBE_DUPLICATED_LABEL, labelName);
         }
+        /* 用户自己创建的 label，需要添加所在的函数域 */
+        label->funcScope = context->pCurrentFunc;
     }
     /* dim 变量声明 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_DIM, token->content)) {
@@ -2020,6 +2028,10 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
             if (!label) {
                 /* 错误：goto用到了没定义过的标签 */
                 compileLineReturnWithError(KBE_UNDEFINED_LABEL, token->content);
+            }
+            /* 检查跳转的 label 是不是不在同一个域 */
+            if (label->funcScope != context->pCurrentFunc) {
+                compileLineReturnWithError(KBE_GOTO_CROSS_SCOPE, token->content);
             }
             /* 生成 cmd */
             vlPushBack(context->commandList, opCommandCreateIfGoto(label));
@@ -2232,6 +2244,10 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
         if (!label) {
             /* 错误，引用了未定义的标签 */
             compileLineReturnWithError(KBE_UNDEFINED_LABEL, token->content);
+        }
+        /* 检查跳转的 label 是不是不在同一个域 */
+        if (label->funcScope != context->pCurrentFunc) {
+            compileLineReturnWithError(KBE_GOTO_CROSS_SCOPE, token->content);
         }
         vlPushBack(context->commandList, opCommandCreateGoto(label));
     }

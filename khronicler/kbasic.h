@@ -42,6 +42,7 @@ typedef enum {
     KBE_DUPLICATED_LABEL,
     KBE_DUPLICATED_VAR,
     KBE_UNDEFINED_LABEL,
+    KBE_GOTO_CROSS_SCOPE,
     KBE_INCOMPLETE_CTRL_FLOW,
     KBE_INCOMPLETE_FUNC,
     KBE_OTHER
@@ -58,10 +59,13 @@ typedef enum {
     KBL_CTRL,
 } KbLabelType;
 
+struct tagKbUserFunc;
+
 typedef struct {
-    KbLabelType type;
-    KDword      pos;
-    char        name[0];
+    KbLabelType             type;
+    KDword                  pos;
+    struct tagKbUserFunc*   funcScope;
+    char                    name[0];
 } KbContextLabel;
 
 typedef enum {
@@ -78,7 +82,7 @@ typedef struct {
     int iLabelEnd;
 } KbCtrlFlowItem;
 
-typedef struct {
+typedef struct tagKbUserFunc {
     char    funcName[KB_IDENTIFIER_LEN_MAX + 1];
     int     numArg;
     int     numVar;
