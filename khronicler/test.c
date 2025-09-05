@@ -681,11 +681,9 @@ void printAsJson(FILE* fp) {
     fprintf(fp, "}\n");
 }
 
-int printHighlightToken(int isPrevSpaceAfter, FILE* fp, Token* token, const char* szStart, int len) {
+void printHighlightToken(FILE* fp, Token* token, const char* szStart, int len) {
     int i;
     const char* htmlClassName = NULL;
-    int isSpaceBefore = 0;
-    int isSpaceAfter = 0;
 
     switch (token->type)
     {
@@ -696,8 +694,6 @@ int printHighlightToken(int isPrevSpaceAfter, FILE* fp, Token* token, const char
         htmlClassName = "tk-id";
         break;
     case TOKEN_OPR:
-        isSpaceBefore = 1;
-        isSpaceAfter = 1;
         htmlClassName = "tk-opr";
         break;
     case TOKEN_FNC:
@@ -716,27 +712,16 @@ int printHighlightToken(int isPrevSpaceAfter, FILE* fp, Token* token, const char
         htmlClassName = "tk-lbl";
         break;
     case TOKEN_KEY:
-        isSpaceAfter = 1;
-        if (!isPrevSpaceAfter && StringEqual("goto", token->content)) {
-            isSpaceBefore = 1;
-        }
         htmlClassName = "tk-key";
         break;
     default:
         break;
     }
-    if (isSpaceBefore) {
-        fputc(' ', fp);
-    }
     fprintf(fp, "<span class=\"%s\">", htmlClassName);
     for (i = 0; i < len; ++i) {
         fputc(szStart[i], fp);
     }
-    if (isSpaceAfter) {
-        fputc(' ', fp);
-    }
     fprintf(fp, "</span>");
-    return isSpaceAfter;
 }
 
 void printScriptWithHighlightHtml(FILE* fp, const char* script) {
@@ -746,7 +731,6 @@ void printScriptWithHighlightHtml(FILE* fp, const char* script) {
     char*       pRemark;
     char        szRemark[200];
     Analyzer    analyzer;
-    int         isSpaceAfter;
 
     fprintf(fp, "<pre class=\"kbcode\">\n");
     for (textPtr = script, lineCount = 1; *textPtr; lineCount++) {
@@ -755,7 +739,6 @@ void printScriptWithHighlightHtml(FILE* fp, const char* script) {
         textPtr += getLineOnly(textPtr, line);
         linePtr = line;
         /* 先打印空白内容 */
-        isSpaceAfter = 1;
         while (*linePtr && isSpace(*linePtr)) {
             fprintf(fp, "%c", *linePtr);
             ++linePtr;
@@ -770,15 +753,20 @@ void printScriptWithHighlightHtml(FILE* fp, const char* script) {
         analyzer.expr = linePtr;
         resetToken(&analyzer);
         while (1) {
+            int i, spaceStartPos = analyzer.eptr - analyzer.expr;
             Token* token = nextToken(&analyzer);
+            /* 打印token跳过的空白*/
+            for (i = spaceStartPos; i < token->sourceStartPos; ++i) {
+                fprintf(fp, "%c", linePtr[i]);
+            }
+            /* 停止 */
             if (!token || token->type == TOKEN_END) {
                 break;
             }
-            isSpaceAfter = printHighlightToken(isSpaceAfter, fp, token, linePtr + token->sourceStartPos, token->sourceLength);
+            printHighlightToken(fp, token, linePtr + token->sourceStartPos, token->sourceLength);
         }
         /* 打印注释 */
         if (pRemark) {
-            if (!isSpaceAfter) fputc(' ', fp);
             fprintf(fp, "<span class=\"tk-remark\">%s</span>", szRemark);
         }
         /* 本行结束 */
