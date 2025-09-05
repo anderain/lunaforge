@@ -124,6 +124,7 @@ const char *_KOCODE_NAME[] = {
     "SUB",
     "MUL",
     "DIV",
+    "POW",
     "INTDIV",
     "MOD",
     "NOT",

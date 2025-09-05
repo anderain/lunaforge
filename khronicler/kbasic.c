@@ -84,8 +84,8 @@ typedef enum {
     OPR_NEG = 0,
     /* 字符串操作链接 */
     OPR_CONCAT,
-    /* 基本运算 加 减 乘 除*/
-    OPR_ADD,        OPR_SUB,        OPR_MUL,        OPR_DIV,
+    /* 基本运算 加 减 乘 除 指数 */
+    OPR_ADD,        OPR_SUB,        OPR_MUL,        OPR_DIV,        OPR_POW,
     /* 整数计算 整数除法 取模 */
     OPR_INTDIV,     OPR_MOD,
     /* 逻辑操作 非 与 或者*/
@@ -104,6 +104,7 @@ const struct {
     { "-",  OPR_SUB     },
     { "*",  OPR_MUL     },
     { "/",  OPR_DIV     },
+    { "^",  OPR_POW     },
     { "\\", OPR_INTDIV  },
     { "%",  OPR_MOD     },
     { "!",  OPR_NOT     },
@@ -132,6 +133,7 @@ const struct {
     { "OPR_SUB",    100 },
     { "OPR_MUL",    200 },
     { "OPR_DIV",    200 },
+    { "OPR_POW",    200 },
     { "OPR_INTDIV", 150 },
     { "OPR_MOD",    200 },
     { "OPR_NOT",    50  },
@@ -144,9 +146,6 @@ const struct {
     { "OPR_GTEQ",   60  },
     { "OPR_LTEQ",   60  }
 };
-
-#define exprNodeLeftChild(en)   ((en)->children[0])
-#define exprNodeRightChild(en)  ((en)->children[1])
 
 Token* assignToken(Analyzer* pAnalyzer, TokenType type, const char *content, const char *eptrStart) {
     Token* token = &pAnalyzer->token;
@@ -892,58 +891,6 @@ int kbFormatBuildError(const KbBuildError *errorVal, char *strBuffer, int strLen
     }
 
     return 1;
-}
-
-ExprNode* sortExprTree(ExprNode *en, int *ptrChangeFlag) {
-    /* printf("en=%s -> '%s' childs = %d\n", DBG_TOKEN_NAME[en->type], en->content, en->numChild); */
-    if (en == NULL) {
-        return NULL;
-    }
-    else if (en->type == TOKEN_FNC || en->type == TOKEN_BKT) {
-        int i;
-        for (i = 0; i < en->numChild; ++i) {
-            en->children[i] = sortExprTree(en->children[i], ptrChangeFlag);
-        }
-        return en;
-    }
-    else if (en->type == TOKEN_OPR) {
-        ExprNode *enr, *enrl;
-        int i;
-
-        /* exprNodeLeftChild(en) = sortExprTree(exprNodeLeftChild(en), ptrChangeFlag); */
-        /* exprNodeRightChild(en) = sortExprTree(exprNodeRightChild(en), ptrChangeFlag); */
-        
-        for (i = 0; i < en->numChild; ++i) {
-            en->children[i] = sortExprTree(en->children[i], ptrChangeFlag);
-        }
-        enr = en->children[en->numChild - 1];
-
-        if (enr->type == TOKEN_OPR) {
-            const int enrPriority = OPERATOR_META[enr->param].priority;
-            const int enPriority = OPERATOR_META[en->param].priority;
-
-            if (enPriority >= enrPriority) {
-                *ptrChangeFlag = 1;
-            
-                enrl = exprNodeLeftChild(enr);
-                en->children[en->numChild - 1] = enrl;
-                exprNodeLeftChild(enr) = en;
-
-                /* exprNodeRightChild(enr) = sortExprTree(exprNodeRightChild(enr), ptrChangeFlag); */
-                return enr;
-            }
-        }
-    }
-    return en;
-}
-
-void sortExpr(ExprNode ** enPtr) {
-    int changeFlag;
-
-    do {
-        changeFlag = 0;
-        *enPtr = sortExprTree(*enPtr, &changeFlag);
-    } while (changeFlag);
 }
 
 KbCtrlFlowItem* csItemNew(int csType) {

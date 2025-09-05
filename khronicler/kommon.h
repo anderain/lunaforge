@@ -85,6 +85,7 @@ typedef enum {
     KBO_OPR_SUB,            /* 相减 */
     KBO_OPR_MUL,            /* 相乘 */
     KBO_OPR_DIV,            /* 相除 */
+    KBO_OPR_POW,            /* 指数 */
     KBO_OPR_INTDIV,         /* 整数除法 */
     KBO_OPR_MOD,            /* 取模 */
     KBO_OPR_NOT,            /* 逻辑反 */

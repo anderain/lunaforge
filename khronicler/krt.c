@@ -416,6 +416,16 @@ int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
                 rtvalueDestroy(operand[1]);
 	            break;
             }
+            case KBO_OPR_POW: {
+                execPopAndCheckType(1, RVT_NUMBER);
+                execPopAndCheckType(0, RVT_NUMBER);
+
+                numResult = pow(operand[0]->data.num, operand[1]->data.num);
+                vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
+                rtvalueDestroy(operand[0]);
+                rtvalueDestroy(operand[1]);
+	            break;
+            }
             case KBO_OPR_INTDIV: {
                 execPopAndCheckType(1, RVT_NUMBER);
                 execPopAndCheckType(0, RVT_NUMBER);
