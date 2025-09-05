@@ -4,6 +4,7 @@
 #include <math.h>
 #include "kbasic.h"
 #include "k_utils.h"
+#include "../artifacts/salvia89/salvia.h"
 
 #define CTRL_LABEL_FORMAT "!_CS%03d_"
 #define FUNC_LABEL_FORMAT "!_FC%03d_"
@@ -835,11 +836,7 @@ void travelExpr(ExprNode *en, int tab) {
     }
 }
 
-#define kbFormatErrorAppend(newPart) (p += StringCopy(p, strLengthMax - (p - strBuffer), newPart))
-
 int kbFormatBuildError(const KbBuildError *errorVal, char *strBuffer, int strLengthMax) {
-    char *p = strBuffer;
-
     if (errorVal == NULL) {
         strBuffer[0] = 0;
         return 0;
@@ -850,64 +847,44 @@ int kbFormatBuildError(const KbBuildError *errorVal, char *strBuffer, int strLen
         StringCopy(strBuffer, strLengthMax, "No error");
         break;
     case KBE_SYNTAX_ERROR: {
-        char buf[100];
-        sprintf(buf, "(%d) ", errorVal->errorPos);
-        kbFormatErrorAppend(buf);
-        kbFormatErrorAppend("Syntax Error - ");
-        if (!StringEqual("", errorVal->message)) {
-            kbFormatErrorAppend(errorVal->message);
-        }
+        Salvia_Format(strBuffer, "(%d) Syntax Error - %s", errorVal->errorPos, errorVal->message);
         break;
     }
     case KBE_UNDEFINED_IDENTIFIER: 
-        kbFormatErrorAppend("Undefined Identifier: ");
-        kbFormatErrorAppend(errorVal->message);
+        Salvia_Format(strBuffer, "Undefined Identifier: \"%s\"", errorVal->message);
         break;
     case KBE_UNDEFINED_FUNC:
-        kbFormatErrorAppend("Undefined Function: ");
-        kbFormatErrorAppend(errorVal->message);
+        Salvia_Format(strBuffer, "Undefined Function: \"%s\"", errorVal->message);
         break;
     case KBE_INVALID_NUM_ARGS:
-        kbFormatErrorAppend("Wrong number of arguments to function \"");
-        kbFormatErrorAppend(errorVal->message);
-        kbFormatErrorAppend("\"");
+        Salvia_Format(strBuffer, "Wrong number of arguments to function: \"%s\"", errorVal->message);
         break;
     case KBE_STRING_NO_SPACE:
-        kbFormatErrorAppend("No enough space for string");
+        Salvia_Format(strBuffer, "No enough space for string");
         break;
     case KBE_TOO_MANY_VAR:
-        kbFormatErrorAppend("Too many variables. Failed to declare \"");
-        kbFormatErrorAppend(errorVal->message);
-        kbFormatErrorAppend("\"");
+        Salvia_Format(strBuffer, "Too many variables. Failed to declare variable \"%s\"", errorVal->message);
         break;
     case KBE_ID_TOO_LONG:
-        kbFormatErrorAppend("Identifier too long \"");
-        kbFormatErrorAppend(errorVal->message);
-        kbFormatErrorAppend("\"");
+        Salvia_Format(strBuffer, "Identifier too long - \"%s\"", errorVal->message);
         break;
     case KBE_DUPLICATED_LABEL:
-        kbFormatErrorAppend("Duplicated label: \"");
-        kbFormatErrorAppend(errorVal->message);
-        kbFormatErrorAppend("\"");
+        Salvia_Format(strBuffer, "Duplicated label: \"%s\"", errorVal->message);
         break;
     case KBE_DUPLICATED_VAR:
-        kbFormatErrorAppend("Duplicated variable: \"");
-        kbFormatErrorAppend(errorVal->message);
-        kbFormatErrorAppend("\"");
+        Salvia_Format(strBuffer, "Duplicated variable: \"%s\"", errorVal->message);
         break;
     case KBE_UNDEFINED_LABEL:
-        kbFormatErrorAppend("Undefined label: \"");
-        kbFormatErrorAppend(errorVal->message);
-        kbFormatErrorAppend("\"");
+        Salvia_Format(strBuffer, "Undefined variable: \"%s\"", errorVal->message);
         break;
     case KBE_INCOMPLETE_CTRL_FLOW:
-        kbFormatErrorAppend("Incomplete control flow, missing 'end'.");
+        Salvia_Format(strBuffer, "Incomplete control flow, missing 'end'.");
         break;
     case KBE_INCOMPLETE_FUNC:
-        kbFormatErrorAppend("Incomplete function.");
+        Salvia_Format(strBuffer, "Incomplete function.");
         break;
     case KBE_OTHER:
-        kbFormatErrorAppend(errorVal->message);
+        StringCopy(strBuffer, strLengthMax, errorVal->message);
         break;
     }
 
@@ -1123,7 +1100,7 @@ KbContextLabel* contextCtrlAddLabel(KbContext* context, int labelIndex) {
     if (labelIndex < 0) {
         return NULL;
     }
-    sprintf(szLabelBuf, CTRL_LABEL_FORMAT, labelIndex);
+    Salvia_Format(szLabelBuf, CTRL_LABEL_FORMAT, labelIndex);
     
     return contextAddLabel(context, szLabelBuf, KBL_CTRL);
 }
@@ -1134,7 +1111,7 @@ KbContextLabel* contextFuncAddLabel(KbContext* context, int labelIndex) {
     if (labelIndex < 0) {
         return NULL;
     }
-    sprintf(szLabelBuf, FUNC_LABEL_FORMAT, labelIndex);
+    Salvia_Format(szLabelBuf, FUNC_LABEL_FORMAT, labelIndex);
     
     return contextAddLabel(context, szLabelBuf, KBL_CTRL);
 }
@@ -1144,7 +1121,7 @@ KbContextLabel* contextCtrlGetLabel(const KbContext* context, int labelIndex) {
     if (labelIndex < 0) {
         return NULL;
     }
-    sprintf(szLabelBuf, CTRL_LABEL_FORMAT, labelIndex);
+    Salvia_Format(szLabelBuf, CTRL_LABEL_FORMAT, labelIndex);
     return contextGetLabel(context, szLabelBuf);
 }
 
@@ -1153,7 +1130,7 @@ KbContextLabel* contextFuncGetLabel(const KbContext* context, int labelIndex) {
     if (labelIndex < 0) {
         return NULL;
     }
-    sprintf(szLabelBuf, FUNC_LABEL_FORMAT, labelIndex);
+    Salvia_Format(szLabelBuf, FUNC_LABEL_FORMAT, labelIndex);
     return contextGetLabel(context, szLabelBuf);
 }
 
