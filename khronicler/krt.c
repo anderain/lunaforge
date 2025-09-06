@@ -14,7 +14,7 @@
 char stringifyBuf[KB_RT_STRINGIFY_BUF_SIZE];
 
 static const char * DBG_RT_VALUE_NAME[] = {
-    "nil", "number", "string"
+    "nil", "number", "string", "array", "array"
 };
 
 KbRuntimeValue* rtvalueCreateNumber(const KB_FLOAT num) {
@@ -24,10 +24,16 @@ KbRuntimeValue* rtvalueCreateNumber(const KB_FLOAT num) {
     return v;
 }
 
-KbRuntimeValue* rtvalueCreateString(const char* sz) {
+KbRuntimeValue* rtvalueCreateString(const char* sz, KBoolean bIsRef) {
     KbRuntimeValue* v = (KbRuntimeValue *)malloc(sizeof(KbRuntimeValue));
     v->type = RVT_STRING;
-    v->data.sz = StringDump(sz);
+    v->data.str.bIsRef = bIsRef;
+    if (bIsRef) {
+        v->data.str.ptr = sz;
+    }
+    else {
+        v->data.str.ptr = StringDump(sz);
+    }
     return v;
 }
 
@@ -38,12 +44,13 @@ KbRuntimeValue* rtvalueCreateFromConcat(const char* szLeft, const char* szRight)
     KbRuntimeValue* v = (KbRuntimeValue *)malloc(sizeof(KbRuntimeValue));
     v->type = RVT_STRING;
 
-
     p = strNew = (char *)malloc(newLength);
     p += StringCopy(p, newLength, szLeft);
     p += StringCopy(p, newLength, szRight);
 
-    v->data.sz = strNew;
+    v->data.str.ptr = strNew;
+    v->data.str.bIsRef = KB_FALSE;
+
     return v;
 }
 
@@ -52,7 +59,7 @@ KbRuntimeValue* rtvalueDuplicate(const KbRuntimeValue* v) {
         return rtvalueCreateNumber(v->data.num);
     }
     else if (v->type == RVT_STRING) {
-        return rtvalueCreateString(v->data.sz);
+        return rtvalueCreateString(v->data.str.ptr, KB_TRUE);
     }
     return NULL;
 }
@@ -64,7 +71,7 @@ char* rtvalueStringify(const KbRuntimeValue* v) {
         return StringDump(_buf);
     }
     else if (v->type == RVT_STRING) {
-        return StringDump(v->data.sz);
+        return StringDump(v->data.str.ptr);
     }
     return StringDump("<unknown-value>");
 }
@@ -78,15 +85,29 @@ int rtvalueIsTrue(const KbRuntimeValue *v) {
         return (int)v->data.num;
     }
     /* 字符串不为空是真 */
-    else if (v->type == RVT_STRING && strlen(v->data.sz) > 0) {
+    else if (v->type == RVT_STRING && strlen(v->data.str.ptr) > 0) {
         return 1;
     }
     return 0;
 }
 
 void rtvalueDestroy(KbRuntimeValue* val) {
-    if (val->type == RVT_STRING) {
-        free(val->data.sz);
+    /* printf("[Release Value] ");
+    switch(val->type) {
+        case RVT_NUMBER:
+            printf("Number = %f", val->data.num);
+            break;
+        case RVT_STRING:
+            printf("String = '%s', isRef = %d", val->data.str.ptr, val->data.str.bIsRef);
+            break;
+        case RVT_ARRAY:
+        case RVT_ARRAY_REF:
+        default:
+            break;
+    }
+    printf("\n"); */
+    if (val->type == RVT_STRING && !val->data.str.bIsRef) {
+        free((void *)val->data.str.ptr);
     }
     free(val);
 }
@@ -338,7 +359,7 @@ int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
             }
             case KBO_PUSH_STR: {
                 const char *sz = (const char *)(machine->raw + machine->header->stringBlockStart + cmd->param.index);
-                vlPushBack(machine->stack, rtvalueCreateString(sz));
+                vlPushBack(machine->stack, rtvalueCreateString(sz, KB_TRUE));
 	            break;
             }
             case KBO_POP: {
@@ -510,7 +531,7 @@ int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
                 }
                 /* 比较字符串 */
                 else if (operand[0]->type == RVT_STRING) {
-                    numResult = StringEqual(operand[0]->data.sz, operand[1]->data.sz);
+                    numResult = StringEqual(operand[0]->data.str.ptr, operand[1]->data.str.ptr);
                 }
                 /* 比较数值 */
                 else if (operand[0]->type == RVT_NUMBER) {
@@ -686,12 +707,12 @@ int machineExecCallBuiltInFunc (int funcId, KbMachine* machine, KbRuntimeError *
     switch (funcId) {
         case KFID_P: {
             KbRuntimeValue *popped = (KbRuntimeValue *)vlPopBack(machine->stack);
-            char *sz = rtvalueStringify(popped);
-            rtvalueDestroy(popped);
 #ifndef DISABLE_P_FUNCTION
+            char *sz = rtvalueStringify(popped);
             printf("%s\n", sz);
-#endif
             free(sz);
+#endif
+            rtvalueDestroy(popped);
             vlPushBack(machine->stack, rtvalueCreateNumber(0));
             return 1;
         }
@@ -730,25 +751,25 @@ int machineExecCallBuiltInFunc (int funcId, KbMachine* machine, KbRuntimeError *
         }
         case KFID_LEN: {
             execPopAndCheckType(0, RVT_STRING);
-            numResult = strlen(operand[0]->data.sz);
+            numResult = strlen(operand[0]->data.str.ptr);
             vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
             rtvalueDestroy(operand[0]);
             return 1;
         }
         case KFID_VAL: {
             execPopAndCheckType(0, RVT_STRING);
-            numResult = kAtof(operand[0]->data.sz);
+            numResult = kAtof(operand[0]->data.str.ptr);
             vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
             rtvalueDestroy(operand[0]);
             return 1;
         }
         case KFID_ASC: {
             execPopAndCheckType(0, RVT_STRING);
-            if (strlen(operand[0]->data.sz) <= 0) {
+            if (strlen(operand[0]->data.str.ptr) <= 0) {
                 numResult = 0;
             }
             else {
-                numResult = (KB_FLOAT)operand[0]->data.sz[0];
+                numResult = (KB_FLOAT)operand[0]->data.str.ptr[0];
             }
             vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
             return 1;
@@ -778,7 +799,7 @@ int machineExecCallBuiltInFunc (int funcId, KbMachine* machine, KbRuntimeError *
                 }
             }
 
-            vlPushBack(machine->stack, rtvalueCreateString(buf));
+            vlPushBack(machine->stack, rtvalueCreateString(buf, KB_FALSE));
             rtvalueDestroy(operand[0]);
             rtvalueDestroy(operand[1]);
             

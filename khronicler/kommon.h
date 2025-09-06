@@ -19,10 +19,13 @@
 #   endif
 #endif
 
-typedef unsigned int KDword;
-typedef unsigned char KByte;
-typedef unsigned short KWord;
+typedef unsigned int    KDword;
+typedef unsigned char   KByte;
+typedef unsigned short  KWord;
+typedef int             KBoolean;
 
+#define KB_TRUE                         1
+#define KB_FALSE                        0
 #define KB_FLOAT                        float
 #define KB_ERROR_MESSAGE_MAX            200
 #define KB_TOKEN_LENGTH_MAX             50

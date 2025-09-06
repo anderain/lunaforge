@@ -26,19 +26,33 @@ typedef enum {
 typedef enum {
     RVT_NIL = 0,
     RVT_NUMBER,
-    RVT_STRING
+    RVT_STRING,
+    RVT_ARRAY,
+    RVT_ARRAY_REF
 } KB_RT_VALUE_TYPE;
 
+struct tagKbRuntimeValue;
+
 typedef struct {
+    struct tagKbRuntimeValue* el;
+    int size;
+} KbRuntimeArray;
+
+typedef struct tagKbRuntimeValue {
     int type;
     union {
-        char *sz;
-        KB_FLOAT num;
+        struct {
+            const char* ptr;
+            KBoolean    bIsRef;
+        } str;
+        KbRuntimeArray  arr;
+        KbRuntimeArray* pArrRef;
+        KB_FLOAT        num;
     } data;
 } KbRuntimeValue;
 
 KbRuntimeValue* rtvalueCreateNumber         (const KB_FLOAT num);
-KbRuntimeValue* rtvalueCreateString         (const char* sz);
+KbRuntimeValue* rtvalueCreateString         (const char* sz, KBoolean bIsRef);
 void            rtvalueDestroy              (KbRuntimeValue* val);
 void            rtvalueDestroyVoidPointer   (void* p);
 char*           rtvalueStringify            (const KbRuntimeValue* v);

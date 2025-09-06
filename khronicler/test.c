@@ -503,7 +503,8 @@ int TestRuntimeValue() {
         KbRuntimeValue tempExpectValue;
         tempExpectValue.type = pCase->exceptedType;
         if (tempExpectValue.type == RVT_STRING) {
-            tempExpectValue.data.sz = pCase->exceptedStr;
+            tempExpectValue.data.str.ptr = pCase->exceptedStr;
+            tempExpectValue.data.str.bIsRef = KB_TRUE;
         }
         else if (tempExpectValue.type == RVT_NUMBER) {
             tempExpectValue.data.num = pCase->exceptedNum;
@@ -583,7 +584,7 @@ compileEnd:
                         break;
                     }
                     case RVT_STRING:
-                        isCasePassed = StringEqual(pCase->exceptedStr, rtActualGot->data.sz);
+                        isCasePassed = StringEqual(pCase->exceptedStr, rtActualGot->data.str.ptr);
                         break;
                     default:
                         isCasePassed = 0;
