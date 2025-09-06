@@ -15,6 +15,7 @@ typedef struct {
 } KeywordDef;
 
 #define KEYWORD_DIM     "dim"
+#define KEYWORD_REDIM   "redim"
 #define KEYWORD_GOTO    "goto"
 #define KEYWORD_IF      "if"
 #define KEYWORD_ELSEIF  "elseif"
@@ -28,6 +29,7 @@ typedef struct {
 
 static const KeywordDef KEYWORDS[] = {
     { KEYWORD_DIM       },
+    { KEYWORD_REDIM     },
     { KEYWORD_GOTO      },
     { KEYWORD_IF        },
     { KEYWORD_ELSEIF    },
@@ -2034,6 +2036,32 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
             compileLineReturnWithError(KBE_SYNTAX_ERROR, "Missing variable name in dim statement");
         }
     }
+    /* redim 变量声明 */
+    else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_REDIM, token->content)) {
+        token = nextToken(&analyzer);
+       
+        if (token->type != TOKEN_ARR) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Missing array name.");
+        }
+        /* 变量长度太长 */
+        if (strlen(token->content) > KB_IDENTIFIER_LEN_MAX) {
+            compileLineReturnWithError(KBE_ID_TOO_LONG, token->content);
+        }
+        /* 表达式 */
+        if (!checkExpr(&analyzer, errorRet)) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid size expression in redim statement.");
+        }
+        /* 匹配右方括号 */
+        token = nextToken(&analyzer);
+        if (!(token->type == TOKEN_SQR_BKT && StringEqual("]", token->content))) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Missing ']' in redim statement.");
+        }
+        /* 匹配行结束 */
+        token = nextToken(&analyzer);
+        if (token->type != TOKEN_END) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Error in redim statement.");
+        }
+    }
     /* 可能是赋值 */
     else if (token->type == TOKEN_ID) {
         /* 匹配 '=' */ 
@@ -2464,6 +2492,33 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
             } else {
                 vlPushBack(context->commandList, opCommandCreateDimArray(varIndex));
             }
+        }
+    }
+    /* redim 调整数组 */
+    else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_REDIM, token->content)) {
+        KBoolean    bIsLocalVar;
+        const char* varName;
+        int         varIndex;
+        /* 获取变量名 */
+        token = nextToken(&analyzer);
+        varName = token->content;
+        /* 寻找存在的变量 */
+        varIndex = contextFindVariabelGlobalOrLocal(context, varName, &bIsLocalVar);
+        if (varIndex < 0) {
+            compileLineReturnWithError(KBE_UNDEFINED_IDENTIFIER, varName);
+            return 0;
+        }
+        /* 编译新尺寸的表达式 */
+        exprRoot = buildExpressionAbstractSyntaxTree(&analyzer);
+        ret = compileExprTree(context, exprRoot, errorRet);
+        if (!ret) {
+            compileLineReturn(0);
+        }
+        /* 生成创建数组的cmd */
+        if (bIsLocalVar) {
+            vlPushBack(context->commandList, opCommandCreateDimArrayLocal(varIndex));
+        } else {
+            vlPushBack(context->commandList, opCommandCreateDimArray(varIndex));
         }
     }
     /* 可能是赋值 */

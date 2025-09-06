@@ -1,6 +1,6 @@
 {
   "name": "kbasic-support",
-  "displayName": "My Language Support",
+  "displayName": "KBasic Language Support",
   "description": "Syntax highlighting for KBasic",
   "version": "0.0.1",
   "engines": {

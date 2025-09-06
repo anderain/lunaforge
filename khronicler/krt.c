@@ -113,7 +113,10 @@ int rtvalueIsTrue(const KbRuntimeValue *v) {
 }
 
 void rtvalueDestroy(KbRuntimeValue* val) {
-    /* printf("[Release Value] ");
+    if (!val) {
+        return;
+    }
+    printf("[Release] ");
     switch(val->type) {
         case RVT_NUMBER:
             printf("Number = %f", val->data.num);
@@ -127,7 +130,7 @@ void rtvalueDestroy(KbRuntimeValue* val) {
         default:
             break;
     }
-    printf("\n"); */
+    printf("\n");
     if (val->type == RVT_STRING && !val->data.str.bIsRef) {
         free((void *)val->data.str.ptr);
         val->data.str.ptr = NULL;
@@ -140,6 +143,24 @@ void rtvalueDestroy(KbRuntimeValue* val) {
         free(val->data.arr.el);
     }
     free(val);
+}
+
+void rtvalueMoveArrayContent(KbRuntimeValue* oldValue, KbRuntimeValue* newValue) {
+    int             i;
+    KbRuntimeArray* oldArray;
+    KbRuntimeArray* newArray;
+
+    if (oldValue->type != RVT_ARRAY || newValue->type != RVT_ARRAY) {
+        return;
+    }
+
+    oldArray = &oldValue->data.arr;
+    newArray = &newValue->data.arr;
+
+    for (i = 0; i < oldArray->size && i < newArray->size; ++i) {
+        newArray->el[i] = oldArray->el[i];
+        oldArray->el[i] = NULL;
+    }
 }
 
 void rtvalueDestroyVoidPointer(void* p) {
@@ -701,7 +722,8 @@ int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
             }
             case KBO_ARR_DIM: {
                 int             arraySize = 0;
-                KbRuntimeValue* old;
+                KbRuntimeValue* oldValue;
+                KbRuntimeValue* newValue;
                 /* 获取数组大小 */
                 execPopAndCheckType(0, RVT_NUMBER);
                 arraySize = (int)operand[0]->data.num;
@@ -709,15 +731,18 @@ int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
                     execReturnErrorWithInt(KBRE_ARRAY_INVALID_SIZE, arraySize);
                 }
                 /* 释放旧的变量内容，替换为新数组 */
-                old = machine->variables[cmd->param.index];
-                rtvalueDestroy(old);
-                machine->variables[cmd->param.index] = rtvalueCreateArray(arraySize);
+                oldValue = machine->variables[cmd->param.index];
+                newValue = rtvalueCreateArray(arraySize);
+                rtvalueMoveArrayContent(oldValue, newValue);
+                machine->variables[cmd->param.index] = newValue;
+                rtvalueDestroy(oldValue);
 	            break;
             }
             case KBO_ARR_DIM_LOCAL: {
                 int             arraySize = 0;
                 KbCallEnv*      pCallEnv;
-                KbRuntimeValue* old;
+                KbRuntimeValue* oldValue;
+                KbRuntimeValue* newValue;
                 /* 检查函数调用栈 */
                 execGetCurrentCallEnv();
                 /* 获取数组大小 */
@@ -727,9 +752,11 @@ int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
                     execReturnErrorWithInt(KBRE_ARRAY_INVALID_SIZE, arraySize);
                 }
                 /* 释放旧的变量内容，替换为新数组 */
-                old = pCallEnv->variables[cmd->param.index];
-                rtvalueDestroy(old);
-                pCallEnv->variables[cmd->param.index] = rtvalueCreateArray(arraySize);
+                oldValue = pCallEnv->variables[cmd->param.index];
+                newValue = rtvalueCreateArray(arraySize);
+                rtvalueMoveArrayContent(oldValue, newValue);
+                pCallEnv->variables[cmd->param.index] = newValue;
+                rtvalueDestroy(oldValue);
 	            break;
             }
             case KBO_ARR_GET: {
