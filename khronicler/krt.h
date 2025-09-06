@@ -21,6 +21,9 @@ typedef enum {
     KBRE_UNKNOWN_BUILT_IN_FUNC,
     KBRE_UNKNOWN_CMD,
     KBRE_NOT_IN_USER_FUNC,
+    KBRE_ARRAY_INVALID_SIZE,
+    KBRE_ARRAY_OUT_OF_BOUNDS,
+    KBRE_NOT_ARRAY
 } KB_RT_ERROR_TYPE;
 
 typedef enum {
@@ -34,7 +37,7 @@ typedef enum {
 struct tagKbRuntimeValue;
 
 typedef struct {
-    struct tagKbRuntimeValue* el;
+    struct tagKbRuntimeValue** el;
     int size;
 } KbRuntimeArray;
 
@@ -91,5 +94,7 @@ int         machineGetUserFuncIndex         (KbMachine* machine, const char* fun
 int         machineExecCallUserFuncByIndex  (KbMachine* machine, int funcIndex, KbRuntimeError *errorRet);
 #define     machinePopUserFuncRetValue(app) ((KbRuntimeValue *)vlPopBack((app)->stack))
 void        formatExecError                 (const KbRuntimeError *errorRet, char *message, int messageLength);
+
+#define KRE_MAX_ARRAY_SIZE  500
 
 #endif

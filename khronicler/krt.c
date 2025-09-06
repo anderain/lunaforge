@@ -37,6 +37,21 @@ KbRuntimeValue* rtvalueCreateString(const char* sz, KBoolean bIsRef) {
     return v;
 }
 
+KbRuntimeValue* rtvalueCreateArray(int size) {
+    KbRuntimeValue* v = (KbRuntimeValue *)malloc(sizeof(KbRuntimeValue));
+    int i;
+
+    v->type = RVT_ARRAY;
+    v->data.arr.size = size;
+    v->data.arr.el = (KbRuntimeValue **)malloc(sizeof(KbRuntimeValue* ) * size);
+    
+    for (i = 0; i < size; ++i) {
+        v->data.arr.el[i] = rtvalueCreateNumber(0);
+    }
+
+    return v;
+}
+
 KbRuntimeValue* rtvalueCreateFromConcat(const char* szLeft, const char* szRight) {
     char *strNew, *p;
     int newLength = strlen(szLeft) + strlen(szRight) + 1;
@@ -107,6 +122,7 @@ void rtvalueDestroy(KbRuntimeValue* val) {
             printf("String = '%s', isRef = %d", val->data.str.ptr, val->data.str.bIsRef);
             break;
         case RVT_ARRAY:
+            printf("Array, size = %d", val->data.arr.size);
         case RVT_ARRAY_REF:
         default:
             break;
@@ -114,6 +130,14 @@ void rtvalueDestroy(KbRuntimeValue* val) {
     printf("\n"); */
     if (val->type == RVT_STRING && !val->data.str.bIsRef) {
         free((void *)val->data.str.ptr);
+        val->data.str.ptr = NULL;
+    }
+    else if (val->type == RVT_ARRAY) {
+        int i;
+        for (i = 0; i < val->data.arr.size; ++i) {
+            rtvalueDestroy(val->data.arr.el[i]);
+        }
+        free(val->data.arr.el);
     }
     free(val);
 }
@@ -250,6 +274,18 @@ void formatExecError(const KbRuntimeError *errorRet, char *message, int messageL
         formatExecErrorAppend("Cannot execute this command out of function.");
         formatExecErrorAppend(errorRet->message);
         break;
+    case KBRE_ARRAY_INVALID_SIZE:
+        formatExecErrorAppend("Invalid array size: ");
+        formatExecErrorAppend(errorRet->message);
+        break;
+    case KBRE_ARRAY_OUT_OF_BOUNDS:
+        formatExecErrorAppend("Array access out of bounds: ");
+        formatExecErrorAppend(errorRet->message);
+        break;
+    case KBRE_NOT_ARRAY:
+        formatExecErrorAppend("Attempt to access a subscript that is not an array: ");
+        formatExecErrorAppend(errorRet->message);
+        break;
     default:
         formatExecErrorAppend("Other problems occurred during runtime. ");
         if (!StringEqual(errorRet->message, "")) {
@@ -292,6 +328,20 @@ void dbgPrintContextCommand(const KbOpCommand *cmd);
         );                                                          \
     } NULL
 
+#define execValidateArrayAccess(array, subscript)   NULL;           \
+    if ((array)->type != RVT_ARRAY) {                               \
+        execReturnErrorWithInt(KBRE_NOT_ARRAY, cmd->op);            \
+    }                                                               \
+    if ((subscript) < 0 || (subscript) >= (array)->data.arr.size) { \
+        execReturnErrorWithInt(KBRE_ARRAY_OUT_OF_BOUNDS, subscript);\
+    } NULL
+
+#define execGetCurrentCallEnv() NULL;                               \
+    if (machine->callEnvStack->size <= 0) {                         \
+        execReturnErrorWithInt(KBRE_NOT_IN_USER_FUNC, cmd->op);     \
+    }                                                               \
+    pCallEnv = (KbCallEnv *)machine->callEnvStack->tail->data; NULL \
+
 int machineExecCallBuiltInFunc(int funcId, KbMachine* machine, KbRuntimeError *errorRet, KbRuntimeValue ** operand);
 
 int machineGetUserFuncIndex(KbMachine* machine, const char* funcName) {
@@ -326,6 +376,7 @@ int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
     int                 numCmd = machine->header->numCmd;
     KbRuntimeValue*     operand[10];
     KB_FLOAT            numResult;
+    KbCallEnv*          pCallEnv;
 
     errorRet->type = KBRE_NO_ERROR;
     errorRet->message[0] = '\0';
@@ -349,11 +400,8 @@ int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
             }
             case KBO_PUSH_LOCAL: {
                 KbRuntimeValue* varValue;
-                KbCallEnv* pCallEnv;
-                if (machine->callEnvStack->size <= 0) {
-                    execReturnErrorWithInt(KBRE_NOT_IN_USER_FUNC, cmd->op);
-                }
-                pCallEnv = (KbCallEnv *)machine->callEnvStack->tail->data;
+                /* 检查函数调用栈 */
+                execGetCurrentCallEnv();
                 varValue = pCallEnv->variables[cmd->param.index];
                 vlPushBack(machine->stack, rtvalueDuplicate(varValue, KB_FALSE));
 	            break;
@@ -641,15 +689,111 @@ int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
 	            break;
             }
             case KBO_ASSIGN_LOCAL: {
-                KbCallEnv* pCallEnv;
-                if (machine->callEnvStack->size <= 0) {
-                    execReturnErrorWithInt(KBRE_NOT_IN_USER_FUNC, cmd->op);
-                }
-                pCallEnv = (KbCallEnv *)machine->callEnvStack->tail->data;
-                KbRuntimeValue *varValue = pCallEnv->variables[cmd->param.index];
-                KbRuntimeValue *popped = (KbRuntimeValue *)vlPopBack(machine->stack);
+                KbRuntimeValue *varValue;
+                KbRuntimeValue *popped;
+                /* 检查函数调用栈 */
+                execGetCurrentCallEnv();
+                varValue = pCallEnv->variables[cmd->param.index];
+                popped = (KbRuntimeValue *)vlPopBack(machine->stack);
                 rtvalueDestroy(varValue);
                 pCallEnv->variables[cmd->param.index] = popped;
+	            break;
+            }
+            case KBO_ARR_DIM: {
+                int             arraySize = 0;
+                KbRuntimeValue* old;
+                /* 获取数组大小 */
+                execPopAndCheckType(0, RVT_NUMBER);
+                arraySize = (int)operand[0]->data.num;
+                if (arraySize < 1 || arraySize > KRE_MAX_ARRAY_SIZE) {
+                    execReturnErrorWithInt(KBRE_ARRAY_INVALID_SIZE, arraySize);
+                }
+                /* 释放旧的变量内容，替换为新数组 */
+                old = machine->variables[cmd->param.index];
+                rtvalueDestroy(old);
+                machine->variables[cmd->param.index] = rtvalueCreateArray(arraySize);
+	            break;
+            }
+            case KBO_ARR_DIM_LOCAL: {
+                int             arraySize = 0;
+                KbCallEnv*      pCallEnv;
+                KbRuntimeValue* old;
+                /* 检查函数调用栈 */
+                execGetCurrentCallEnv();
+                /* 获取数组大小 */
+                execPopAndCheckType(0, RVT_NUMBER);
+                arraySize = (int)operand[0]->data.num;
+                if (arraySize < 1 || arraySize > KRE_MAX_ARRAY_SIZE) {
+                    execReturnErrorWithInt(KBRE_ARRAY_INVALID_SIZE, arraySize);
+                }
+                /* 释放旧的变量内容，替换为新数组 */
+                old = pCallEnv->variables[cmd->param.index];
+                rtvalueDestroy(old);
+                pCallEnv->variables[cmd->param.index] = rtvalueCreateArray(arraySize);
+	            break;
+            }
+            case KBO_ARR_GET: {
+                int             subscript;
+                KbRuntimeValue* array;
+                /* 获取下标 */
+                execPopAndCheckType(0, RVT_NUMBER);
+                subscript = (int)operand[0]->data.num;
+                /* 检查数组是否合法、是否越界 */
+                array = machine->variables[cmd->param.index];
+                execValidateArrayAccess(array, subscript);
+                /* 数组下标对应元素入栈 */
+                vlPushBack(machine->stack, rtvalueDuplicate(array->data.arr.el[subscript], KB_FALSE));
+	            break;
+            }
+            case KBO_ARR_GET_LOCAL: {
+                int             subscript;
+                KbRuntimeValue* array;
+                /* 检查函数调用栈 */
+                execGetCurrentCallEnv();
+                /* 获取下标 */
+                execPopAndCheckType(0, RVT_NUMBER);
+                subscript = (int)operand[0]->data.num;
+                /* 检查数组是否合法、是否越界 */
+                array = pCallEnv->variables[cmd->param.index];
+                execValidateArrayAccess(array, subscript);
+                /* 数组下标对应元素入栈 */
+                vlPushBack(machine->stack, rtvalueDuplicate(array->data.arr.el[subscript], KB_FALSE));
+	            break;
+            }
+            case KBO_ARR_SET: {
+                KbRuntimeValue* popped;
+                int             subscript;
+                KbRuntimeValue* array;
+                /* 获取将赋值的值 */
+                popped = (KbRuntimeValue *)vlPopBack(machine->stack);
+                /* 获取下标 */
+                execPopAndCheckType(0, RVT_NUMBER);
+                subscript = (int)operand[0]->data.num;
+                /* 检查数组是否合法、是否越界 */
+                array = machine->variables[cmd->param.index];
+                execValidateArrayAccess(array, subscript);
+                /* 释放旧值并赋新值 */
+                rtvalueDestroy(array->data.arr.el[subscript]);
+                array->data.arr.el[subscript] = popped;
+	            break;
+            }
+            case KBO_ARR_SET_LOCAL: {
+                KbRuntimeValue* popped;
+                int             subscript;
+                KbRuntimeValue* array;
+                /* 检查函数调用栈 */
+                execGetCurrentCallEnv();
+                /* 获取将赋值的值 */
+                popped = (KbRuntimeValue *)vlPopBack(machine->stack);
+                /* 获取下标 */
+                execPopAndCheckType(0, RVT_NUMBER);
+                subscript = (int)operand[0]->data.num;
+                /* 检查数组是否合法、是否越界 */
+                array = pCallEnv->variables[cmd->param.index];
+                execValidateArrayAccess(array, subscript);
+                /* 释放旧值并赋新值 */
+                rtvalueDestroy(array->data.arr.el[subscript]);
+                array->data.arr.el[subscript] = popped;
 	            break;
             }
             case KBO_GOTO: {
