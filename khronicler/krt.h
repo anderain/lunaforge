@@ -56,7 +56,7 @@ KbRuntimeValue* rtvalueCreateString         (const char* sz, KBoolean bIsRef);
 void            rtvalueDestroy              (KbRuntimeValue* val);
 void            rtvalueDestroyVoidPointer   (void* p);
 char*           rtvalueStringify            (const KbRuntimeValue* v);
-KbRuntimeValue* rtvalueDuplicate            (const KbRuntimeValue* v);
+KbRuntimeValue* rtvalueDuplicate            (const KbRuntimeValue* v, KBoolean bDeepClone);
 
 typedef struct {
     int                 prevCmdPos;

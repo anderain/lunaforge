@@ -54,12 +54,12 @@ KbRuntimeValue* rtvalueCreateFromConcat(const char* szLeft, const char* szRight)
     return v;
 }
 
-KbRuntimeValue* rtvalueDuplicate(const KbRuntimeValue* v) {
+KbRuntimeValue* rtvalueDuplicate(const KbRuntimeValue* v, KBoolean bDeepClone) {
     if (v->type == RVT_NUMBER) {
         return rtvalueCreateNumber(v->data.num);
     }
     else if (v->type == RVT_STRING) {
-        return rtvalueCreateString(v->data.str.ptr, KB_TRUE);
+        return rtvalueCreateString(v->data.str.ptr, !bDeepClone);
     }
     return NULL;
 }
@@ -338,7 +338,7 @@ int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
             }
             case KBO_PUSH_VAR: {
                 KbRuntimeValue *varValue = machine->variables[cmd->param.index];
-                vlPushBack(machine->stack, rtvalueDuplicate(varValue));
+                vlPushBack(machine->stack, rtvalueDuplicate(varValue, KB_FALSE));
 	            break;
             }
             case KBO_PUSH_LOCAL: {
@@ -349,7 +349,7 @@ int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
                 }
                 pCallEnv = (KbCallEnv *)machine->callEnvStack->tail->data;
                 varValue = pCallEnv->variables[cmd->param.index];
-                vlPushBack(machine->stack, rtvalueDuplicate(varValue));
+                vlPushBack(machine->stack, rtvalueDuplicate(varValue, KB_FALSE));
 	            break;
             }
             case KBO_PUSH_NUM: {

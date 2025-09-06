@@ -471,7 +471,7 @@ KbRuntimeValue* runBinaryAndDumpFirstVar(const KByte* pRaw, char* errMsg, int er
         return NULL;
     }
 
-    rtValueRet = rtvalueDuplicate(app->variables[0]);
+    rtValueRet = rtvalueDuplicate(app->variables[0], KB_TRUE);
 
     machineDestroy(app);
     return rtValueRet;
