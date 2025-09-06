@@ -8,9 +8,9 @@
 typedef enum {
     TOKEN_ERR,      TOKEN_END,      TOKEN_NUM,
     TOKEN_ID,       TOKEN_OPR,      TOKEN_FNC,
-    TOKEN_BKT,      TOKEN_CMA,      TOKEN_STR,
-    TOKEN_LABEL,    TOKEN_KEY,
-    TOKEN_UDF
+    TOKEN_ARR,      TOKEN_BKT,      TOKEN_SQR_BKT,
+    TOKEN_CMA,      TOKEN_STR,      TOKEN_LABEL,
+    TOKEN_KEY,      TOKEN_UDF
 } TokenType;
 
 typedef struct {

@@ -81,6 +81,13 @@ typedef enum {
     KBO_POP,                /* 出栈 */
     KBO_ASSIGN_VAR,         /* 出栈并且赋值给全局变量 */
     KBO_ASSIGN_LOCAL,       /* 出栈并且赋值给局部变量 */
+    /* 数组操作指令 */
+    KBO_ARR_DIM,            /* 定义全局数组 */
+    KBO_ARR_DIM_LOCAL,          /* 定义局部数组 */
+    KBO_ARR_GET,            /* 从全局数组取出元素并压栈 */
+    KBO_ARR_GET_LOCAL,          /* 从局部数组取出元素并压栈 */
+    KBO_ARR_SET,            /* 全局数组赋值元素 */
+    KBO_ARR_SET_LOCAL,          /* 局部数组赋值元素 */
     /* 运算符命令 */
     KBO_OPR_NEG,            /* 数字取负 */
     KBO_OPR_CONCAT,         /* 字符串连接 */

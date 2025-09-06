@@ -14,7 +14,7 @@
 char stringifyBuf[KB_RT_STRINGIFY_BUF_SIZE];
 
 static const char * DBG_RT_VALUE_NAME[] = {
-    "nil", "number", "string", "array", "array"
+    "nil", "number", "string", "array", "array_ref"
 };
 
 KbRuntimeValue* rtvalueCreateNumber(const KB_FLOAT num) {
@@ -72,6 +72,12 @@ char* rtvalueStringify(const KbRuntimeValue* v) {
     }
     else if (v->type == RVT_STRING) {
         return StringDump(v->data.str.ptr);
+    }
+    else if (v->type == RVT_ARRAY) {
+        return StringDump("[Array]");
+    }
+    else if (v->type == RVT_ARRAY_REF) {
+        return StringDump("[ArrayRef]");
     }
     return StringDump("<unknown-value>");
 }

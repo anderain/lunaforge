@@ -64,12 +64,12 @@ static const BuiltInFunction FUNCTION_LIST[] = {
     { "zeropad",    2, KFID_ZEROPAD     }
 };
 
-const char* DBG_TOKEN_NAME[] = {
-    "TOKEN_ERR",    "TOKEN_END",    "TOKEN_NUM",
-    "TOKEN_ID",     "TOKEN_OPR",    "TOKEN_FNC",
-    "TOKEN_BKT",    "TOKEN_CMA",    "TOKEN_STR",
-    "TOKEN_LABEL",
-    "TOKEN_UDF"
+static const char* DBG_TOKEN_NAME[] = {
+    "ERR",      "END",      "NUM",
+    "ID",       "OPR",      "FNC",
+    "ARR",      "BKT",      "SQR_BKT",
+    "CMA",      "STR",      "LABEL",
+    "KEY",      "UDF"
 };
 
 typedef struct tagExprNode {
@@ -187,6 +187,11 @@ Token* nextToken(Analyzer *_self) {
         buffer[1] = '\0';
         _self->eptr++;
         return assignToken(_self, TOKEN_BKT, buffer, eptrStart);
+    case '[':   case ']':
+        buffer[0] = firstChar;
+        buffer[1] = '\0';
+        _self->eptr++;
+        return assignToken(_self, TOKEN_SQR_BKT, buffer, eptrStart);
     case ',':
         buffer[0] = firstChar;
         buffer[1] = '\0';
@@ -305,7 +310,8 @@ Token* nextToken(Analyzer *_self) {
     /* 标志符 identifier */
     else if (isAlpha(firstChar)) {
         int         i;
-        int         isFunc = 0;
+        KBoolean    bIsFunc = KB_FALSE;
+        KBoolean    bIsArray = KB_FALSE;
         const char* pIdEnd;
 
         while (isAlphaNum(*_self->eptr)) {
@@ -330,7 +336,13 @@ Token* nextToken(Analyzer *_self) {
         /* 后面是左括号，是函数定义或者函数调用 */
         if (*_self->eptr == '(') {
             _self->eptr++;
-            isFunc = 1;
+            bIsFunc = KB_TRUE;
+        }
+
+        /* 后面是左中括号，是数组定义或者数组取值 */
+        if (*_self->eptr == '[') {
+            _self->eptr++;
+            bIsArray = KB_TRUE;
         }
         
         /* token 过长 */
@@ -338,9 +350,13 @@ Token* nextToken(Analyzer *_self) {
             assignToken(_self, TOKEN_ERR, "Identifier too long", eptrStart);
         }
 
-        if (isFunc) {
+        if (bIsFunc) {
             /* 函数名：读取长度 = id长度 + 中间的空白 + 右括号 */
             return assignToken(_self, TOKEN_FNC, buffer, eptrStart);
+        }
+        else if (bIsArray) {
+            /* 数组名字：读取长度 = id长度 + 中间的空白 + 右中括号 */
+            return assignToken(_self, TOKEN_ARR, buffer, eptrStart);
         }
         else {
             /* 变量：读取长度 = 仅id长度 */
@@ -448,7 +464,7 @@ void resetToken(Analyzer *_self) {
 
 int matchExpr(Analyzer *_self);
 
-int matchTryNext(Analyzer *_self) {
+KBoolean matchTryNextOperator(Analyzer *_self) {
     Token *next = nextToken(_self);
     if (next->type == TOKEN_OPR) {
         return matchExpr(_self);
@@ -456,18 +472,18 @@ int matchTryNext(Analyzer *_self) {
     else {
         rewindToken(_self);
     }
-    return 1;
+    return KB_TRUE;
 }
 
-int matchExpr(Analyzer *_self) {
+KBoolean matchExpr(Analyzer *_self) {
     Token *token = nextToken(_self);
     /* printf("[%s] %s\n", DBG_TOKEN_NAME[token->type], token->content); */
     if (token->type == TOKEN_ID || token->type == TOKEN_NUM || token->type == TOKEN_STR) {
-        return matchTryNext(_self);
+        return matchTryNextOperator(_self);
     }
     else if ((token->type == TOKEN_OPR && StringEqual(token->content, "-"))
             || (token->type == TOKEN_OPR && StringEqual(token->content, "!"))) {
-        return matchExpr(_self) && matchTryNext(_self);
+        return matchExpr(_self) && matchTryNextOperator(_self);
     }
     else if (token->type == TOKEN_FNC) {
         token = nextToken(_self);
@@ -477,38 +493,40 @@ int matchExpr(Analyzer *_self) {
         else {
             /* 至少有一个参数 */
             rewindToken(_self);
-            while (1) {
+            for (;;) {
                 int result = matchExpr(_self);
                 if (!result)
-                    return 0;
+                    return KB_FALSE;
                 token = nextToken(_self);
                 if (token->type == TOKEN_CMA)
                     continue;
                 else if (token->type == TOKEN_BKT && *token->content == ')')
                     break;
                 else
-                    return 0;
+                    return KB_FALSE;
             }
         }
-        return matchTryNext(_self);
+        return matchTryNextOperator(_self);
+    }
+    else if (token->type == TOKEN_ARR) {
+        KBoolean success = matchExpr(_self);
+        if (!success) return KB_FALSE;
+        token = nextToken(_self);
+        if (!(token->type == TOKEN_SQR_BKT && StringEqual(token->content, "]"))) {
+            return KB_FALSE;
+        }
+        return matchTryNextOperator(_self);
     }
     else if (token->type == TOKEN_BKT && StringEqual(token->content, "(")) {
-        int success = matchExpr(_self);
-        if (!success) return 0;
+        KBoolean success = matchExpr(_self);
+        if (!success) return KB_FALSE;
         token = nextToken(_self);
-        if (token->type == TOKEN_BKT && StringEqual(token->content, ")")) {
-            Token *next = nextToken(_self);
-            if (next->type == TOKEN_OPR) {
-                return matchExpr(_self);
-            }
-            else {
-                rewindToken(_self);
-            }
-            return 1;
+        if (!(token->type == TOKEN_BKT && StringEqual(token->content, ")"))) {
+            return KB_FALSE;
         }
-        return 0;
+        return matchTryNextOperator(_self);
     }
-    return 0;
+    return KB_FALSE;
 }
 
 void displaySyntaxError(Analyzer *_self) {
@@ -522,8 +540,8 @@ void displaySyntaxError(Analyzer *_self) {
     printf("^\n");
 }
 
-int checkExpr(Analyzer *_self, KbBuildError *errorRet) {
-    int result = matchExpr(_self);
+KBoolean checkExpr(Analyzer *_self, KbBuildError *errorRet) {
+    KBoolean result = matchExpr(_self);
     /* 表达式里有语法错误 */
     if (!result) {
         if (errorRet) {
@@ -781,6 +799,33 @@ void buildAstTryOperand(Analyzer *pAnalyzer, Vlist* pStackOperand, Vlist* pStack
         /* 尝试下一个 token 是否是运算符 */
         buildAstTryOperator(pAnalyzer, pStackOperand, pStackOperator);
     }
+    /* 数组 */
+    else if (token->type == TOKEN_ARR) {
+        ExprNode* arrAccessNode = enNew(TOKEN_ARR, token->content, 1);
+        /* 括号节点入操作符栈 */
+        vlPushBack(pStackOperator, arrAccessNode);
+        /* 构建括号内的表达式 */
+        buildAstTryOperand(pAnalyzer, pStackOperand, pStackOperator);
+        /* 忽略最后的右中括号 */
+        nextToken(pAnalyzer);
+        /* 处理合并括号中的表达式 */
+        while (pStackOperator->size > 0) {
+            ExprNode *enTop = (ExprNode *)vlPeek(pStackOperator);
+            /* 遇到当前括号节点，弹出了所有的内容了，结束 */
+            if (enTop == arrAccessNode) {
+                vlPopBack(pStackOperator);
+                break;
+            }
+            /* 处理运算符 */
+            buildAstHandleBinaryOperator(pStackOperand, pStackOperator);
+        }
+        /* 括号内表达式出栈，作为括号节点的子节点 */
+        arrAccessNode->children[0] = (ExprNode *)vlPopBack(pStackOperand);
+        /* 括号节点入表达式栈 */
+        vlPushBack(pStackOperand, arrAccessNode);
+        /* 尝试下一个 token 是否是运算符 */
+        buildAstTryOperator(pAnalyzer, pStackOperand, pStackOperator);
+    }
 }
 
 ExprNode* buildExpressionAbstractSyntaxTree(Analyzer *pAnalyzer) {
@@ -983,6 +1028,27 @@ int contextGetLocalVariableIndex (const KbContext *context, const char * varToFi
     return -1;
 }
 
+int contextFindVariabelGlobalOrLocal(KbContext* context, const char* varName, KBoolean* pbIsLocalVar) {
+    int         varIndex = -1;
+    KBoolean    isFuncScope = context->pCurrentFunc != NULL;
+    KBoolean    isLocalVar = KB_FALSE;
+
+    /* 当前在函数内，先尝试在函数内寻找 */
+    if (isFuncScope) {
+        varIndex = contextGetLocalVariableIndex(context, varName);
+        if (varIndex >= 0) {
+            isLocalVar = KB_TRUE;
+        }
+    }
+    /* 如果没找到，或者在全局，再在全局寻找 */
+    if (varIndex < 0) {
+        varIndex = contextGetVariableIndex(context, varName);
+    }
+
+    *pbIsLocalVar = isLocalVar;
+    return varIndex;
+}
+
 int contextAppendText(KbContext* context, const char* string) {
     char *oldBufferPtr = context->stringBufferPtr;
 
@@ -1156,6 +1222,7 @@ KbUserFunc* contextFuncFind(KbContext* context, const char* funcName, int* pInde
     return NULL;
 }
 
+
 KbOpCommand* opCommandCreateBuiltInFunction(int funcId) {
     KbOpCommand* cmd = (KbOpCommand*)malloc(sizeof(KbOpCommand));
 
@@ -1232,6 +1299,60 @@ KbOpCommand* opCommandCreateAssignLocal(int varIndex) {
     KbOpCommand* cmd = (KbOpCommand*)malloc(sizeof(KbOpCommand));
 
     cmd->op = KBO_ASSIGN_LOCAL;
+    cmd->param.index = varIndex;
+
+    return cmd;
+}
+
+KbOpCommand* opCommandCreateDimArray(int varIndex) {
+    KbOpCommand* cmd = (KbOpCommand*)malloc(sizeof(KbOpCommand));
+
+    cmd->op = KBO_ARR_DIM;
+    cmd->param.index = varIndex;
+
+    return cmd;
+}
+
+KbOpCommand* opCommandCreateDimArrayLocal(int varIndex) {
+    KbOpCommand* cmd = (KbOpCommand*)malloc(sizeof(KbOpCommand));
+
+    cmd->op = KBO_ARR_DIM_LOCAL;
+    cmd->param.index = varIndex;
+
+    return cmd;
+}
+
+KbOpCommand* opCommandCreateArrayGet(int varIndex) {
+    KbOpCommand* cmd = (KbOpCommand*)malloc(sizeof(KbOpCommand));
+
+    cmd->op = KBO_ARR_GET;
+    cmd->param.index = varIndex;
+
+    return cmd;
+}
+
+KbOpCommand* opCommandCreateArrayGetLocal(int varIndex) {
+    KbOpCommand* cmd = (KbOpCommand*)malloc(sizeof(KbOpCommand));
+
+    cmd->op = KBO_ARR_GET_LOCAL;
+    cmd->param.index = varIndex;
+
+    return cmd;
+}
+
+KbOpCommand* opCommandCreateArraySet(int varIndex) {
+    KbOpCommand* cmd = (KbOpCommand*)malloc(sizeof(KbOpCommand));
+
+    cmd->op = KBO_ARR_SET;
+    cmd->param.index = varIndex;
+
+    return cmd;
+}
+
+KbOpCommand* opCommandCreateArraySetLocal(int varIndex) {
+    KbOpCommand* cmd = (KbOpCommand*)malloc(sizeof(KbOpCommand));
+
+    cmd->op = KBO_ARR_SET_LOCAL;
     cmd->param.index = varIndex;
 
     return cmd;
@@ -1346,35 +1467,46 @@ int compileExprTree(KbContext *context, ExprNode *node, KbBuildError *errorRet) 
             vlPushBack(context->commandList, opCommandCreateBuiltInFunction(targetFunc->funcId));
         }
     }
-    /* 运算符 */
-    else if (node->type == TOKEN_OPR) {
-        vlPushBack(context->commandList, opCommandCreateOperator(node->param));
-    }
-    /* 变量 */
-    else if (node->type == TOKEN_ID) {
-        int varIndex = -1;
-        int isFuncScope = context->pCurrentFunc != NULL;
-        int isLocalVar = 0;
-        char* varName = node->content;
-        /* 当前在函数内，先尝试在函数内寻找 */
-        if (isFuncScope) {
-            varIndex = contextGetLocalVariableIndex(context, varName);
-            if (varIndex >= 0) {
-                isLocalVar = 1;
-            }
-        }
-        /* 如果没找到，或者在全局，再在全局寻找 */
-        if (varIndex < 0) {
-            varIndex = contextGetVariableIndex(context, varName);
-        }
-        /* 变量未定义 */
+    /* 数组取值 */
+    else if (node->type == TOKEN_ARR) {
+        int         varIndex    = -1;
+        KBoolean    bIsLocalVar = 0;
+        const char* varName = node->content;
+
+        varIndex = contextFindVariabelGlobalOrLocal(context, varName, &bIsLocalVar);
         if (varIndex < 0) {
             errorRet->errorPos = 0;
             errorRet->errorType = KBE_UNDEFINED_IDENTIFIER;
             StringCopy(errorRet->message, KB_ERROR_MESSAGE_MAX, varName);
             return 0;
         }
-        if (isLocalVar) {
+
+        if (bIsLocalVar) {
+            vlPushBack(context->commandList, opCommandCreateArrayGetLocal(varIndex));
+        }
+        else {
+            vlPushBack(context->commandList, opCommandCreateArrayGet(varIndex));
+        }
+    }
+    /* 运算符 */
+    else if (node->type == TOKEN_OPR) {
+        vlPushBack(context->commandList, opCommandCreateOperator(node->param));
+    }
+    /* 变量 */
+    else if (node->type == TOKEN_ID) {
+        int         varIndex    = -1;
+        KBoolean    bIsLocalVar = 0;
+        const char* varName = node->content;
+    
+        varIndex = contextFindVariabelGlobalOrLocal(context, varName, &bIsLocalVar);
+        if (varIndex < 0) {
+            errorRet->errorPos = 0;
+            errorRet->errorType = KBE_UNDEFINED_IDENTIFIER;
+            StringCopy(errorRet->message, KB_ERROR_MESSAGE_MAX, varName);
+            return 0;
+        }
+
+        if (bIsLocalVar) {
             vlPushBack(context->commandList, opCommandCreatePushLocal(varIndex));
         }
         else {
@@ -1423,6 +1555,12 @@ void dbgPrintContextCommand(const KbOpCommand *cmd) {
      || cmd->op == KBO_CALL_USER
      || cmd->op == KBO_ASSIGN_VAR
      || cmd->op == KBO_ASSIGN_LOCAL
+     || cmd->op == KBO_ARR_DIM
+     || cmd->op == KBO_ARR_DIM_LOCAL
+     || cmd->op == KBO_ARR_GET
+     || cmd->op == KBO_ARR_GET_LOCAL
+     || cmd->op == KBO_ARR_SET
+     || cmd->op == KBO_ARR_SET_LOCAL
      || cmd->op == KBO_GOTO
      || cmd->op == KBO_IF_GOTO
      || cmd->op == KBO_UNLESS_GOTO) {
@@ -1621,7 +1759,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         /* 匹配表达式 */
         ret = matchExpr(&analyzer);
         if (!ret) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid express in if statement");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid expression in if statement");
         }
         /* 下一个 token，结束或者 goto */
         token = nextToken(&analyzer);
@@ -1652,7 +1790,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         /* 匹配表达式 */
         ret = matchExpr(&analyzer);
         if (!ret) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid express in elseif statement");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid expression in elseif statement");
         }
         /* 匹配语句结束 */
         token = nextToken(&analyzer);
@@ -1685,7 +1823,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         /* 匹配表达式 */
         ret = matchExpr(&analyzer);
         if (!ret) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid express in while statement");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid expression in while statement");
         }
         /* 匹配语句结束 */
         token = nextToken(&analyzer);
@@ -1793,7 +1931,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         /* 匹配表达式 */
         ret = matchExpr(&analyzer);
         if (!ret) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid express in return statement");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid expression in return statement");
         }
         /* 匹配行结束 */
         token = nextToken(&analyzer);
@@ -1845,22 +1983,46 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
     }
     /* dim 变量声明 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_DIM, token->content)) {
-        /* 匹配是变量名 */
         token = nextToken(&analyzer);
-        if (token->type != TOKEN_ID) {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Missing variable in dim statement");
+        /* 普通变量 */
+        if (token->type == TOKEN_ID) {
+            /* 变量长度太长 */
+            if (strlen(token->content) > KB_IDENTIFIER_LEN_MAX) {
+                compileLineReturnWithError(KBE_ID_TOO_LONG, token->content);
+            }
+            /* 匹配行结束或者'=' */
+            token = nextToken(&analyzer);
+            /* 等号，带赋值的dim */
+            if (token->type == TOKEN_OPR && StringEqual("=", token->content)) {
+                /* 表达式 */
+                if (!checkExpr(&analyzer, errorRet)) {
+                    compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid expression.");
+                }
+                /* 匹配行结束 */
+                token = nextToken(&analyzer);
+                if (token->type != TOKEN_END) {
+                    compileLineReturnWithError(KBE_SYNTAX_ERROR, "Error in dim statement.");
+                }
+            }
+            /* 直接结束 */
+            else if (token->type == TOKEN_END) {
+                /* 什么也不做 */
+            }
         }
-        /* 变量长度太长 */
-        if (strlen(token->content) > KB_IDENTIFIER_LEN_MAX) {
-            compileLineReturnWithError(KBE_ID_TOO_LONG, token->content);
-        }
-        /* 匹配行结束或者= */
-        token = nextToken(&analyzer);
-        /* 等号，带赋值的dim */
-        if (token->type == TOKEN_OPR && StringEqual("=", token->content)) {
+        /* 数组 */
+        else if (token->type == TOKEN_ARR) {
+            /* 变量长度太长 */
+            if (strlen(token->content) > KB_IDENTIFIER_LEN_MAX) {
+                compileLineReturnWithError(KBE_ID_TOO_LONG, token->content);
+            }
             /* 表达式 */
             if (!checkExpr(&analyzer, errorRet)) {
-                compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid expression.");
+                compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid size expression in array declaration.");
+            }
+            /* 匹配右方括号 */
+            token = nextToken(&analyzer);
+            if (!(token->type == TOKEN_SQR_BKT && StringEqual("]", token->content))) {
+                compileLineReturnWithError(KBE_SYNTAX_ERROR, "Missing ']' in array declaration.");
             }
             /* 匹配行结束 */
             token = nextToken(&analyzer);
@@ -1868,13 +2030,8 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
                 compileLineReturnWithError(KBE_SYNTAX_ERROR, "Error in dim statement.");
             }
         }
-        /* 直接结束 */
-        else if (token->type == TOKEN_END) {
-            /* 什么也不做 */
-        }
-        /* 其他情况是错误*/
         else {
-            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Error in dim statement");
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Missing variable name in dim statement");
         }
     }
     /* 可能是赋值 */
@@ -1889,12 +2046,7 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
         }
         /* 其他情况，此行是表达式 */
         else {
-            /* 解析器回到开始位置 */
-            resetToken(&analyzer);
-            /* 检查表达式合法性 */
-            if (!checkExpr(&analyzer, errorRet)) {
-                compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid expression.");
-            }
+            goto exprFallback;
         }
         /* 匹配行结束 */
         token = nextToken(&analyzer);
@@ -1902,8 +2054,35 @@ int kbScanLineSyntax(const char* line, KbContext *context, KbBuildError *errorRe
             compileLineReturnWithError(KBE_SYNTAX_ERROR, "Error in assignment statement.");
         }
     }
+    /* 可能是赋值 */
+    else if (token->type == TOKEN_ARR) {
+        /* 匹配数组下标表达式 */
+        if (!checkExpr(&analyzer, errorRet)) {
+            goto exprFallback;
+        }
+        /* 匹配右中括号 */
+        token = nextToken(&analyzer);
+        if (!(token->type == TOKEN_SQR_BKT && StringEqual("]", token->content))) {
+            goto exprFallback;
+        }
+        /* 匹配 = */
+        token = nextToken(&analyzer);
+        if (!(token->type == TOKEN_OPR && StringEqual("=", token->content))) {
+            goto exprFallback;
+        }
+        /* 检查赋值表达式 */
+        if (!checkExpr(&analyzer, errorRet)) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Invalid expression in assignment statement.");
+        }
+        /* 匹配行结束 */
+        token = nextToken(&analyzer);
+        if (token->type != TOKEN_END) {
+            compileLineReturnWithError(KBE_SYNTAX_ERROR, "Error in array assignment statement.");
+        }
+    }
     /* 其他情况，此行是表达式 */
     else {
+        exprFallback:
         /* 解析器回到开始位置 */
         resetToken(&analyzer);
         /* 检查表达式合法性 */
@@ -2209,14 +2388,18 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
     }
     /* dim 变量声明 */
     else if (token->type == TOKEN_KEY && StringEqual(KEYWORD_DIM, token->content)) {
-        char*   varName;;
-        int     varIndex;
-        int     isFuncScope = context->pCurrentFunc != NULL;
+        char*       varName;
+        int         varIndex;
+        KBoolean    bIsFuncScope = context->pCurrentFunc != NULL;
+        KBoolean    bIsArray = KB_FALSE;
+
         /* 获取变量名 */
         token = nextToken(&analyzer);
+        bIsArray = token->type == TOKEN_ARR;
+    
         varName = token->content;
         /* 当前在函数内 */
-        if (isFuncScope) {
+        if (bIsFuncScope) {
             /* 获取变量 index */
             varIndex = contextGetLocalVariableIndex(context, varName);
             /* 创建新变量 */
@@ -2247,88 +2430,134 @@ int kbCompileLine(const char * line, KbContext *context, KbBuildError *errorRet)
                 compileLineReturnWithError(KBE_DUPLICATED_VAR, varName);
             }
         }
-        /* 匹配行结束或者= */
-        token = nextToken(&analyzer);
-        /* 赋值 = */
-        if (token->type == TOKEN_OPR && StringEqual("=", token->content)) {
+        /* 普通变量 */
+        if (!bIsArray) {
+            /* 匹配行结束或者'=' */
+            token = nextToken(&analyzer);
+            /* 赋值 = */
+            if (token->type == TOKEN_OPR && StringEqual("=", token->content)) {
+                exprRoot = buildExpressionAbstractSyntaxTree(&analyzer);
+                ret = compileExprTree(context, exprRoot, errorRet);
+                if (!ret) {
+                    compileLineReturn(0);
+                }
+                enDestroy(exprRoot);
+                /* 生成cmd，赋值 */
+                if (bIsFuncScope) {
+                    vlPushBack(context->commandList, opCommandCreateAssignLocal(varIndex));
+                } else {
+                    vlPushBack(context->commandList, opCommandCreateAssignVar(varIndex));
+                }
+            }
+        }
+        /* 数组声明 */
+        else {
             exprRoot = buildExpressionAbstractSyntaxTree(&analyzer);
             ret = compileExprTree(context, exprRoot, errorRet);
             if (!ret) {
                 compileLineReturn(0);
             }
             enDestroy(exprRoot);
-            /* 生成cmd，赋值 */
-            if (isFuncScope) {
-                vlPushBack(context->commandList, opCommandCreateAssignLocal(varIndex));
+            /* 生成创建数组的cmd */
+            if (bIsFuncScope) {
+                vlPushBack(context->commandList, opCommandCreateDimArrayLocal(varIndex));
             } else {
-                vlPushBack(context->commandList, opCommandCreateAssignVar(varIndex));
+                vlPushBack(context->commandList, opCommandCreateDimArray(varIndex));
             }
-        }
-        /* 直接结束 */
-        else if (token->type == TOKEN_END) {
-            /* 什么也不做 */
         }
     }
     /* 可能是赋值 */
     else if (token->type == TOKEN_ID) {
-        char    varName[KB_TOKEN_LENGTH_MAX];
-        int     varIndex = -1;
-        int     isFuncScope = context->pCurrentFunc != NULL;
-        int     isLocalVar = 0;
+        char        varName[KB_TOKEN_LENGTH_MAX];
+        int         varIndex = -1;
+        KBoolean    bIsLocalVar = 0;
     
         StringCopy(varName, sizeof(varName), token->content);
 
         /* 尝试下一个 token */
         token = nextToken(&analyzer);
         /* 匹配 '=' */ 
-        if (token->type == TOKEN_OPR && StringEqual("=", token->content)) {
-            /* 当前在函数内，先尝试在函数内寻找 */
-            if (isFuncScope) {
-                varIndex = contextGetLocalVariableIndex(context, varName);
-                if (varIndex >= 0) {
-                    isLocalVar = 1;
-                }
-            }
-            /* 如果没找到，或者在全局，再在全局寻找 */
-            if (varIndex < 0) {
-                varIndex = contextGetVariableIndex(context, varName);
-            }
-            if (varIndex < 0) {
-                compileLineReturnWithError(KBE_UNDEFINED_IDENTIFIER, varName);
-                return 0;
-            }
-            /* 编译表达式 */
-            exprRoot = buildExpressionAbstractSyntaxTree(&analyzer);
-            ret = compileExprTree(context, exprRoot, errorRet);
-            if (!ret) {
-                compileLineReturn(0);
-            }
-            enDestroy(exprRoot);
-            /* 生成cmd，赋值 */
-            if (isLocalVar) {
-                vlPushBack(context->commandList, opCommandCreateAssignLocal(varIndex));
-            }
-            else {
-                vlPushBack(context->commandList, opCommandCreateAssignVar(varIndex));
-            }
+        if (!(token->type == TOKEN_OPR && StringEqual("=", token->content))) {
+            goto exprFallback;
         }
-        /* 其他情况，此行是表达式 */
+        /* 寻找变量 */
+        varIndex = contextFindVariabelGlobalOrLocal(context, varName, &bIsLocalVar);
+        if (varIndex < 0) {
+            compileLineReturnWithError(KBE_UNDEFINED_IDENTIFIER, varName);
+            return 0;
+        }
+        /* 编译表达式 */
+        exprRoot = buildExpressionAbstractSyntaxTree(&analyzer);
+        ret = compileExprTree(context, exprRoot, errorRet);
+        if (!ret) {
+            compileLineReturn(0);
+        }
+        enDestroy(exprRoot);
+        /* 生成cmd，赋值 */
+        if (bIsLocalVar) {
+            vlPushBack(context->commandList, opCommandCreateAssignLocal(varIndex));
+        }
         else {
-            /* 解析器回到开始位置 */
-            resetToken(&analyzer);
-            /* 编译表达式 */
-            exprRoot = buildExpressionAbstractSyntaxTree(&analyzer);
-            ret = compileExprTree(context, exprRoot, errorRet);
-            if (!ret) {
-                compileLineReturn(0);
-            }
-            enDestroy(exprRoot);
-            /* pop 未使用的值 */
-            vlPushBack(context->commandList, opCommandCreatePop());
+            vlPushBack(context->commandList, opCommandCreateAssignVar(varIndex));
+        }
+    }
+    /* 可能是数组赋值 */
+    else if (token->type == TOKEN_ARR) {
+        const char* indexExprPtr;
+        const char* exprPtr;
+        char        varName[KB_TOKEN_LENGTH_MAX];
+        int         varIndex = -1;
+        KBoolean    bIsLocalVar = 0;
+    
+        StringCopy(varName, sizeof(varName), token->content);
+
+        indexExprPtr = analyzer.eptr;
+        /* 匹配数组下标表达式 */
+        if (!checkExpr(&analyzer, errorRet)) {
+            goto exprFallback;
+        }
+        /* 匹配右中括号 */
+        token = nextToken(&analyzer);
+        if (!(token->type == TOKEN_SQR_BKT && StringEqual("]", token->content))) {
+            goto exprFallback;
+        }
+        /* 匹配 = */
+        token = nextToken(&analyzer);
+        if (!(token->type == TOKEN_OPR && StringEqual("=", token->content))) {
+            goto exprFallback;
+        }
+        exprPtr = analyzer.eptr;
+        /* 寻找变量 */
+        varIndex = contextFindVariabelGlobalOrLocal(context, varName, &bIsLocalVar);
+        if (varIndex < 0) {
+            compileLineReturnWithError(KBE_UNDEFINED_IDENTIFIER, varName);
+            return 0;
+        }
+        /* 编译下标部分 */
+        analyzer.eptr = indexExprPtr;
+        exprRoot = buildExpressionAbstractSyntaxTree(&analyzer);
+        ret = compileExprTree(context, exprRoot, errorRet);
+        if (!ret) {
+            compileLineReturn(0);
+        }
+        /* 编译赋值部分 */
+        analyzer.eptr = exprPtr;
+        exprRoot = buildExpressionAbstractSyntaxTree(&analyzer);
+        ret = compileExprTree(context, exprRoot, errorRet);
+        if (!ret) {
+            compileLineReturn(0);
+        }
+        /* 生成cmd，赋值 */
+        if (bIsLocalVar) {
+            vlPushBack(context->commandList, opCommandCreateArraySetLocal(varIndex));
+        }
+        else {
+            vlPushBack(context->commandList, opCommandCreateArraySet(varIndex));
         }
     }
     /* 其他情况，此行是表达式 */
     else {
+        exprFallback:
         /* 解析器回到开始位置 */
         resetToken(&analyzer);
         /* 编译表达式 */
