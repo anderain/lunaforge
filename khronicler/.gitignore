@@ -3,6 +3,8 @@
 *.o
 *.exe
 *.kbs
-.vscode
 *.html
 *.json
+*.xml
+.vscode
+salvia89

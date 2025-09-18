@@ -1,100 +1,79 @@
 #ifndef _KRT_H_
 #define _KRT_H_
 
-#if defined(_SH3) || defined(_SH4)
-#   ifndef _FX_9860_
-#       define _FX_9860_
-#   endif
-#endif
+#include "kommon.h"
+#include "kutils.h"
 
-#ifdef _FX_9860_
-#   include "../core/kommon.h"
-#else
-#   include "kommon.h"
-#endif
+typedef enum tagRuntimeErrorId {
+    RUNTIME_NONE,
+    RUNTIME_STACK_UNDERFLOW,
+    RUNTIME_TYPE_MISMATCH,
+    RUNTIME_UNKNOWN_OPCODE,
+    RUNTIME_UNKNOWN_OPERATOR,
+    RUNTIME_UNKNOWN_BUILT_IN_FUNC,
+    RUNTIME_UNKNOWN_USER_FUNC,
+    RUNTIME_DIVISION_BY_ZERO,
+    RUNTIME_NOT_IN_USER_FUNC,
+    RUNTIME_ARRAY_INVALID_SIZE,
+    RUNTIME_ARRAY_OUT_OF_BOUNDS,
+    RUNTIME_NOT_ARRAY
+} RuntimeErrorId;
 
-typedef enum {
-    KBRE_NO_ERROR,
-    KBRE_OPERAND_TYPE_MISMATCH,
-    KBRE_STACK_OVERFLOW,
-    KBRE_ILLEGAL_RETURN,
-    KBRE_UNKNOWN_BUILT_IN_FUNC,
-    KBRE_UNKNOWN_CMD,
-    KBRE_NOT_IN_USER_FUNC,
-    KBRE_ARRAY_INVALID_SIZE,
-    KBRE_ARRAY_OUT_OF_BOUNDS,
-    KBRE_NOT_ARRAY
-} KB_RT_ERROR_TYPE;
-
-typedef enum {
-    RVT_NIL = 0,
-    RVT_NUMBER,
-    RVT_STRING,
-    RVT_ARRAY,
-    RVT_ARRAY_REF
-} KB_RT_VALUE_TYPE;
+typedef enum tagRuntimeValueTypeId {
+    RT_VALUE_NIL = 0,
+    RT_VALUE_NUMBER,
+    RT_VALUE_STRING,
+    RT_VALUE_ARRAY,
+    RT_VALUE_ARRAY_REF
+} RuntimeValueTypeId;
 
 struct tagKbRuntimeValue;
 
 typedef struct {
-    struct tagKbRuntimeValue** el;
-    int size;
+    struct tagKbRuntimeValue** pArrPtrElements;
+    int iSize;
 } KbRuntimeArray;
 
 typedef struct tagKbRuntimeValue {
-    int type;
+    int iType;
     union {
         struct {
-            const char* ptr;
-            KBoolean    bIsRef;
-        } str;
-        KbRuntimeArray  arr;
+            union {
+                const char* pReadOnly;
+                char* pReadWrite;
+            } uContent;
+            KBool bIsRef;
+        } sString;
+        KbRuntimeArray  sArray;
         KbRuntimeArray* pArrRef;
-        KB_FLOAT        num;
-    } data;
+        KFloat fNumber;
+    } uData;
 } KbRuntimeValue;
 
-KbRuntimeValue* rtvalueCreateNumber         (const KB_FLOAT num);
-KbRuntimeValue* rtvalueCreateString         (const char* sz, KBoolean bIsRef);
-void            rtvalueDestroy              (KbRuntimeValue* val);
-void            rtvalueDestroyVoidPointer   (void* p);
-char*           rtvalueStringify            (const KbRuntimeValue* v);
-KbRuntimeValue* rtvalueDuplicate            (const KbRuntimeValue* v, KBoolean bDeepClone);
-
 typedef struct {
-    int                 prevCmdPos;
-    int                 numVar, numArg;
-    KbRuntimeValue**    variables;
+    int iPrevOpCodePos;
+    int iNumVar;
+    int iNumParams;
+    KbRuntimeValue** pArrPtrLocalVars;
 } KbCallEnv;
 
-typedef struct {
-    const KbBinaryHeader*       header;
-    Vlist*                      stack;          /* <KbRuntimeValue> */
-    const KbOpCommand *         cmdPtr;
-    const KByte*                raw;
-    KbRuntimeValue**            variables;
-    Vlist*                      callEnvStack;   /* <KbCallEnv> */
-    const KbExportedFunction*   pExportedFunc;
-} KbMachine;
+typedef struct tagKbVirtualMachine {
+    const KbBinaryHeader*       pBinHeader;
+    Vlist*                      pStackOperand;      /* <KbRuntimeValue> */
+    const OpCode *              pOpCodeCur;
+    const KByte*                pByteRaw;
+    KbRuntimeValue**            pArrPtrGlobalVars;
+    Vlist*                      pStackCallEnv;      /* <KbCallEnv> */
+    const KbBinaryFunctionInfo* pArrFuncInfo;
+    int                         iStopValue;
+} KbVirtualMachine;
 
-typedef struct {
-    int     type;
-    int     cmdOp;
-    char    message[KB_ERROR_MESSAGE_MAX];
-} KbRuntimeError;
-
-KbMachine*  machineCreate                   (const KByte * raw);
-void        machineCommandReset             (KbMachine* machine);
-int         machineGetLabelPos              (KbMachine* machine, const char* labelName);
-int         machineExec                     (KbMachine* machine, int startPos, KbRuntimeError *errorRet);
-void        machineDestroy                  (KbMachine* machine);
-int         machineVarAssignNum             (KbMachine* machine, int varIndex, KB_FLOAT num);
-void        machineMovePushValue            (KbMachine* machine, KbRuntimeValue* pRtValue);
-int         machineGetUserFuncIndex         (KbMachine* machine, const char* funcName);
-int         machineExecCallUserFuncByIndex  (KbMachine* machine, int funcIndex, KbRuntimeError *errorRet);
-#define     machinePopUserFuncRetValue(app) ((KbRuntimeValue *)vlPopBack((app)->stack))
-void        formatExecError                 (const KbRuntimeError *errorRet, char *message, int messageLength);
-
-#define KRE_MAX_ARRAY_SIZE  500
+const char*         KRuntimeValue_GetTypeNameById   (RuntimeValueTypeId iRtTypeId);
+const char*         KRuntimeValue_Stringify         (KbRuntimeValue* pRtValue, KBool *pBoolNeedDispose);
+const char*         KRuntimeError_GetNameById       (RuntimeErrorId iRuntimeErrorId);
+const char*         KRuntimeError_GetMessageById    (RuntimeErrorId iRuntimeErrorId);
+KBool               KRuntime_MachineExecute         (KbVirtualMachine* pMachine, int iStartPos, RuntimeErrorId* pIntRtErrId, const OpCode** ppStopOpCode);
+KbVirtualMachine*   KRuntime_CreateMachine          (const KByte* pSerializedRaw);
+void                KRuntime_DestroyMachine         (KbVirtualMachine* pMachine);
 
 #endif

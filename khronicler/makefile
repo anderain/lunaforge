@@ -1,77 +1,69 @@
 #====================================================
-# * 目录配置
+# * Compiler Related Configuration
 #----------------------------------------------------
-# - SALVIA_FOLDER	Salvia 库的目录
-#====================================================
-SALVIA_FOLDER	= ../artifacts/salvia89
-
-#====================================================
-# * 编译器相关配置
-#----------------------------------------------------
-# - CC			编译器
-# - C_FLAGS		编译参数
-# - LDFLAGS		链接参数
-# - CORE_OBJS	核心obj文件
-# - LIB_OBJS	依赖库obj文件
-# - MAIN_EXE	主程序
-# - TEST_EXE	测试程序
+# - CC			Compiler
+# - C_FLAGS		Compilation flags
+# - LDFLAGS		Linker flags
+# - CORE_OBJS	Core object files
+# - LIB_OBJS	Dependent library object files
+# - MAIN_EXE	Main executable
+# - TEST_EXE	Test executable
 #====================================================
 CC          = gcc
 C_FLAGS     = -c -Wall -ansi
 LD_FLAGS 	=
-CORE_OBJS   = k_utils.o kbasic.o kommon.o krt.o
-LIB_OBJS	= salvia.o
-MAIN_EXE	= khronicler.exe
-TEST_EXE    = khronicler_test.exe
+CORE_OBJS   = klexer.o kparser.o kompiler.o kutils.o kommon.o krt.c
+MAIN_EXE	= kbasic.exe
+TEST_EXE    = ktest.exe
 
 #====================================================
-# * 目标：主程序
+# * Target: Main Program
 #====================================================
-all: $(CORE_OBJS) $(LIB_OBJS) main.o
-	$(CC) $(LD_FLAGS) $(CORE_OBJS) $(LIB_OBJS) main.o -o $(MAIN_EXE)
+all: $(CORE_OBJS) main.o test_as_utils.o
+	$(CC) $(LD_FLAGS) $(CORE_OBJS) main.o test_as_utils.o -o $(MAIN_EXE)
 
 #====================================================
-# * 目标：测试程序
+# * Target: Test Program
 #====================================================
-test: $(CORE_OBJS) $(LIB_OBJS) test.o 
-	$(CC) $(LD_FLAGS) $(CORE_OBJS) $(LIB_OBJS) test.o -o $(TEST_EXE)
+test: $(CORE_OBJS) main.o test.o
+	$(CC) $(LD_FLAGS) $(CORE_OBJS) test.o -o $(TEST_EXE)
 
 #====================================================
-# * 目标：核心文件
+# * Target: Core Files
 #====================================================
-k_utils.o: k_utils.c k_utils.h kommon.h
-	$(CC) $(C_FLAGS) k_utils.c
+kutils.o: kutils.c kommon.h kutils.h kalias.h
+	$(CC) $(C_FLAGS) kutils.c
 
-kbasic.o: kbasic.c kbasic.h k_utils.h kommon.h
-	$(CC) $(C_FLAGS) kbasic.c
+kparser.o: kparser.c klexer.h kommon.h kparser.h kutils.h kalias.h
+	$(CC) $(C_FLAGS) kparser.c
+
+kompiler.o: kompiler.c kompiler.h kparser.h klexer.h kommon.h kutils.h kalias.h
+	$(CC) $(C_FLAGS) kompiler.c
 
 kommon.o: kommon.c kommon.h
 	$(CC) $(C_FLAGS) kommon.c
 
-krt.o: krt.c krt.h k_utils.h kommon.h
+klexer.o: klexer.c klexer.h kommon.h kutils.h kalias.h
+	$(CC) $(C_FLAGS) klexer.c
+
+krt.o: krt.c krt.h kommon.h kutils.h kalias.h
 	$(CC) $(C_FLAGS) krt.c
 
 #====================================================
-# * 目标：主程序入口
+# * Target: Entry of main / test Program
 #====================================================
-main.o: main.c kbasic.h k_utils.h krt.h kommon.h
+main.o: main.c kbasic.h kalias.h klexer.h kparser.h kompiler.h kommon.h kutils.h krt.h
 	$(CC) $(C_FLAGS) main.c
 
-#====================================================
-# * 目标：测试程序入口
-#====================================================
-test.o: test.c kbasic.h k_utils.h krt.h kommon.h
-	$(CC) $(C_FLAGS) test.c
+test_as_utils.o: test.c kbasic.h kalias.h klexer.h kparser.h kompiler.h kommon.h kutils.h krt.h
+	$(CC) $(C_FLAGS) test.c -o test_as_utils.o
+
+test.o: test.c kbasic.h kalias.h klexer.h kparser.h kompiler.h kommon.h kutils.h krt.h
+	$(CC) $(C_FLAGS) -DIS_TEST_PROGRAM test.c
 
 #====================================================
-# * 目标：通用库
-#====================================================
-salvia.o: $(SALVIA_FOLDER)/salvia.c $(SALVIA_FOLDER)/salvia.h
-	$(CC) $(C_FLAGS) $(SALVIA_FOLDER)/salvia.c -o salvia.o
-
-#====================================================
-# * 清理
+# * Clean
 #====================================================
 .PHONY: clean
 clean:
-	rm *.o *.kbn $(MAIN_EXE) $(TEST_EXE)
+	rm *.o *.kbn $(MAIN_EXE) $(TEST_EXE) test_report.html

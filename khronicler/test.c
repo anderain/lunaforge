@@ -1,929 +1,814 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "kbasic.h"
-#include "k_utils.h"
-#include "krt.h"
+#include "kalias.h"
 
-#define RESULT_SUCCESS      1
-#define RESULT_FAILED       0
-
-typedef struct {
-    int excepted;
-    char* name;
-    char* source;
-} SyntaxTest;
-
-SyntaxTest SyntaxTestCases[] = {
-    {
-        RESULT_SUCCESS,
-        "empty_input",
-        "# Comment Only"
-    },
-    {
-        RESULT_FAILED,
-        "function_nested_in_function",
-        "func outside()\n"
-        "func nested()"
-    },
-    {
-        RESULT_FAILED,
-        "function_nested_in_control_flow",
-        "if 1\n"
-        "func nested()"
-    },
-    {
-        RESULT_FAILED,
-        "function_missing_name",
-        "func 1"
-    },
-    {
-        RESULT_FAILED,
-        "function_name_too_long",
-        "func l234512345123456()"
-    },
-    {
-        RESULT_FAILED,
-        "function_invalid_parameters",
-        "func parameters(a,b c)"
-    },
-    {
-        RESULT_FAILED,
-        "function_duplicated_parameters",
-        "func parameters(a,b,a)"
-    },
-    {
-        RESULT_FAILED,
-        "function_too_many_parameters",
-        "func too_many(v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w)"
-    },
-    {
-        RESULT_FAILED,
-        "if_missing_expression",
-        "if "
-    },
-    {
-        RESULT_FAILED,
-        "if_redundant_statement",
-        "if 1 + 1 2"
-    },
-    {
-        RESULT_FAILED,
-        "if_goto_missing_label",
-        "if 1 > 1 goto"
-    },
-    {
-        RESULT_FAILED,
-        "elseif_missing_expression",
-        "if 0\n"
-        "elseif"
-    },
-    {
-        RESULT_FAILED,
-        "elseif_redundant_statement",
-        "if 0\n"
-        "elseif 0 goto"
-    },
-    {
-        RESULT_FAILED,
-        "elseif_not_after_if",
-        "elseif 1 > 1"
-    },
-    {
-        RESULT_FAILED,
-        "else_redundant_statement",
-        "else 1"
-    },
-    {
-        RESULT_FAILED,
-        "else_not_after_if",
-        "else"
-    },
-    {
-        RESULT_FAILED,
-        "while_missing_expression",
-        "while"
-    },
-    {
-        RESULT_FAILED,
-        "while_redundant",
-        "while 1 > 1 2"
-    },
-    {
-        RESULT_FAILED,
-        "break_redundant",
-        "break 1"
-    },
-    {
-        RESULT_FAILED,
-        "break_not_in_loop",
-        "break"
-    },
-    {
-        RESULT_FAILED,
-        "end_invalid_context",
-        "end goto"
-    },
-    {
-        RESULT_FAILED,
-        "endif_not_after_if",
-        "while 1\n"
-        "end if"
-    },
-    {
-        RESULT_FAILED,
-        "endwhile_not_after_while",
-        "if 0 > 1\n"
-        "end while"
-    },
-    {
-        RESULT_FAILED,
-        "exit_non_empty",
-        "exit 12"
-    },
-    {
-        RESULT_FAILED,
-        "return_missing_expression",
-        "return"
-    },
-    {
-        RESULT_FAILED,
-        "return_redundant",
-        "return 1 123"
-    },
-    {
-        RESULT_FAILED,
-        "goto_missing_label",
-        "goto"
-    },
-    {
-        RESULT_FAILED,
-        "goto_redundant",
-        "goto labelName 123"
-    },
-    {
-        RESULT_FAILED,
-        "label_missing_name",
-        ":123"
-    },
-    {
-        RESULT_FAILED,
-        "label_redundant",
-        ":labelName 123"
-    },
-    {
-        RESULT_FAILED,
-        "label_name_too_long",
-        ":l234567890123456"
-    },
-    {
-        RESULT_FAILED,
-        "dim_missing_variable",
-        "dim 2"
-    },
-    {
-        RESULT_FAILED,
-        "dim_missing_expression",
-        "dim a ="
-    },
-    {
-        RESULT_FAILED,
-        "dim_redundant_case1",
-        "dim a = 1 2"
-    },
-    {
-        RESULT_FAILED,
-        "dim_redundant_case2",
-        "dim a 2"
-    },
-    {
-        RESULT_FAILED,
-        "assignment_missing_expression",
-        "a = "
-    },
-    {
-        RESULT_FAILED,
-        "assignment_redundant",
-        "a = 1 2"
-    },
-    {
-        RESULT_FAILED,
-        "expression_invalid_case1",
-        "1 2"
-    },
-    {
-        RESULT_FAILED,
-        "expression_invalid_case2",
-        "a >"
-    },
-    {
-        RESULT_FAILED,
-        "expression_invalid_case3",
-        "= b"
-    },
-    {
-        RESULT_SUCCESS,
-        "expression_plain",
-        "a > b"
-    },
-    {
-        RESULT_SUCCESS,
-        "all_correct",
-        "dim a = 1\n"
-        "while a < 100\n"
-        "  if a < 10\n"
-        "    p(\"loop \" + a)\n"
-        "  else\n"
-        "    break\n"
-        "  end if\n"
-        "  a = a + 1\n"
-        "end while\n"
-        "p(\"loop exit\")"
+static void printStringEscaped(FILE* fp, const unsigned char* szToPrint) {
+    int i, ch;
+    fprintf(fp, "\"");
+    for (i = 0; (ch = szToPrint[i]) != 0; ++i) {
+        switch (ch) {
+            case '\\':  fprintf(fp, "\\");      break;
+            case '\n':  fprintf(fp, "\\n");     break;
+            case '\r':  fprintf(fp, "\\r");     break;
+            case '\t':  fprintf(fp, "\\t");     break;
+            case '"':   fprintf(fp, "\\\"");    break;
+            default:
+                if (ch >= ' ' && ch <= '~')
+                    fprintf(fp, "%c", ch);
+                else
+                    fprintf(fp, "\\x%02x", ch);
+        }
     }
-};
-
-#define SYNTAX_TEST_NUM (sizeof(SyntaxTestCases) / sizeof(SyntaxTestCases[0]))
-
-typedef struct {
-    int isPassed;
-    char errMsg[200];
-} SyntaxTestResult;
-
-SyntaxTestResult syntaxTestResults[SYNTAX_TEST_NUM];
-
-int numSyntaxTestPassed = 0;
-
-int TestAllSyntaxError() {
-    KbBuildError    errorRet = { KBE_NO_ERROR, 0, { '\0' }};
-    KbContext*      context;
-    int             ret;
-    char            *textBuf;
-    char            *textPtr;
-    int             lineCount;
-    char            errBuf[100];
-    int             i;
-    int             numPassCount = 0;
-
-    for (i = 0; i < SYNTAX_TEST_NUM; i++) {
-        int                 isSyntaxCheckSuccess = 0;
-        SyntaxTest*         pCase = SyntaxTestCases + i;
-        SyntaxTestResult*   pCaseResult = syntaxTestResults + i;
-
-        textBuf = pCase->source;
-        errorRet.errorType = KBE_NO_ERROR;
-        StringCopy(pCaseResult->errMsg, sizeof(pCaseResult->errMsg), "");
-        pCaseResult->isPassed = 0;
-    
-        context = kbCompileStart();
-        contextCtrlResetCounter(context);
-
-        for (textPtr = textBuf, lineCount = 1; *textPtr; lineCount++) {
-            char line[1000];
-            textPtr += getLineTrimRemarks(textPtr, line);
-            ret = kbScanLineSyntax(line, context, &errorRet);
-            if (!ret) {
-                goto compileEnd;
-            }
-        }
-    
-        if (context->pCurrentFunc != NULL) {
-            errorRet.errorPos = 0;
-            errorRet.errorType = KBE_INCOMPLETE_FUNC;
-            errorRet.message[0] = '\0';
-            isSyntaxCheckSuccess = 0;
-            goto compileEnd;
-        }
-    
-        if (context->ctrlFlow.stack->size > 0) {
-            errorRet.errorPos = 0;
-            errorRet.errorType = KBE_INCOMPLETE_CTRL_FLOW;
-            errorRet.message[0] = '\0';
-            isSyntaxCheckSuccess = 0;
-            goto compileEnd;
-        }
-        isSyntaxCheckSuccess = 1;
-    
-compileEnd:
-        if (pCase->excepted == isSyntaxCheckSuccess) {
-            pCaseResult->isPassed = 1;
-            numPassCount++;
-        }
-
-        kbFormatBuildError(&errorRet, errBuf, sizeof(errBuf));
-        StringCopy(pCaseResult->errMsg, sizeof(pCaseResult->errMsg), errBuf);
-        contextDestroy(context);
-    }
-
-    return numPassCount;
+    fprintf(fp, "\"");
 }
 
-typedef struct {
-    int         exceptedType;
-    KB_FLOAT    exceptedNum;
-    char*       exceptedStr;
-    char*       name;
-    char*       source;
-} RuntimeValueTest;
+void dumpKbasicBinary(const char* szOutputFile, const KByte* pRawSerialized) {
+    FILE*               fp          = NULL;
+    const BinHeader*    pHeader     = (const BinHeader *)pRawSerialized;
+    const BinFuncInfo*  pFuncInfo   = (const BinFuncInfo *)(pRawSerialized + pHeader->dwFuncBlockStart);
+    const OpCode*       pOpCodes    = (const OpCode *)(pRawSerialized + pHeader->dwOpCodeBlockStart);
+    const char*         pStrPool    = (const char *)(pRawSerialized + pHeader->dwStringPoolStart);
+    int                 i, s;
+    char                szNumBuf[K_NUMERIC_STRINGIFY_BUF_MAX];
 
-RuntimeValueTest RuntimeValueTestCases[] = {
-    {
-        RVT_NUMBER, 1, NULL,
-        "relative equality",
-        "dim result = floatRelEqual()\n"
-        "func floatRelEqual()\n"
-        "    dim a = 1.0000001\n"
-        "    dim b = 1.0000002\n"
-        "    return a ~= b\n"
-        "end func"
-    },
-    {
-        RVT_NUMBER, 120, NULL,
-        "factorial",
-        "dim result = factorial(5)\n"
-        "func factorial(n)\n"
-        "    if n = 0\n"
-        "        return 1\n"
-        "    else\n"
-        "        return n * factorial(n-1)\n"
-        "    end if\n"
-        "end func"
-    },
-    {
-        RVT_NUMBER, 8, NULL,
-        "fibonacci",
-        "dim result = fib(6)\n"
-        "func fib(n)\n"
-        "    if n <= 0\n"
-        "        return 0\n"
-        "    elseif n = 1\n"
-        "        return 1\n"
-        "    else\n"
-        "        return fib(n - 1) + fib(n - 2)\n"
-        "    end if\n"
-        "end func"
-    },
-    {
-        RVT_NUMBER, 1, NULL,
-        "random range test",
-        "dim result = chkRandRange()\n"
-        "func chkRandRange()\n"
-        "    dim i = 0\n"
-        "    dim sc = 0\n"
-        "    dim r = 0\n"
-        "    while i < 100\n"
-        "        r = rand()\n"
-        "        if r > 0 && r < 1\n"
-        "            sc = sc + 1\n"
-        "        end if\n"
-        "        i = i + 1\n"
-        "    end while\n"
-        "    return sc = 100\n"
-        "end func"
-    },
-    {
-        RVT_NUMBER, 1, NULL,
-        "mutual prime test",
-        "dim result = gcd(28463, 79867)\n"
-        "func gcd(a, b)\n"
-        "    dim temp = 0\n"
-        "    while b <> 0\n"
-        "        temp = b\n"
-        "        b = a % b\n"
-        "        a = temp\n"
-        "    end while\n"
-        "    return a\n"
-        "end func"
-    },
-    {
-        RVT_NUMBER, 1024, NULL,
-        "fast power algorithm",
-        "dim result = fastPow(2,10)\n"
-        "func fastPow(x, n)\n"
-        "    dim half\n"
-        "    if n = 0\n"
-        "        return 1\n"
-        "    elseif n % 2 = 0\n"
-        "        half = fastPow(x, n / 2)\n"
-        "        return half * half\n"
-        "    else\n"
-        "        return x * fastPow(x, n - 1)\n"
-        "    end if\n"
-        "end func"
-    },
-    {
-        RVT_STRING, 0, "A->C;A->B;C->B;A->C;B->A;B->C;A->C;",
-        "hanoi",
-        "dim actions = hanoi(3, \"A\", \"C\", \"B\")\n"
-        "func hanoi(n, s, t, a)\n"
-        "    if n > 0\n"
-        "        dim move = s & \"->\" & t & \";\"\n"
-        "        return hanoi(n - 1, s, a, t) & move & hanoi(n - 1, a, t, s)\n"
-        "    end if\n"
-        "    return \"\"\n"
-        "end func"
-    },
-    {
-        RVT_NUMBER, 1, NULL,
-        "string functions",
-        "dim checkResult = checkLen() && checkVal() && checkAsc()\n"
-        "# String length\n"
-        "func checkLen()\n"
-        "    return len(\"hello world\") ~= 11\n"
-        "end func\n"
-        "# String to numeric\n"
-        "func checkVal()\n"
-        "    return val(\"123.456\") ~= 123.456\n"
-        "end func\n"
-        "# Character to ASCII code\n"
-        "func checkAsc()\n"
-        "    return asc(\"ASCII\") ~= 65\n"
-        "end func\n"
-    }
-};
-#define RUNTIME_VALUE_TEST_NUM (sizeof(RuntimeValueTestCases) / sizeof(RuntimeValueTestCases[0]))
-
-typedef struct {
-    int isPassed;
-    char errMsg[200];
-    char szExcepted[200];
-    char szActualGot[200];
-} RuntimeTestResult;
-
-RuntimeTestResult RuntimeTestResults[RUNTIME_VALUE_TEST_NUM];
-
-int numRuntimeTestPassed = 0;
-
-KbRuntimeValue* runBinaryAndDumpFirstVar(const KByte* pRaw, char* errMsg, int errMsgLength) {
-    KbRuntimeError  errorRet;
-    int             ret;
-    KbMachine*      app;
-    KbRuntimeValue* rtValueRet;
-
-    app = machineCreate(pRaw);
-
-    if (!app) {
-        return NULL;
+    if (szOutputFile == NULL) {
+        fp = stdout;
     }
 
-    ret = machineExec(app, 0, &errorRet);
-    if (!ret) {
-        formatExecError(&errorRet, errMsg, errMsgLength);
-        machineDestroy(app);
-        return NULL;
+    fprintf(fp, "--------------- Header ---------------\n");
+    fprintf(fp, "Header Magic        = 0x%x\n", pHeader->uHeaderMagic.dwVal);
+    fprintf(fp, "Little Endian       = %s\n", pHeader->dwIsLittleEndian ? "Yes" : "No");
+    fprintf(fp, "Extension Id        = %s\n", pHeader->szExtensionId);
+    fprintf(fp, "Num Variables       = %d\n", pHeader->dwNumVariables);
+    fprintf(fp, "Func Block Start    = %d\n", pHeader->dwFuncBlockStart);
+    fprintf(fp, "Num Func            = %d\n", pHeader->dwNumFunc);
+    fprintf(fp, "OpCode Block Start  = %d\n", pHeader->dwOpCodeBlockStart);
+    fprintf(fp, "Num OpCode          = %d\n", pHeader->dwNumOpCode);
+    fprintf(fp, "String Pool Start   = %d\n", pHeader->dwStringPoolStart);
+    fprintf(fp, "String Pool Length  = %d\n", pHeader->dwStringPoolLength);
+    fprintf(fp, "String Aligned Size = %d\n", pHeader->dwStringAlignedSize);
+
+    fprintf(fp, "-------------- Function --------------\n");
+    for (i = 0; i < pHeader->dwNumFunc; ++i) {
+        const BinFuncInfo* pFunc = pFuncInfo + i;
+        fprintf(fp, "%3d | %-18s | Param=%2d | Var=%2d | Start=%3d\n", i, pFunc->szName, pFunc->dwNumParams, pFunc->dwNumVars, pFunc->dwOpCodePos);
     }
-
-    rtValueRet = rtvalueDuplicate(app->variables[0], KB_TRUE);
-
-    machineDestroy(app);
-    return rtValueRet;
-}
-
-int TestRuntimeValue() {
-    KbBuildError    errorRet;
-    KbContext*      context;
-    int             ret;
-    char            *textBuf;
-    char            *textPtr;
-    int             isSuccess = 1;
-    int             lineCount = 1;
-    int             resultByteLength;
-    KByte*          pSerializedRaw;
-    int             i;
-    int             numPassCount = 0;
-
-
-    for (i = 0; i < RUNTIME_VALUE_TEST_NUM; i++) {
-        int isCasePassed = 0;
-        char* szExcepted = NULL;
-        char* szActualGot = NULL;
-        char  errBuf[200] = "";
     
-        RuntimeValueTest*   pCase = RuntimeValueTestCases + i;
-        RuntimeTestResult*  pCaseResult = RuntimeTestResults + i;
-
-        KbRuntimeValue tempExpectValue;
-        tempExpectValue.type = pCase->exceptedType;
-        if (tempExpectValue.type == RVT_STRING) {
-            tempExpectValue.data.str.ptr = pCase->exceptedStr;
-            tempExpectValue.data.str.bIsRef = KB_TRUE;
-        }
-        else if (tempExpectValue.type == RVT_NUMBER) {
-            tempExpectValue.data.num = pCase->exceptedNum;
-        }
-        szExcepted = rtvalueStringify(&tempExpectValue);
-
-        StringCopy(pCaseResult->errMsg, sizeof(pCaseResult->errMsg), "");
-        StringCopy(pCaseResult->szActualGot, sizeof(pCaseResult->szActualGot), "N/A");
-
-        textBuf = pCase->source;
-        context = kbCompileStart();
-        contextCtrlResetCounter(context);
-
-        isSuccess = 1; 
-        for (textPtr = textBuf, lineCount = 1; *textPtr; lineCount++) {
-            char line[1000];
-            textPtr += getLineTrimRemarks(textPtr, line);
-            ret = kbScanLineSyntax(line, context, &errorRet);
-            if (!ret) {
-                isSuccess = 0;
-                goto compileEnd;
-            }
-        }
-        --lineCount;
-        if (context->pCurrentFunc != NULL) {
-            errorRet.errorPos = 0;
-            errorRet.errorType = KBE_INCOMPLETE_FUNC;
-            errorRet.message[0] = '\0';
-            isSuccess = 0;
-            goto compileEnd;
-        }
-        if (context->ctrlFlow.stack->size > 0) {
-            errorRet.errorPos = 0;
-            errorRet.errorType = KBE_INCOMPLETE_CTRL_FLOW;
-            errorRet.message[0] = '\0';
-            isSuccess = 0;
-            goto compileEnd;
-        }
-        contextCtrlResetCounter(context);
-        for (textPtr = textBuf, lineCount = 1; *textPtr; lineCount++) {
-            char line[1000];
-            textPtr += getLineTrimRemarks(textPtr, line);
-            ret = kbCompileLine(line, context, &errorRet);
-            if (!ret) {
-                isSuccess = 0;
-                goto compileEnd;
-            }
-        }
-        kbCompileEnd(context);
-
-compileEnd:
-    
-        if (!isSuccess) {
-            kbFormatBuildError(&errorRet, errBuf, sizeof(errBuf));
-            contextDestroy(context);
-        }
-        else {
-            KbRuntimeValue* rtActualGot = NULL;
-            
-            ret = kbSerialize(context, &pSerializedRaw, &resultByteLength);
-            contextDestroy(context);
-            if (ret) {
-                rtActualGot = runBinaryAndDumpFirstVar(pSerializedRaw, errBuf, sizeof(errBuf));
-                free(pSerializedRaw);
-            }
-
-            if (rtActualGot) {
-
-                szActualGot = rtvalueStringify(rtActualGot);
-                if (pCase->exceptedType != rtActualGot->type) {
-                    isCasePassed = 0;
-                }
-                else {
-                    switch (pCase->exceptedType) {
-                    case RVT_NUMBER: {
-                        isCasePassed = kFloatEqualRel(pCase->exceptedNum, rtActualGot->data.num);
-                        break;
-                    }
-                    case RVT_STRING:
-                        isCasePassed = StringEqual(pCase->exceptedStr, rtActualGot->data.str.ptr);
-                        break;
-                    default:
-                        isCasePassed = 0;
-                        break;
-                    }
-                }
-                rtvalueDestroy(rtActualGot);
-                if (isCasePassed) {
-                    numPassCount++;
-                }
-            }
-        }
-
-        StringCopy(pCaseResult->errMsg, sizeof(pCaseResult->errMsg), errBuf);
-        StringCopy(pCaseResult->szActualGot, sizeof(pCaseResult->szActualGot), szActualGot ? szActualGot : "N/A");
-        StringCopy(pCaseResult->szExcepted, sizeof(pCaseResult->szExcepted), szExcepted ? szExcepted : "N/A");
-        pCaseResult->isPassed = isCasePassed;
-    
-        if (szExcepted) free(szExcepted);
-        if (szActualGot) free(szActualGot);
-    }
-    return numPassCount;
-}
-
-void printStringInJson(FILE* fp, const char *str) {
-    int i;
-    for (i = 0; str[i]; ++i) {
-        char c = str[i];
-        if (c == '\n') {
-            fprintf(fp, "\\n");
-        }
-        else if (c == '"') {
-            fprintf(fp, "\\\"");
-        }
-        else if (c == '\t') {
-            fprintf(fp, "\t");
-        }
-        else if (c == '\r') {
-            fprintf(fp, "\r");
-        }
-        else {
-            fprintf(fp, "%c", c);
-        }
-    }
-}
-
-void printAsJson(FILE* fp) {
-    int i;
-
-    fprintf(fp, "{\n");
-    fprintf(fp, "  \"syntax_test\": [\n");
-
-    for (i = 0; i < SYNTAX_TEST_NUM; i++) {
-        SyntaxTest*         pCase = SyntaxTestCases + i;
-        SyntaxTestResult*   pCaseResult = syntaxTestResults + i;
-
-        fprintf(fp, "    {\n");
-        fprintf(fp, "      \"id\": \"SYN-%03d\",\n", i + 1);
-        fprintf(fp, "      \"name\": \"", i + 1); printStringInJson(fp, pCase->name); fprintf(fp, "\",\n");
-        fprintf(fp, "      \"src\": \"", i + 1); printStringInJson(fp, pCase->source); fprintf(fp, "\",\n");
-        fprintf(fp, "      \"expect_success\": %s,\n", pCase->excepted ? "true" : "false");
-        fprintf(fp, "      \"err_msg\": \"", i + 1); printStringInJson(fp, pCaseResult->errMsg); fprintf(fp, "\",\n");
-        fprintf(fp, "      \"passed\": %s\n", pCaseResult->isPassed ? "true" : "false");
-        fprintf(fp, "    }");
-        if (i >= SYNTAX_TEST_NUM - 1) {
-            fprintf(fp, "\n");
-        }
-        else {
-            fprintf(fp, ",\n");
-        }
-    }
-    fprintf(fp, "  ],\n");
-    fprintf(fp, "  \"runtime_test\": [\n");
-    for (i = 0; i < RUNTIME_VALUE_TEST_NUM; i++) {
-        RuntimeValueTest*   pCase = RuntimeValueTestCases + i;
-        RuntimeTestResult*  pCaseResult = RuntimeTestResults + i;
-    
-        fprintf(fp, "    {\n");
-        fprintf(fp, "      \"id\": \"RT-%03d\",\n", i + 1);
-        fprintf(fp, "      \"name\": \"", i + 1); printStringInJson(fp, pCase->name); fprintf(fp, "\",\n");
-        fprintf(fp, "      \"src\": \"", i + 1); printStringInJson(fp, pCase->source); fprintf(fp, "\",\n");
-        fprintf(fp, "      \"expected\": \"", i + 1); printStringInJson(fp, pCaseResult->szExcepted); fprintf(fp, "\",\n");
-        fprintf(fp, "      \"actual_got\": \"", i + 1); printStringInJson(fp, pCaseResult->szActualGot); fprintf(fp, "\",\n");
-        fprintf(fp, "      \"err_msg\": \"", i + 1); printStringInJson(fp, pCaseResult->errMsg); fprintf(fp, "\",\n");
-        fprintf(fp, "      \"passed\": %s\n", pCaseResult->isPassed ? "true" : "false");
-        fprintf(fp, "    }");
-        if (i >= RUNTIME_VALUE_TEST_NUM - 1) {
-            fprintf(fp, "\n");
-        }
-        else {
-            fprintf(fp, ",\n");
-        }
-    }
-    fprintf(fp, "  ]\n");
-    fprintf(fp, "}\n");
-}
-
-void printHighlightToken(FILE* fp, Token* token, const char* szStart, int len) {
-    int i;
-    const char* htmlClassName = NULL;
-
-    switch (token->type)
-    {
-    case TOKEN_NUM:
-        htmlClassName = "tk-num";
-        break;
-    case TOKEN_ID:
-        htmlClassName = "tk-id";
-        break;
-    case TOKEN_OPR:
-        htmlClassName = "tk-opr";
-        break;
-    case TOKEN_FNC:
-        htmlClassName = "tk-fnc";
-        break;
-    case TOKEN_BKT:
-        htmlClassName = "tk-bkt";
-        break;
-    case TOKEN_CMA:
-        htmlClassName = "tk-cma";
-        break;
-    case TOKEN_STR:
-        htmlClassName = "tk-str";
-        break;
-    case TOKEN_LABEL:
-        htmlClassName = "tk-lbl";
-        break;
-    case TOKEN_KEY:
-        htmlClassName = "tk-key";
-        break;
-    default:
-        break;
-    }
-    fprintf(fp, "<span class=\"%s\">", htmlClassName);
-    for (i = 0; i < len; ++i) {
-        fputc(szStart[i], fp);
-    }
-    fprintf(fp, "</span>");
-}
-
-void printScriptWithHighlightHtml(FILE* fp, const char* script) {
-    const char* textPtr;
-    int         lineCount = 0;
-    char        line[1000];
-    char*       pRemark;
-    char        szRemark[200];
-    Analyzer    analyzer;
-
-    fprintf(fp, "<pre class=\"kbcode\">\n");
-    for (textPtr = script, lineCount = 1; *textPtr; lineCount++) {
-        char* linePtr;
-        /* 读取一行 */
-        textPtr += getLineOnly(textPtr, line);
-        linePtr = line;
-        /* 先打印空白内容 */
-        while (*linePtr && isSpace(*linePtr)) {
-            fprintf(fp, "%c", *linePtr);
-            ++linePtr;
-        }
-        /* 寻找注释 */
-        pRemark = strchr(linePtr, '#');
-        if (pRemark) {
-            strcpy(szRemark, pRemark);
-            *pRemark = '\0';
-        }
-        /* 获取其他token */
-        analyzer.expr = linePtr;
-        resetToken(&analyzer);
-        while (1) {
-            int i, spaceStartPos = analyzer.eptr - analyzer.expr;
-            Token* token = nextToken(&analyzer);
-            /* 打印token跳过的空白*/
-            for (i = spaceStartPos; i < token->sourceStartPos; ++i) {
-                fprintf(fp, "%c", linePtr[i]);
-            }
-            /* 停止 */
-            if (!token || token->type == TOKEN_END) {
+    fprintf(fp, "--------------- OpCode ---------------\n");
+    for (i = 0; i < pHeader->dwNumOpCode; ++i) {
+        const OpCode* pOpCode = pOpCodes + i;
+        fprintf(fp, "%03d | %-18s | ", i, getOpCodeName(pOpCode->dwOpCodeId));
+        switch (pOpCode->dwOpCodeId) {
+            case K_OPCODE_PUSH_NUM:
+                Ftoa(pOpCode->uParam.fLiteral, szNumBuf, K_DEFAULT_FTOA_PRECISION);
+                fprintf(fp, "%s", szNumBuf);
                 break;
-            }
-            printHighlightToken(fp, token, linePtr + token->sourceStartPos, token->sourceLength);
+            case K_OPCODE_PUSH_STR:
+                printStringEscaped(fp, (const unsigned char *)(pStrPool + pOpCode->uParam.dwStringPoolPos));
+                break;
+            case K_OPCODE_BINARY_OPERATOR:
+            case K_OPCODE_UNARY_OPERATOR:
+                fprintf(fp, "%s", getOperatorNameById(pOpCode->uParam.dwOperatorId));
+                break;
+            case K_OPCODE_POP:
+                break;
+            case K_OPCODE_PUSH_VAR:
+            case K_OPCODE_SET_VAR:
+            case K_OPCODE_SET_VAR_AS_ARRAY:
+            case K_OPCODE_ARR_GET:
+            case K_OPCODE_ARR_SET:
+                fprintf(fp, "<%s> %d", pOpCode->uParam.sVarAccess.wIsLocal ? "LOCAL" : "GLOBAL", pOpCode->uParam.sVarAccess.wVarIndex);
+                break;
+            case K_OPCODE_CALL_BUILT_IN:
+                fprintf(fp, "%d", pOpCode->uParam.dwBuiltFuncId);
+                break;
+            case K_OPCODE_GOTO:
+            case K_OPCODE_IF_GOTO:
+            case K_OPCODE_UNLESS_GOTO:
+                fprintf(fp, "%d", pOpCode->uParam.dwOpCodePos);
+                break;
+            case K_OPCODE_CALL_FUNC:
+                fprintf(fp, "%d", pOpCode->uParam.dwFuncIndex);
+                break;
         }
-        /* 打印注释 */
-        if (pRemark) {
-            fprintf(fp, "<span class=\"tk-remark\">%s</span>", szRemark);
-        }
-        /* 本行结束 */
         fprintf(fp, "\n");
     }
-    fprintf(fp, "</pre>\n");
+
+    fprintf(fp, "------------ String Pool -------------\n");
+    for (i = 0, s = 0; s < pHeader->dwStringPoolLength; ++i, s += strlen(pStrPool + s) + 1) {
+        fprintf(fp, "%3d | ", i);
+        printStringEscaped(fp, (const unsigned char *)(pStrPool + s));
+        fprintf(fp, "\n");
+    }
 }
 
-void printAsHtml(FILE* fp) {
+static void printTab(FILE* fp, int iTabLevel) {
     int i;
-
-    fputs(
-        "<!DOCTYPE html>"
-        "<html lang=\"en-US\">"
-        "<head>"
-        "<meta charset=\"UTF-8\">"
-        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
-        "<title> KBasic Test Report </title>"
-        "</head>"
-        "<body>"
-        "<div class=\"report-container\">",
-        fp
-    );
-
-    fputs("<h1>KBasic Khronicler</h1>", fp);
-    fprintf(fp, "<p>Comipler / KRT Version %s</p>\n", KBASIC_VERSION);
-
-    fputs("<h2>Overall Test Summary</h2>\n", fp);
-    fputs("<table>\n", fp);
-    fputs(
-        "<tr>"
-        "<th>Test Category</th>"
-        "<th>Total Cases</th>"
-        "<th>Passed</th>"
-        "<th>Failed</th>"
-        "<th>Pass Rate</th>"
-        "</tr>",
-        fp
-    );
-    fprintf(fp, "<tr>");
-    fprintf(fp, "<td> Syntax Tests </td>");
-    fprintf(fp, "<td class=\"numeric\"> %d </td>", SYNTAX_TEST_NUM);
-    fprintf(fp, "<td class=\"numeric\"> %d </td>", numSyntaxTestPassed);
-    fprintf(fp, "<td class=\"numeric\"> %d </td>", SYNTAX_TEST_NUM - numSyntaxTestPassed);
-    fprintf(fp, "<td class=\"numeric\"> %d%% </td>", numSyntaxTestPassed * 100 / SYNTAX_TEST_NUM);
-    fprintf(fp, "</tr>");
-    fprintf(fp, "<tr>");
-    fprintf(fp, "<td> Runtime Tests </td>");
-    fprintf(fp, "<td class=\"numeric\"> %d </td>", RUNTIME_VALUE_TEST_NUM);
-    fprintf(fp, "<td class=\"numeric\"> %d </td>", numRuntimeTestPassed);
-    fprintf(fp, "<td class=\"numeric\"> %d </td>", RUNTIME_VALUE_TEST_NUM - numRuntimeTestPassed);
-    fprintf(fp, "<td class=\"numeric\"> %d%% </td>", numRuntimeTestPassed * 100 / RUNTIME_VALUE_TEST_NUM);
-    fprintf(fp, "</tr>");
-    fputs("</table>\n", fp);
-
-    fputs("<h2>Syntax Tests</h2>\n", fp);
-    fputs("<table>\n", fp);
-    fputs(
-        "<tr>"
-        "<th class=\"case-id\">Case ID</th>"
-        "<th class=\"case-name\">Case Name</th>"
-        "<th class=\"source-code\">Source Code</th>"
-        "<th class=\"text-expected\">Expected</th>"
-        "<th class=\"err-msg\">Error Message</th>"
-        "<th class=\"test-result\">Result</th>"
-        "</tr>",
-        fp
-    );
-    for (i = 0; i < SYNTAX_TEST_NUM; i++) {
-        SyntaxTest*         pCase = SyntaxTestCases + i;
-        SyntaxTestResult*   pCaseResult = syntaxTestResults + i;
-
-        fputs("<tr>", fp);
-        fprintf(fp, "<td class=\"case-id\"> SYN-%03d </td>", i + 1);
-        fprintf(fp, "<td class=\"case-name\"> %s </td>", pCase->name);
-        fprintf(fp, "<td class=\"source-code\">");
-        printScriptWithHighlightHtml(fp, pCase->source);
-        fprintf(fp, "</td>");
-        fprintf(fp, "<td class=\"text-expected\"> %s </td>", pCase->excepted ? "Success" : "Fail");
-        fprintf(fp, "<td class=\"err-msg\"> %s </td>", pCaseResult->errMsg);
-        fprintf(fp, "<td class=\"test-result\"><span class=\"%s\"> %s </span></td>", pCaseResult->isPassed ? "test-status success" : "test-status failed", pCaseResult->isPassed ? "PASSED" : "NOT PASSED");
-        fputs("</tr>", fp);
+    for (i = 0 ; i < iTabLevel * 2; ++i) {
+        fputc(' ', fp);
     }
-    fputs("<table>\n", fp);
-
-    fputs("<h2>Runtime Value Tests</h2>\n", fp);
-    fputs(
-        "<tr>"
-        "<th class=\"case-id\">Case ID</th>"
-        "<th class=\"case-name\">Case Name</th>"
-        "<th class=\"source-code\">Source Code</th>"
-        "<th class=\"text-expected\">Expected Output</th>"
-        "<th class=\"text-got\">Actual Output</th>"
-        "<th class=\"err-msg\">Error Message</th>"
-        "<th class=\"test-result\">Result</th>"
-        "</tr>",
-        fp
-    );
-    for (i = 0; i < RUNTIME_VALUE_TEST_NUM; i++) {
-        RuntimeValueTest*   pCase = RuntimeValueTestCases + i;
-        RuntimeTestResult*  pCaseResult = RuntimeTestResults + i;
-
-        fputs("<tr>", fp);
-        fprintf(fp, "<td class=\"case-id\"> RT-%03d </td>", i + 1);
-        fprintf(fp, "<td class=\"case-name\"> %s </td>", pCase->name);
-        fprintf(fp, "<td class=\"source-code\">");
-        printScriptWithHighlightHtml(fp, pCase->source);
-        fprintf(fp, "</td>");
-        fprintf(fp, "<td class=\"text-expected\"> %s </td>", pCaseResult->szExcepted);
-        fprintf(fp, "<td class=\"text-got\"> %s </td>", pCaseResult->szActualGot);
-        fprintf(fp, "<td class=\"err-msg\"> %s </td>", pCaseResult->errMsg);
-        fprintf(fp, "<td class=\"test-result\"><span class=\"%s\"> %s </span></td>", pCaseResult->isPassed ? "test-status success" : "test-status failed", pCaseResult->isPassed ? "PASSED" : "NOT PASSED");
-        fputs("</tr>", fp);
-    }
-
-    fputs(
-        "</div>"
-        "</body>\n"
-        "<style>"
-        "td.case-id{color:#999;font-weight:bold}"
-        "body,html{color: #333;padding:0;margin:0;overflow-x:hidden;font-family:Arial,Helvetica,sans-serif}"
-        ".report-container{width:100%;max-width:1200px;margin:0 auto;padding:10px}"
-        "table{table-layout:auto;width:100%;font-size:12px;border-collapse:collapse}"
-        "h1,h2,h3,h4,h5,h6{color:#14509a}"
-        "h1{padding-bottom:4px;border-bottom:2px solid #5d93d5}"
-        "tr{border-bottom:1px solid #ddd}"
-        "td{padding:4px 4px}"
-        "th{color:#fff;background:linear-gradient(#14509a,#5d93d5);padding:8px 4px;background: -ms-linear-gradient(top,#14509a 0%,#5d93d5 100%)}"
-        "pre{text-align:left;margin: 0;font-family:\"Consolas\",\"Monaco\",\"Lucida Console\",\"Courier New\",monospace;font-size:12px;line-height:1.25;tab-size:4}"
-        "pre.kbcode{color:#1E1E1E;background-color:#fff;white-space:pre-wrap;word-wrap:break-word;}"
-        ".kbcode .tk-num{color:#098658}"
-        ".kbcode .tk-id{color:#495057}"
-        ".kbcode .tk-opr{color:#9D7E14}"
-        ".kbcode .tk-fnc{color:#1E1E1E}"
-        ".kbcode .tk-bkt{color:#1E1E1E}"
-        ".kbcode .tk-cma{color:#1E1E1E}"
-        ".kbcode .tk-str{color:#A31515}"
-        ".kbcode .tk-lbl{color:#AF00DB}"
-        ".kbcode .tk-key{color:#0000FF}"
-        ".kbcode .tk-remark{color:#008000}"
-        "th.case-id{width:100px}"
-        "td.case-id{text-align:center}"
-        "td.text-expected,td.text-got{text-align:center;max-width:100px}"
-        "td.numeric{text-align:right}"
-        ".test-status{font-weight:700;white-space:nowrap;padding:2px 8px;border-radius:4px;color:#fff;display:block;margin:0 auto;width:fit-content}"
-        ".test-status.success{background-color:green}"
-        ".test-status.failed{background-color:red}"
-        "</style>\n"
-        "</html>",
-        fp
-    );
 }
 
-int main(int argc, char** argv) {
-    numSyntaxTestPassed = TestAllSyntaxError();
-    numRuntimeTestPassed = TestRuntimeValue();
-    printAsHtml(stdout);
+static void printAstNodeAsXml(FILE* fp, AstNode* pAstNode, int iTabLevel) {
+    VlistNode* pVlNode;
+    const char* szTagName = getAstTypeNameById(pAstNode->iType);
+
+    printTab(fp, iTabLevel); fprintf(fp, "<%s>\n", szTagName);
+
+    if (pAstNode->iLineNumber >= 0) {
+        printTab(fp, iTabLevel + 1); fprintf(fp, "<LineNumber> %d </LineNumber>\n", pAstNode->iLineNumber);
+    }
+    
+    switch (pAstNode->iType) {
+        case AST_EMPTY:
+            break;
+        case AST_PROGRAM:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<NumberOfControl> %d </NumberOfControl>\n", pAstNode->uData.sProgram.iNumControl);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Statements>\n");
+            for (pVlNode = pAstNode->uData.sProgram.pListStatements->head; pVlNode; pVlNode = pVlNode->next) {
+                printAstNodeAsXml(fp, (AstNode *)pVlNode->data, iTabLevel + 2);
+            }
+            printTab(fp, iTabLevel + 1); fprintf(fp, "</Statements>\n");
+            break;
+        case AST_FUNCTION_DECLARE:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<ControlId> %d </ControlId>\n", pAstNode->iControlId);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Name> %s </Name>\n", pAstNode->uData.sFunctionDeclare.szFunction);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Parameters>\n");
+            for (pVlNode = pAstNode->uData.sFunctionDeclare.pListParameters->head; pVlNode; pVlNode = pVlNode->next) {
+                printTab(fp, iTabLevel + 2); fprintf(fp, "<Parameter name=\"%s\" />\n", (char *)pVlNode->data);
+            }
+            printTab(fp, iTabLevel + 1); fprintf(fp, "</Parameters>\n");
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Statements>\n");
+            for (pVlNode = pAstNode->uData.sFunctionDeclare.pListStatements->head; pVlNode; pVlNode = pVlNode->next) {
+                printAstNodeAsXml(fp, (AstNode *)pVlNode->data, iTabLevel + 2);
+            }
+            printTab(fp, iTabLevel + 1); fprintf(fp, "</Statements>\n");
+            break;
+         case AST_IF_GOTO:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<LabelName> %s </LabelName>\n", pAstNode->uData.sIfGoto.szLabelName);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Condition>\n");
+            printAstNodeAsXml(fp, pAstNode->uData.sIfGoto.pAstCondition, iTabLevel + 2);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "</Condition>\n");
+            break;
+        case AST_IF:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<ControlId> %d </ControlId>\n", pAstNode->iControlId);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Condition>\n");
+            printAstNodeAsXml(fp, pAstNode->uData.sIf.pAstCondition, iTabLevel + 2);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "</Condition>\n");
+            printAstNodeAsXml(fp, pAstNode->uData.sIf.pAstThen, iTabLevel + 1);
+            for (pVlNode = pAstNode->uData.sIf.pListElseIf->head; pVlNode; pVlNode = pVlNode->next) {
+                printAstNodeAsXml(fp, (AstNode *)pVlNode->data, iTabLevel + 1);
+            }
+            if (pAstNode->uData.sIf.pAstElse) {
+                printAstNodeAsXml(fp, pAstNode->uData.sIf.pAstElse, iTabLevel + 1);
+            }
+            break;
+        case AST_THEN:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Statements>\n");
+            for (pVlNode = pAstNode->uData.sThen.pListStatements->head; pVlNode; pVlNode = pVlNode->next) {
+                printAstNodeAsXml(fp, (AstNode *)pVlNode->data, iTabLevel + 2);
+            }
+            printTab(fp, iTabLevel + 1); fprintf(fp, "</Statements>\n");
+            break;
+        case AST_ELSEIF:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Condition>\n");
+            printAstNodeAsXml(fp, pAstNode->uData.sElseIf.pAstCondition, iTabLevel + 2);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "</Condition>\n");
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Statements>\n");
+            for (pVlNode = pAstNode->uData.sElseIf.pListStatements->head; pVlNode; pVlNode = pVlNode->next) {
+                printAstNodeAsXml(fp, (AstNode *)pVlNode->data, iTabLevel + 2);
+            }
+            printTab(fp, iTabLevel + 1); fprintf(fp, "</Statements>\n");
+            break;
+        case AST_ELSE:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Statements>\n");
+            for (pVlNode = pAstNode->uData.sElse.pListStatements->head; pVlNode; pVlNode = pVlNode->next) {
+                printAstNodeAsXml(fp, (AstNode *)pVlNode->data, iTabLevel + 2);
+            }
+            printTab(fp, iTabLevel + 1); fprintf(fp, "</Statements>\n");
+            break;
+        case AST_WHILE:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<ControlId> %d </ControlId>\n", pAstNode->iControlId);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Condition>\n");
+            printAstNodeAsXml(fp, pAstNode->uData.sWhile.pAstCondition, iTabLevel + 2);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "</Condition>\n");
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Statements>\n");
+            for (pVlNode = pAstNode->uData.sWhile.pListStatements->head; pVlNode; pVlNode = pVlNode->next) {
+                printAstNodeAsXml(fp, (AstNode *)pVlNode->data, iTabLevel + 2);
+            }
+            printTab(fp, iTabLevel + 1); fprintf(fp, "</Statements>\n");
+            break;
+        case AST_DO_WHILE:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<ControlId> %d </ControlId>\n", pAstNode->iControlId);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Statements>\n");
+            for (pVlNode = pAstNode->uData.sDoWhile.pListStatements->head; pVlNode; pVlNode = pVlNode->next) {
+                printAstNodeAsXml(fp, (AstNode *)pVlNode->data, iTabLevel + 2);
+            }
+            printTab(fp, iTabLevel + 1); fprintf(fp, "</Statements>\n");
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Condition>\n");
+            printAstNodeAsXml(fp, pAstNode->uData.sDoWhile.pAstCondition, iTabLevel + 2);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "</Condition>\n");
+            break;
+        case AST_FOR:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<ControlId> %d </ControlId>\n", pAstNode->iControlId);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Variable> %s </Variable>\n", pAstNode->uData.sFor.szVariable);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<RangeFrom>\n");
+            printAstNodeAsXml(fp, pAstNode->uData.sFor.pAstRangeFrom, iTabLevel + 2);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "</RangeFrom>\n");
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<RangeTo>\n");
+            printAstNodeAsXml(fp, pAstNode->uData.sFor.pAstRangeTo, iTabLevel + 2);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "</RangeTo>\n");
+            if (pAstNode->uData.sFor.pAstStep) {
+                printTab(fp, iTabLevel + 1); fprintf(fp, "<Step>\n");
+                printAstNodeAsXml(fp, pAstNode->uData.sFor.pAstStep, iTabLevel + 2);
+                printTab(fp, iTabLevel + 1); fprintf(fp, "</Step>\n");
+            }
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Statements>\n");
+            for (pVlNode = pAstNode->uData.sFor.pListStatements->head; pVlNode; pVlNode = pVlNode->next) {
+                printAstNodeAsXml(fp, (AstNode *)pVlNode->data, iTabLevel + 2);
+            }
+            printTab(fp, iTabLevel + 1); fprintf(fp, "</Statements>\n");
+            break;
+        case AST_EXIT:
+            if (pAstNode->uData.sExit.pAstExpression) {
+                printAstNodeAsXml(fp, pAstNode->uData.sExit.pAstExpression, iTabLevel + 1);
+            }
+            break;
+        case AST_RETURN:
+            if (pAstNode->uData.sReturn.pAstExpression) {
+                printAstNodeAsXml(fp, pAstNode->uData.sReturn.pAstExpression, iTabLevel + 1);
+            }
+            break;
+        case AST_GOTO:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Label> %s </Label>\n", pAstNode->uData.sGoto.szLabelName);
+            break;
+        case AST_DIM:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Variable> %s </Variable>\n", pAstNode->uData.sDim.szVariable);
+            if (pAstNode->uData.sDim.pAstInitializer) {
+                printTab(fp, iTabLevel + 1); fprintf(fp, "<Initializer>\n");
+                printAstNodeAsXml(fp, pAstNode->uData.sDim.pAstInitializer, iTabLevel + 2);
+                printTab(fp, iTabLevel + 1); fprintf(fp, "</Initializer>\n");
+            }
+            break;
+        case AST_DIM_ARRAY:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<ArrayName> %s </ArrayName>\n", pAstNode->uData.sDimArray.szArrayName);
+            if (pAstNode->uData.sDimArray.pAstDimension) {
+                printTab(fp, iTabLevel + 1); fprintf(fp, "<Dimension>\n");
+                printAstNodeAsXml(fp, pAstNode->uData.sDimArray.pAstDimension, iTabLevel + 2);
+                printTab(fp, iTabLevel + 1); fprintf(fp, "</Dimension>\n");
+            }
+            break;
+        case AST_REDIM:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<ArrayName> %s </ArrayName>\n", pAstNode->uData.sRedim.szArrayName);
+            if (pAstNode->uData.sRedim.pAstDimension) {
+                printTab(fp, iTabLevel + 1); fprintf(fp, "<Dimension>\n");
+                printAstNodeAsXml(fp, pAstNode->uData.sRedim.pAstDimension, iTabLevel + 2);
+                printTab(fp, iTabLevel + 1); fprintf(fp, "</Dimension>\n");
+            }
+            break;
+        case AST_ASSIGN:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Variable> %s </Variable>\n", pAstNode->uData.sAssign.szVariable);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Value>\n");
+            printAstNodeAsXml(fp, pAstNode->uData.sAssign.pAstValue, iTabLevel + 2);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "</Value>\n");
+            break;
+        case AST_ASSIGN_ARRAY:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Variable> %s </Variable>\n", pAstNode->uData.sAssignArray.szArrayName);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Subscript>\n");
+            printAstNodeAsXml(fp, pAstNode->uData.sAssignArray.pAstSubscript, iTabLevel + 2);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "</Subscript>\n");
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Value>\n");
+            printAstNodeAsXml(fp, pAstNode->uData.sAssignArray.pAstValue, iTabLevel + 2);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "</Value>\n");
+            break;
+        case AST_LABEL_DECLARE:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Label> %s </Label>\n", pAstNode->uData.sLabel.szLabelName);
+            break;
+        case AST_UNARY_OPERATOR:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Operator> %s </Operator>\n", getOperatorNameById(pAstNode->uData.sUnaryOperator.iOperatorId));
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Operand>\n");
+            printAstNodeAsXml(fp, pAstNode->uData.sUnaryOperator.pAstOperand, iTabLevel + 2);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "</Operand>\n");
+            break;
+        case AST_BINARY_OPERATOR:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Operator> %s </Operator>\n", getOperatorNameById(pAstNode->uData.sBinaryOperator.iOperatorId));
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<LeftOperand>\n");
+            printAstNodeAsXml(fp, pAstNode->uData.sBinaryOperator.pAstLeftOperand, iTabLevel + 2);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "</LeftOperand>\n");
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<RightOperand>\n");
+            printAstNodeAsXml(fp, pAstNode->uData.sBinaryOperator.pAstRightOperand, iTabLevel + 2);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "</RightOperand>\n");
+            break;
+        case AST_PAREN:
+            printAstNodeAsXml(fp, pAstNode->uData.sParen.pAstExpr, iTabLevel + 1);
+            break;
+        case AST_LITERAL_NUMERIC: {
+            char szNumericBuf[K_NUMERIC_STRINGIFY_BUF_MAX];
+            Ftoa(pAstNode->uData.sLiteralNumeric.fValue, szNumericBuf, K_DEFAULT_FTOA_PRECISION);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "%s\n", szNumericBuf);
+            break;
+        }
+        case AST_LITERAL_STRING:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "%s\n", pAstNode->uData.sLiteralString.szValue);
+            break;
+        case AST_VARIABLE:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "%s\n", pAstNode->uData.sVariable.szName);
+            break;
+        case AST_ARRAY_ACCESS:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<ArrayName> %s </ArrayName>\n", pAstNode->uData.sArrayAccess.szArrayName);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Subscript>\n");
+            printAstNodeAsXml(fp, pAstNode->uData.sArrayAccess.pAstSubscript, iTabLevel + 2);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "</Subscript>\n");
+            break;
+        case AST_FUNCTION_CALL:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Name> %s </Name>\n", pAstNode->uData.sFunctionCall.szFunction);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "<Arguments>\n");
+            for (pVlNode = pAstNode->uData.sFunctionCall.pListArguments->head; pVlNode; pVlNode = pVlNode->next) {
+                printAstNodeAsXml(fp, (AstNode *)pVlNode->data, iTabLevel + 2);
+            }
+            printTab(fp, iTabLevel + 1); fprintf(fp, "</Arguments>\n");
+            break;
+    }
+
+    printTab(fp, iTabLevel); fprintf(fp, "</%s>\n", szTagName);
+}
+
+void printAsXml(const char* szOutputFile, KbAstNode* pAstNode) {
+    FILE* fp = NULL;
+    if (szOutputFile == NULL) {
+        fp = stdout;
+    }
+    if (!pAstNode) return;
+    fprintf(fp, "<?xml version=\"1.0\"?>\n");
+    printAstNodeAsXml(fp, pAstNode, 0);
+}
+
+static void printAstNodeAsJson(FILE* fp, AstNode* pAstNode, int iTabLevel, KBool bSkipFirstTab);
+
+static void printAstNodeStatementsAsJson(
+    FILE*   fp,
+    Vlist*  pListStatements, /* <AstNode> */ 
+    int     iTabLevel
+) {
+    VlistNode* pVlNode;
+    for (
+        pVlNode = pListStatements->head;
+        pVlNode != NULL;
+        pVlNode = pVlNode->next
+    ) {
+        printAstNodeAsJson(fp, (AstNode *)pVlNode->data, iTabLevel + 1, KB_FALSE);
+        if (pVlNode->next != NULL) {
+            fprintf(fp, ",\n");
+        }
+        else {
+            fprintf(fp, "\n");
+        }
+    }
+}
+
+static void printAstNodeAsJson(FILE* fp, AstNode* pAstNode, int iTabLevel, KBool bSkipFirstTab) {
+    VlistNode* pVlNode;
+    if (!bSkipFirstTab) {
+        printTab(fp, iTabLevel);
+    }
+    fprintf(fp, "{\n");
+    printTab(fp, iTabLevel + 1); fprintf(fp, "\"astType\": \"%s\",\n", getAstTypeNameById(pAstNode->iType));
+
+    if (pAstNode->iLineNumber >= 0) {
+        printTab(fp, iTabLevel + 1); fprintf(fp, "\"lineNumber\": %d,\n", pAstNode->iLineNumber);
+    }
+
+    switch (pAstNode->iType) {
+        case AST_EMPTY:
+            fprintf(fp, "\"isEmpty\": true\n");
+            break;
+        case AST_PROGRAM:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"numOfControl\": %d,\n", pAstNode->uData.sProgram.iNumControl);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"statements\": [\n");
+            printAstNodeStatementsAsJson(fp, pAstNode->uData.sProgram.pListStatements, iTabLevel + 1);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "]\n");
+            break;
+        case AST_FUNCTION_DECLARE:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"controlId\": %d,\n", pAstNode->iControlId);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"name\": \"%s\",\n", pAstNode->uData.sFunctionDeclare.szFunction);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"parameters\": [");
+            for (pVlNode = pAstNode->uData.sFunctionDeclare.pListParameters->head; pVlNode; pVlNode = pVlNode->next) {
+                fprintf(fp, "\"%s\"", (const char *)pVlNode->data);
+                if (pVlNode->next != NULL) {
+                    fprintf(fp, ", ");
+                }
+                else {
+                    fprintf(fp, "");
+                }
+            }
+            fprintf(fp, "],\n");
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"statements\": [\n");
+            printAstNodeStatementsAsJson(fp, pAstNode->uData.sFunctionDeclare.pListStatements, iTabLevel + 1);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "]\n");
+            break;
+        case AST_IF_GOTO:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"labelName\": \"%s\",\n", pAstNode->uData.sIfGoto.szLabelName);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"condition\": ");
+            printAstNodeAsJson(fp, pAstNode->uData.sIfGoto.pAstCondition, iTabLevel + 1, KB_TRUE);
+            fprintf(fp, "\n");
+            break;
+        case AST_IF:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"controlId\": %d,\n", pAstNode->iControlId);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"condition\": ");
+            printAstNodeAsJson(fp, pAstNode->uData.sIf.pAstCondition, iTabLevel + 1, KB_TRUE);
+            fprintf(fp, ",\n");
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"then\": ");
+            printAstNodeAsJson(fp, pAstNode->uData.sIf.pAstThen, iTabLevel + 1, KB_TRUE);
+            fprintf(fp, ",\n");
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"elseif\": [\n");
+            printAstNodeStatementsAsJson(fp, pAstNode->uData.sIf.pListElseIf, iTabLevel + 1);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "],\n");
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"else\": ");
+            if (pAstNode->uData.sIf.pAstElse) {
+                printAstNodeAsJson(fp, pAstNode->uData.sIf.pAstElse, iTabLevel + 1, KB_TRUE);
+            }
+            else {
+                fprintf(fp, "null");
+            }
+            fprintf(fp, "\n");
+            break;
+        case AST_THEN:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"statements\": [\n");
+            printAstNodeStatementsAsJson(fp, pAstNode->uData.sThen.pListStatements, iTabLevel + 1);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "]\n");
+            break;
+        case AST_ELSEIF:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"condition\": ");
+            printAstNodeAsJson(fp, pAstNode->uData.sElseIf.pAstCondition, iTabLevel + 1, KB_TRUE);
+            fprintf(fp, ",\n");
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"statements\": [\n");
+            printAstNodeStatementsAsJson(fp, pAstNode->uData.sElseIf.pListStatements, iTabLevel + 1);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "]\n");
+            break;
+        case AST_ELSE:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"statements\": [\n");
+            printAstNodeStatementsAsJson(fp, pAstNode->uData.sElse.pListStatements, iTabLevel + 1);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "]\n");
+            break;
+        case AST_WHILE:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"controlId\": %d,\n", pAstNode->iControlId);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"condition\": ");
+            printAstNodeAsJson(fp, pAstNode->uData.sWhile.pAstCondition, iTabLevel + 1, KB_TRUE);
+            fprintf(fp, ",\n");
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"statements\": [\n");
+            printAstNodeStatementsAsJson(fp, pAstNode->uData.sWhile.pListStatements, iTabLevel + 1);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "]\n");
+            break;
+        case AST_DO_WHILE:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"controlId\": %d,\n", pAstNode->iControlId);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"statements\": [\n");
+            printAstNodeStatementsAsJson(fp, pAstNode->uData.sDoWhile.pListStatements, iTabLevel + 1);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "],\n");
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"condition\": ");
+            printAstNodeAsJson(fp, pAstNode->uData.sDoWhile.pAstCondition, iTabLevel + 1, KB_TRUE);
+            fprintf(fp, "\n");
+            break;
+        case AST_FOR:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"controlId\": %d,\n", pAstNode->iControlId);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"variable\": \"%s\",\n", pAstNode->uData.sFor.szVariable);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"rangeFrom\": ");
+            printAstNodeAsJson(fp, pAstNode->uData.sFor.pAstRangeFrom, iTabLevel + 1, KB_TRUE);
+            fprintf(fp, ",\n");
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"rangeTo\": ");
+            printAstNodeAsJson(fp, pAstNode->uData.sFor.pAstRangeTo, iTabLevel + 1, KB_TRUE);
+            fprintf(fp, ",\n");
+            if (pAstNode->uData.sFor.pAstStep) {
+                printTab(fp, iTabLevel + 1); fprintf(fp, "\"step\": ");
+                printAstNodeAsJson(fp, pAstNode->uData.sFor.pAstStep, iTabLevel + 1, KB_TRUE);
+                fprintf(fp, ",\n");
+            }
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"statements\": [\n");
+            printAstNodeStatementsAsJson(fp, pAstNode->uData.sFor.pListStatements, iTabLevel + 1);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "]\n");
+            break;
+        case AST_EXIT:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"expression\": ");
+            if (pAstNode->uData.sExit.pAstExpression) {
+                printAstNodeAsJson(fp, pAstNode->uData.sExit.pAstExpression, iTabLevel + 1, KB_TRUE);
+            }
+            else {
+                fprintf(fp, "null");
+            }
+            fprintf(fp, "\n");
+            break;
+        case AST_RETURN:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"expression\": ");
+            if (pAstNode->uData.sReturn.pAstExpression) {
+                printAstNodeAsJson(fp, pAstNode->uData.sReturn.pAstExpression, iTabLevel + 1, KB_TRUE);
+            }
+            else {
+                fprintf(fp, "null");
+            }
+            fprintf(fp, "\n");
+            break;
+        case AST_GOTO:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"labelName\": \"%s\"\n", pAstNode->uData.sGoto.szLabelName);
+            break;
+        case AST_DIM:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"variable\": \"%s\",\n", pAstNode->uData.sDim.szVariable);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"initializer\": ");
+            if (pAstNode->uData.sDim.pAstInitializer) {
+                printAstNodeAsJson(fp, pAstNode->uData.sDim.pAstInitializer, iTabLevel + 1, KB_TRUE);
+            }
+            else {
+                fprintf(fp, "null");
+            }
+            fprintf(fp, "\n");
+            break;
+        case AST_DIM_ARRAY:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"arrayName\": \"%s\"\n", pAstNode->uData.sDimArray.szArrayName);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"dimension\": ");
+            printAstNodeAsJson(fp, pAstNode->uData.sDimArray.pAstDimension, iTabLevel + 1, KB_TRUE);
+            fprintf(fp, "\n");
+            break;
+        case AST_REDIM:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"arrayName\": \"%s\"\n", pAstNode->uData.sRedim.szArrayName);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"dimension\": ");
+            printAstNodeAsJson(fp, pAstNode->uData.sRedim.pAstDimension, iTabLevel + 1, KB_TRUE);
+            fprintf(fp, "\n");
+            break;
+        case AST_ASSIGN:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"variable\": \"%s\",\n", pAstNode->uData.sAssign.szVariable);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"value\": ");
+            printAstNodeAsJson(fp, pAstNode->uData.sAssign.pAstValue, iTabLevel + 1, KB_TRUE);
+            fprintf(fp, "\n");
+            break;
+        case AST_ASSIGN_ARRAY:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"variable\": \"%s\",\n", pAstNode->uData.sAssign.szVariable);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"subscript\": ");
+            printAstNodeAsJson(fp, pAstNode->uData.sAssignArray.pAstSubscript, iTabLevel + 1, KB_TRUE);
+            fprintf(fp, ",\n");
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"value\": ");
+            printAstNodeAsJson(fp, pAstNode->uData.sAssignArray.pAstValue, iTabLevel + 1, KB_TRUE);
+            fprintf(fp, "\n");
+            break;
+        case AST_LABEL_DECLARE:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"labelName\": \"%s\"\n", pAstNode->uData.sLabel.szLabelName);
+            break;
+        case AST_UNARY_OPERATOR:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"operator\": \"%s\",\n", getOperatorNameById(pAstNode->uData.sUnaryOperator.iOperatorId));
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"operand\": ");
+            printAstNodeAsJson(fp, pAstNode->uData.sUnaryOperator.pAstOperand, iTabLevel + 1, KB_TRUE);
+            fprintf(fp, "\n");
+            break;
+        case AST_BINARY_OPERATOR:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"operator\": \"%s\",\n", getOperatorNameById(pAstNode->uData.sBinaryOperator.iOperatorId));
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"leftOperand\": ");
+            printAstNodeAsJson(fp, pAstNode->uData.sBinaryOperator.pAstLeftOperand, iTabLevel + 1, KB_TRUE);
+            fprintf(fp, ",\n");
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"rightOperand\": ");
+            printAstNodeAsJson(fp, pAstNode->uData.sBinaryOperator.pAstRightOperand, iTabLevel + 1, KB_TRUE);
+            fprintf(fp, "\n");
+            break;
+        case AST_PAREN:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"expression\": ");
+            printAstNodeAsJson(fp, pAstNode->uData.sParen.pAstExpr, iTabLevel + 1, KB_TRUE);
+            fprintf(fp, "\n");
+            break;
+        case AST_LITERAL_NUMERIC: {
+            char szNumericBuf[K_NUMERIC_STRINGIFY_BUF_MAX];
+            Ftoa(pAstNode->uData.sLiteralNumeric.fValue, szNumericBuf, K_DEFAULT_FTOA_PRECISION);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"value\": %s", szNumericBuf);
+            fprintf(fp, "\n");
+            break;
+        }
+        case AST_LITERAL_STRING:
+            printTab(fp, iTabLevel + 1);
+            fprintf(fp, "\"value\": ");
+            printStringEscaped(fp, (const unsigned char *)pAstNode->uData.sLiteralString.szValue);
+            fprintf(fp, "\n");
+            break;
+        case AST_VARIABLE:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"variable\": \"%s\"\n", pAstNode->uData.sVariable.szName);
+            break;
+        case AST_ARRAY_ACCESS:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"arrayName\": \"%s\",\n", pAstNode->uData.sArrayAccess.szArrayName);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"subscript\": ");
+            printAstNodeAsJson(fp, pAstNode->uData.sArrayAccess.pAstSubscript, iTabLevel + 1, KB_TRUE);
+            fprintf(fp, "\n");
+            break;
+        case AST_FUNCTION_CALL:
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"name\": \"%s\",\n", pAstNode->uData.sFunctionCall.szFunction);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"arguments\": [\n");
+            printAstNodeStatementsAsJson(fp, pAstNode->uData.sFunctionCall.pListArguments, iTabLevel + 1);
+            printTab(fp, iTabLevel + 1); fprintf(fp, "]\n");
+            break;
+    }
+
+    printTab(fp, iTabLevel); fprintf(fp, "}");
+}
+
+void formatSyntaxErrorMessage(char* szBuf, int iStopLineNumber, StatementId iStopStatement, SyntaxErrorId iSyntaxErrorId) {
+    const char* szSyntaxError = getSyntaxErrMsg(iSyntaxErrorId);
+    const char* szStatement = getStatementName(iStopStatement);
+    if (iSyntaxErrorId == SYN_EXPECT_LINE_END || iSyntaxErrorId == SYN_EXPR_INVALID) {
+        sprintf(szBuf, "Syntax error in '%s' statement: %s", szStatement, szSyntaxError);
+    }
+    else {
+        sprintf(szBuf, "Syntax error: %s", szSyntaxError);
+    }
+}
+
+void formatSemanticErrorMessage(char* szBuf, const AstNode* pAstSemStop, SemanticErrorId iSemanticErrorId) {
+    const char* szSemanticError = getSemanticErrMsg(iSemanticErrorId);
+    const char* szAstTypeName = getAstTypeNameById(pAstSemStop->iType);
+    sprintf(szBuf, "Semantic error in '%s': %s", szAstTypeName, szSemanticError);
+}
+
+void formatRuntimeErrorMessage(char* szBuf, const OpCode* pStopOpCode, RuntimeErrorId iRuntimeErrorId) {
+    const char* szRuntimeError = getRuntimeErrMsg(iRuntimeErrorId);
+    const char* szOpCodeName = getOpCodeName(pStopOpCode->dwOpCodeId);
+
+    switch (pStopOpCode->dwOpCodeId) {
+        case K_OPCODE_UNARY_OPERATOR:
+        case K_OPCODE_BINARY_OPERATOR:
+            sprintf(szBuf, "Runtime error in '%s.%s': %s", szOpCodeName, getOperatorNameById(pStopOpCode->uParam.dwOperatorId), szRuntimeError);
+            break;
+        default:
+            sprintf(szBuf, "Runtime error in '%s': %s", szOpCodeName, szRuntimeError);
+            break;
+    }
+}
+
+void printAsJson(const char* szOutputFile, KbAstNode* pAstNode) {
+    FILE* fp = NULL;
+    if (szOutputFile == NULL) {
+        fp = stdout;
+    }
+    if (!pAstNode) return;
+    printAstNodeAsJson(fp, pAstNode, 0, KB_FALSE);
+    fprintf(fp, "\n");
+}
+
+typedef enum tagTestTargetId {
+    TEST_CHECK_ERROR = 0,
+    TEST_GENERATE_AST
+} TestTargetId;
+
+
+int testMain(int argc, char** argv) {
+    const char*     szInputTarget;          /* 命令行传入的测试目标 */
+    TestTargetId    iTestTargetId;          /* 测试目标 ID */
+    const char*     szSource;               /* 用户输入的源代码 */
+    char            szErrorMessage[200];    /* 各种错误的格式化缓冲区 */
+    /* Parser 部分 */
+    AstNode*        pAstProgram;            /* 源代码解析后生成的 AST 根节点 */
+    SyntaxErrorId   iSyntaxErrorId;         /* 语法错误 ID */
+    StatementId     iStopStatement;         /* 语法错误停止的语句类型 */
+    int             iStopLineNumber;        /* 停止时候的行号 */
+    /* Compiler 部分 */
+    Context*        pContext;               /* 编译上下文 */
+    const AstNode*  pAstSemStop;            /* 编译解析 AST 遇到错误停止时的节点 */
+    SemanticErrorId iSemanticErrorId;       /* 语义错误 ID */
+    KByte*          pRawSerialized;         /* 序列化后的字节 */
+    KDword          dwRawSize;              /* 序列化的字节长度 */
+    /* Runtime 部分 */
+    Machine*        pMachine;               /* 虚拟机实例 */
+    KBool           bExecuteSuccess;        /* 执行是否成功结束 */
+    RuntimeErrorId  iRuntimeErrorId;        /* 运行时错误 */
+    const OpCode*   pStopOpCode;            /* 运行时错误结束的 opCode */
+
+    if (argc != 3) {
+        fprintf(stderr, "Usage: %s 'TestTarget' 'SourceCode'\n", argv[0]);
+        fprintf(stderr, "Available targets:\n");
+        fprintf(stderr, "  check   - Check syntax, semantic or runtime error.\n");
+        fprintf(stderr, "  ast     - Generates an abstract expression tree in JSON format.\n");
+        return -1;
+    }
+    szInputTarget = argv[1];
+
+    if (IsStringEqual(szInputTarget, "check")) {
+        iTestTargetId = TEST_CHECK_ERROR;
+    }
+    else if (IsStringEqual(szInputTarget, "ast")) {
+        iTestTargetId = TEST_GENERATE_AST;
+    }
+    else {
+        fprintf(stderr, "Unrecognized target: '%s'\n", szInputTarget);
+        return -1;
+    }
+    
+    szSource = argv[2];
+
+    switch (iTestTargetId) {
+        case TEST_GENERATE_AST: {
+            /* 解析源代码为 AST */
+            pAstProgram = parseAsAst(szSource, &iSyntaxErrorId, &iStopStatement, &iStopLineNumber);
+            /* 有语法错误 */
+            if (iSyntaxErrorId != SYN_NO_ERROR) {
+                formatSyntaxErrorMessage(szErrorMessage, iStopLineNumber, iStopStatement, iSyntaxErrorId);
+                printf("{\n");
+                printf("  \"error\": true,\n");
+                printf("  \"errorMessage\": ");
+                printStringEscaped(stdout, (const unsigned char *)szErrorMessage);
+                printf("\n}\n");
+                destroyAst(pAstProgram);
+                return 0;
+            }
+            /* 打印 AST 为 JSON */
+            printAsJson(NULL, pAstProgram);
+            break;
+        }
+        case TEST_CHECK_ERROR: {
+            /* 解析源代码为 AST */
+            pAstProgram = parseAsAst(szSource, &iSyntaxErrorId, &iStopStatement, &iStopLineNumber);
+            /* 有语法错误 */
+            if (iSyntaxErrorId != SYN_NO_ERROR) {
+                formatSyntaxErrorMessage(szErrorMessage, iStopLineNumber, iStopStatement, iSyntaxErrorId);
+                printf("{\n");
+                printf("  \"error\": true,\n");
+                printf("  \"lineNumber\": %d,\n", iStopLineNumber);
+                printf("  \"errorId\": \"%s\",\n", getSyntaxErrName(iSyntaxErrorId));
+                printf("  \"errorMessage\": ");
+                printStringEscaped(stdout, (const unsigned char *)szErrorMessage);
+                printf("\n}\n");
+                destroyAst(pAstProgram);
+                return 0;
+            }
+            /* 编译 AST 为上下文 */
+            pContext = buildContext(pAstProgram, &iSemanticErrorId, &pAstSemStop);
+            /* 有语义错误 */
+            if (iSemanticErrorId != SEM_NO_ERROR) {
+                formatSemanticErrorMessage(szErrorMessage, pAstSemStop, iSemanticErrorId);
+                printf("{\n");
+                printf("  \"error\": true,\n");
+                printf("  \"lineNumber\": %d,\n", pAstSemStop->iLineNumber);
+                printf("  \"errorId\": \"%s\",\n", getSemanticErrName(iSemanticErrorId));
+                printf("  \"errorMessage\": ");
+                printStringEscaped(stdout, (const unsigned char *)szErrorMessage);
+                printf("\n}\n");
+                destroyAst(pAstProgram);
+                destroyContext(pContext);
+                return 0;
+            }
+            destroyAst(pAstProgram);
+
+            /* 序列化上下文 */
+            serializeContext(pContext, &pRawSerialized, &dwRawSize);
+            destroyContext(pContext);
+
+            /* 执行 opCode */
+            pMachine = createMachine(pRawSerialized);
+            bExecuteSuccess = executeMachine(pMachine, 0, &iRuntimeErrorId, &pStopOpCode);
+    
+            /* 执行有错误 */
+            if (!bExecuteSuccess) {
+                formatRuntimeErrorMessage(szErrorMessage, pStopOpCode, iRuntimeErrorId);
+                printf("{\n");
+                printf("  \"error\": true,\n");
+                printf("  \"errorId\": \"%s\",\n", getRuntimeErrName(iRuntimeErrorId));
+                printf("  \"errorMessage\": ");
+                printStringEscaped(stdout, (const unsigned char *)szErrorMessage);
+                printf("\n}\n");
+            }
+            /* 没有错误 */
+            else {
+                /* 没有全局变量 */
+                if (pMachine->pBinHeader->dwNumVariables <= 0) {
+                    printf("{\n");
+                    printf("  \"stopValue\": %d\n", pMachine->iStopValue);
+                    printf("}\n");
+                }
+                /* 输出第一个全局变量的值 */
+                else {
+                    const char* szValueStringified;
+                    KBool       bNeedDispose;
+                    RtValue*    pRtValue = pMachine->pArrPtrGlobalVars[0];
+
+                    szValueStringified = stringifyRtValue(pRtValue, &bNeedDispose);
+
+                    printf("{\n");
+                    printf("  \"stopValue\": %d,\n", pMachine->iStopValue);
+                    printf("  \"target\": {\n");
+                    printf("    \"type\": \"%s\",\n", getRtValueTypeName(pRtValue->iType));
+                    printf("    \"stringified\": ");
+                    printStringEscaped(stdout, (const unsigned char *)szValueStringified);
+                    printf("\n  }\n");
+                    printf("}\n");
+
+                    if (bNeedDispose) {
+                        free((void *)szValueStringified);
+                    }
+                }
+            }
+
+            destroyMachine(pMachine);
+            free(pRawSerialized);
+        }
+    }
+
     return 0;
 }
+
+#ifdef IS_TEST_PROGRAM
+int main(int argc, char** argv) {
+    return testMain(argc, argv);
+}
+#endif

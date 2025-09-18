@@ -1,987 +1,859 @@
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <stdio.h>
 #include <math.h>
+#include <string.h>
+#include <time.h>
 #include "krt.h"
-#include "k_utils.h"
+#include "kalias.h"
 
-#if defined(_FX_9860_) || defined(VER_PLATFORM_WIN32_CE)
-#   define DISABLE_P_FUNCTION
-#endif
-
-#define KB_RT_STRINGIFY_BUF_SIZE 200
-
-char stringifyBuf[KB_RT_STRINGIFY_BUF_SIZE];
-
-static const char * DBG_RT_VALUE_NAME[] = {
-    "nil", "number", "string", "array", "array_ref"
+static const struct {
+    const char* szName;
+    const char* szMessage;
+} RUNTIME_ERROR_DETAIL[] = {
+    { "RUNTIME_NONE",                   "No runtime error occurred" },
+    { "RUNTIME_STACK_UNDERFLOW",        "Stack underflow: attempted to pop from an empty stack" },
+    { "RUNTIME_TYPE_MISMATCH",          "Type mismatch: operation applied to incompatible types" },
+    { "RUNTIME_UNKNOWN_OPCODE",         "Unknown opcode encountered during execution" },
+    { "RUNTIME_UNKNOWN_OPERATOR",       "Unknown operator encountered during expression evaluation" },
+    { "RUNTIME_UNKNOWN_BUILT_IN_FUNC",  "Attempted to call an undefined built-in function" },
+    { "RUNTIME_UNKNOWN_USER_FUNC",      "Attempted to call an undefined user function" },
+    { "RUNTIME_DIVISION_BY_ZERO",       "Division by zero is not allowed" },
+    { "RUNTIME_NOT_IN_USER_FUNC",       "Return statement encountered outside of a function context" },
+    { "RUNTIME_ARRAY_INVALID_SIZE",     "Invalid array size specified during allocation" },
+    { "RUNTIME_ARRAY_OUT_OF_BOUNDS",    "Array index out of bounds" },
+    { "RUNTIME_NOT_ARRAY",              "Attempted to perform array operation on a non-array value" }
 };
 
-KbRuntimeValue* rtvalueCreateNumber(const KB_FLOAT num) {
-    KbRuntimeValue* v = (KbRuntimeValue *)malloc(sizeof(KbRuntimeValue));
-    v->type = RVT_NUMBER;
-    v->data.num = num;
-    return v;
+const char* KRuntimeError_GetNameById(RuntimeErrorId iRuntimeErrorId) {
+    if (iRuntimeErrorId < 0 || iRuntimeErrorId > RUNTIME_NOT_ARRAY) return "n/a";
+    return RUNTIME_ERROR_DETAIL[iRuntimeErrorId].szName;
 }
 
-KbRuntimeValue* rtvalueCreateString(const char* sz, KBoolean bIsRef) {
-    KbRuntimeValue* v = (KbRuntimeValue *)malloc(sizeof(KbRuntimeValue));
-    v->type = RVT_STRING;
-    v->data.str.bIsRef = bIsRef;
-    if (bIsRef) {
-        v->data.str.ptr = sz;
-    }
-    else {
-        v->data.str.ptr = StringDump(sz);
-    }
-    return v;
+const char* KRuntimeError_GetMessageById(RuntimeErrorId iRuntimeErrorId) {
+    if (iRuntimeErrorId < 0 || iRuntimeErrorId > RUNTIME_NOT_ARRAY) return "n/a";
+    return RUNTIME_ERROR_DETAIL[iRuntimeErrorId].szMessage;
 }
 
-KbRuntimeValue* rtvalueCreateArray(int size) {
-    KbRuntimeValue* v = (KbRuntimeValue *)malloc(sizeof(KbRuntimeValue));
+const char* KRuntimeValue_GetTypeNameById(RuntimeValueTypeId iRtTypeId) {
+    static const char * SZ_RT_VALUE_NAME[] = {
+        "nil", "number", "string", "array", "array_ref"
+    };
+    return SZ_RT_VALUE_NAME[iRtTypeId];
+}
+
+static void destroyRtValue(RtValue* pRtValue) {
+    switch (pRtValue->iType) {
+        /* 不需要释放值 */
+        case RT_VALUE_NIL:
+        case RT_VALUE_NUMBER:
+        case RT_VALUE_ARRAY_REF:
+        default:
+            break;
+        /* 释放字符串 */
+        case RT_VALUE_STRING:
+            if (!pRtValue->uData.sString.bIsRef) {
+                free(pRtValue->uData.sString.uContent.pReadWrite);
+            }
+            break;
+        /* 释放数组 */
+        case RT_VALUE_ARRAY:
+            free(pRtValue->uData.sArray.pArrPtrElements);
+            pRtValue->uData.sArray.iSize = 0;
+            break;
+    }
+    free(pRtValue);
+}
+
+static void destroyRtValueVoidPtr(void* pVoidPtr) {
+    destroyRtValue((RtValue *)pVoidPtr);
+}
+
+static RtValue* createNumericRtValue(KFloat fValue) {
+    RtValue* pRtValue = (RtValue *)malloc(sizeof(RtValue));
+    pRtValue->iType = RT_VALUE_NUMBER;
+    pRtValue->uData.fNumber = fValue;
+    return pRtValue;
+}
+
+static RtValue* createStringRtValue(char* szValue) {
+    RtValue* pRtValue = (RtValue *)malloc(sizeof(RtValue));
+    pRtValue->iType = RT_VALUE_STRING;
+    pRtValue->uData.sString.bIsRef = KB_FALSE;
+    pRtValue->uData.sString.uContent.pReadWrite = szValue;
+    return pRtValue;
+}
+
+static RtValue* createStringRefRtValue(const char* szValue) {
+    RtValue* pRtValue = (RtValue *)malloc(sizeof(RtValue));
+    pRtValue->iType = RT_VALUE_STRING;
+    pRtValue->uData.sString.bIsRef = KB_TRUE;
+    pRtValue->uData.sString.uContent.pReadOnly = szValue;
+    return pRtValue;
+}
+
+static RtValue* createArrayRtValue(int iArraySize) {
+    RtValue* pRtValue = (RtValue *)malloc(sizeof(RtValue));
     int i;
+    pRtValue->iType = RT_VALUE_ARRAY;
+    pRtValue->uData.sArray.iSize = iArraySize;
+    pRtValue->uData.sArray.pArrPtrElements = (RtValue **)malloc(sizeof(RtValue* ) * iArraySize);
+    for (i = 0; i < iArraySize; ++i) {
+        pRtValue->uData.sArray.pArrPtrElements[i] = createNumericRtValue(0);
+    }
+    return pRtValue;
+}
 
-    v->type = RVT_ARRAY;
-    v->data.arr.size = size;
-    v->data.arr.el = (KbRuntimeValue **)malloc(sizeof(KbRuntimeValue* ) * size);
+const char* KRuntimeValue_Stringify(KbRuntimeValue* pRtValue, KBool *pBoolNeedDispose) {
+    *pBoolNeedDispose = KB_FALSE;
+    switch (pRtValue->iType) {
+        default:
+            return "![n/a]";
+        case RT_VALUE_NIL:
+            return "![nil]";
+        case RT_VALUE_NUMBER: {
+            char szBuf[K_NUMERIC_STRINGIFY_BUF_MAX];
+            Ftoa(pRtValue->uData.fNumber, szBuf, K_DEFAULT_FTOA_PRECISION);
+            *pBoolNeedDispose = KB_TRUE;
+            return StringDump(szBuf);
+        }
+        case RT_VALUE_STRING: {
+            if (pRtValue->uData.sString.bIsRef) {
+                return pRtValue->uData.sString.uContent.pReadOnly;
+            }
+            else {
+                return pRtValue->uData.sString.uContent.pReadWrite;
+            }
+        }
+        case RT_VALUE_ARRAY: {
+            return "![array]";
+        }
+        case RT_VALUE_ARRAY_REF: {
+            return "![arrayRef]";
+        }
+    }
+}
+
+static RtValue* createStringRtValueFromConcat(RtValue* pRtLeft, RtValue* pRtRight) {
+    RtValue*    pRtValue = (RtValue *)malloc(sizeof(RtValue));
+    const char  *szLeft, *szRight;
+    KBool       bLeftNeedDispose, bRightNeedDispose;
+
+    szLeft = stringifyRtValue(pRtLeft, &bLeftNeedDispose);
+    szRight = stringifyRtValue(pRtRight, &bRightNeedDispose);
+
+    pRtValue->iType = RT_VALUE_STRING;
+    pRtValue->uData.sString.bIsRef = KB_FALSE;
+    pRtValue->uData.sString.uContent.pReadWrite = StringConcat(szLeft, szRight);
+
+    if (bLeftNeedDispose) free((void *)szLeft);
+    if (bRightNeedDispose) free((void *)szRight);
     
-    for (i = 0; i < size; ++i) {
-        v->data.arr.el[i] = rtvalueCreateNumber(0);
-    }
-
-    return v;
+    return pRtValue;
 }
 
-KbRuntimeValue* rtvalueCreateFromConcat(const char* szLeft, const char* szRight) {
-    char *strNew, *p;
-    int newLength = strlen(szLeft) + strlen(szRight) + 1;
-
-    KbRuntimeValue* v = (KbRuntimeValue *)malloc(sizeof(KbRuntimeValue));
-    v->type = RVT_STRING;
-
-    p = strNew = (char *)malloc(newLength);
-    p += StringCopy(p, newLength, szLeft);
-    p += StringCopy(p, newLength, szRight);
-
-    v->data.str.ptr = strNew;
-    v->data.str.bIsRef = KB_FALSE;
-
-    return v;
-}
-
-KbRuntimeValue* rtvalueDuplicate(const KbRuntimeValue* v, KBoolean bDeepClone) {
-    if (v->type == RVT_NUMBER) {
-        return rtvalueCreateNumber(v->data.num);
-    }
-    else if (v->type == RVT_STRING) {
-        return rtvalueCreateString(v->data.str.ptr, !bDeepClone);
+static RtValue* createRefRtValue(RtValue* pRtValue) {
+    switch (pRtValue->iType) {
+        default:
+        case RT_VALUE_NIL:
+            return createNumericRtValue(0);
+        case RT_VALUE_NUMBER: 
+            return createNumericRtValue(pRtValue->uData.fNumber);
+        case RT_VALUE_STRING:
+            return createStringRefRtValue(pRtValue->uData.sString.uContent.pReadOnly);
+        case RT_VALUE_ARRAY: {
+            RtValue* pRtNew = (RtValue *)malloc(sizeof(RtValue));
+            pRtNew->iType = RT_VALUE_ARRAY_REF;
+            pRtNew->uData.pArrRef = &pRtValue->uData.sArray;
+            return pRtNew;
+        }
+        case RT_VALUE_ARRAY_REF: {
+            RtValue* pRtNew = (RtValue *)malloc(sizeof(RtValue));
+            pRtNew->iType = RT_VALUE_ARRAY_REF;
+            pRtNew->uData.pArrRef = pRtValue->uData.pArrRef;
+            return pRtNew;
+        }
     }
     return NULL;
 }
 
-char* rtvalueStringify(const KbRuntimeValue* v) {
-    if (v->type == RVT_NUMBER) {
-        char _buf[KB_RT_STRINGIFY_BUF_SIZE];
-        kFtoa(v->data.num, _buf, DEFAUL_FTOA_PRECISION);
-        return StringDump(_buf);
-    }
-    else if (v->type == RVT_STRING) {
-        return StringDump(v->data.str.ptr);
-    }
-    else if (v->type == RVT_ARRAY) {
-        return StringDump("[Array]");
-    }
-    else if (v->type == RVT_ARRAY_REF) {
-        return StringDump("[ArrayRef]");
-    }
-    return StringDump("<unknown-value>");
-}
-
-int rtvalueIsTrue(const KbRuntimeValue *v) {
-    if (v == NULL) {
-        return 0;
-    }
-    /* 数字不为零是真 */
-    else if (v->type == RVT_NUMBER) {
-        return (int)v->data.num;
-    }
-    /* 字符串不为空是真 */
-    else if (v->type == RVT_STRING && strlen(v->data.str.ptr) > 0) {
-        return 1;
-    }
-    return 0;
-}
-
-void rtvalueDestroy(KbRuntimeValue* val) {
-    if (!val) {
-        return;
-    }
-    printf("[Release] ");
-    switch(val->type) {
-        case RVT_NUMBER:
-            printf("Number = %f", val->data.num);
-            break;
-        case RVT_STRING:
-            printf("String = '%s', isRef = %d", val->data.str.ptr, val->data.str.bIsRef);
-            break;
-        case RVT_ARRAY:
-            printf("Array, size = %d", val->data.arr.size);
-        case RVT_ARRAY_REF:
+static KBool canBeConsideredAsTrue(RtValue* pRtValue) {
+    switch (pRtValue->iType) {
         default:
-            break;
-    }
-    printf("\n");
-    if (val->type == RVT_STRING && !val->data.str.bIsRef) {
-        free((void *)val->data.str.ptr);
-        val->data.str.ptr = NULL;
-    }
-    else if (val->type == RVT_ARRAY) {
-        int i;
-        for (i = 0; i < val->data.arr.size; ++i) {
-            rtvalueDestroy(val->data.arr.el[i]);
+        case RT_VALUE_NIL:
+            return KB_FALSE;
+        case RT_VALUE_NUMBER:
+            return !!(int)pRtValue->uData.fNumber;
+        case RT_VALUE_STRING: {
+            const char* szValue = pRtValue->uData.sString.uContent.pReadOnly;
+            return szValue && StringLength(szValue) > 0;
         }
-        free(val->data.arr.el);
-    }
-    free(val);
-}
-
-void rtvalueMoveArrayContent(KbRuntimeValue* oldValue, KbRuntimeValue* newValue) {
-    int             i;
-    KbRuntimeArray* oldArray;
-    KbRuntimeArray* newArray;
-
-    if (oldValue->type != RVT_ARRAY || newValue->type != RVT_ARRAY) {
-        return;
-    }
-
-    oldArray = &oldValue->data.arr;
-    newArray = &newValue->data.arr;
-
-    for (i = 0; i < oldArray->size && i < newArray->size; ++i) {
-        newArray->el[i] = oldArray->el[i];
-        oldArray->el[i] = NULL;
+        case RT_VALUE_ARRAY: {
+            return KB_TRUE;
+        }
+        case RT_VALUE_ARRAY_REF: {
+            return KB_TRUE;
+        }
     }
 }
 
-void rtvalueDestroyVoidPointer(void* p) {
-    rtvalueDestroy((KbRuntimeValue *)p);
+static KBool canBeConsideredEqual(RtValue* pRtLeft, RtValue* pRtRight) {
+    if (pRtLeft->iType == RT_VALUE_NIL && pRtRight->iType == RT_VALUE_NIL) {
+        return KB_TRUE;
+    }
+    else if (pRtLeft->iType == RT_VALUE_NUMBER && pRtRight->iType == RT_VALUE_NUMBER) {
+        return pRtLeft->uData.fNumber == pRtRight->uData.fNumber;
+    }
+    else if (pRtLeft->iType == RT_VALUE_STRING && pRtRight->iType == RT_VALUE_STRING) {
+        const char* szLeft = pRtLeft->uData.sString.uContent.pReadOnly;
+        const char* szRight = pRtRight->uData.sString.uContent.pReadOnly;
+        return IsStringEqual(szLeft, szRight);
+    }
+    return KB_FALSE;
 }
 
-KbCallEnv* callEnvCreate(int prevCmdPos, const KbExportedFunction* pExportedFunc) {
-    KbCallEnv* pEnv = (KbCallEnv *)malloc(sizeof(KbCallEnv));
+CallEnv* createCallEnv(int iPrevPos, const BinFuncInfo* pFuncInfo) {
+    CallEnv* pEnv = (CallEnv *)malloc(sizeof(CallEnv));
     int i;
-    pEnv->numArg = pExportedFunc->numArg;
-    pEnv->numVar = pExportedFunc->numVar;
-    pEnv->prevCmdPos = prevCmdPos;
-    /* 前numArg个变量从栈上取得，不需要初始化 */
-    pEnv->variables  = (KbRuntimeValue **)malloc(sizeof(KbRuntimeValue *) * pEnv->numVar);
-    /* 其他的初始化为0 */
-    for (i = pEnv->numArg; i < pEnv->numVar; ++i) {
-        pEnv->variables[i] = rtvalueCreateNumber(0);
+
+    pEnv->iNumParams        = pFuncInfo->dwNumParams;
+    pEnv->iNumVar           = pFuncInfo->dwNumVars;
+    pEnv->iPrevOpCodePos    = iPrevPos;
+    pEnv->pArrPtrLocalVars  = (RtValue **)malloc(sizeof(RtValue *) * pEnv->iNumVar);
+
+    /* 前 numArg 个变量从栈上取得，不需要初始化, 其他的初始化为0 */
+    for (i = pEnv->iNumParams; i < pEnv->iNumVar; ++i) {
+        pEnv->pArrPtrLocalVars[i] = createNumericRtValue(0);
     }
     return pEnv;
 }
 
-void callEnvDestroy(KbCallEnv * pEnv) {
-    int numVar = pEnv->numVar, i;
-    for (i = 0; i < numVar; ++i) {
-        rtvalueDestroy(pEnv->variables[i]);
+void destroyCallEnv(CallEnv * pEnv) {
+    int i;
+    for (i = 0; i < pEnv->iNumParams; ++i) {
+        destroyRtValue(pEnv->pArrPtrLocalVars[i]);
     }
-    free(pEnv->variables);
+    free(pEnv->pArrPtrLocalVars);
     free(pEnv);
 }
 
-void callEnvDestroyVoidPtr(void* pEnv) {
-    callEnvDestroy(pEnv);
+void destroyCallEnvVoidPtr(void* pEnv) {
+    destroyCallEnv((CallEnv *)pEnv);
 }
 
-void machineCommandReset(KbMachine* machine) {
-    machine->cmdPtr = (KbOpCommand *)(machine->raw + machine->header->cmdBlockStart);
-}
+KbVirtualMachine* KRuntime_CreateMachine(const KByte* pSerializedRaw) {
+    Machine* pMachine = (Machine *)malloc(sizeof(Machine));
+    int iNumVar, i;
 
-KbMachine* machineCreate(const KByte* raw) {
-    KbMachine* machine;
-    int numVar, i;
-
-    machine = (KbMachine *)malloc(sizeof(KbMachine));
-
-    machine->raw            = raw;
-    machine->header         = (const KbBinaryHeader *)raw;
-    machine->pExportedFunc  = (const KbExportedFunction *)(raw + machine->header->funcBlockStart);
-    machine->stack          = vlNewList();
-    machine->callEnvStack   = vlNewList();
+    pMachine->pByteRaw      = pSerializedRaw;
+    pMachine->pBinHeader    = (const BinHeader *)pSerializedRaw;
+    pMachine->pArrFuncInfo  = (const BinFuncInfo *)(pSerializedRaw + pMachine->pBinHeader->dwFuncBlockStart);
+    pMachine->pStackOperand = vlNewList();
+    pMachine->pStackCallEnv = vlNewList();
+    pMachine->iStopValue    = 0;
 
     /* 全部以数字0初始化全局变量 */
-    numVar = machine->header->numVariables;
-    machine->variables  = (KbRuntimeValue **)malloc(sizeof(KbRuntimeValue *) * numVar);
-    for (i = 0; i < numVar; ++i) {
-       machine->variables[i] = rtvalueCreateNumber(0);
-    }    
+    iNumVar = pMachine->pBinHeader->dwNumVariables;
+    pMachine->pArrPtrGlobalVars = (RtValue **)malloc(sizeof(RtValue *) * iNumVar);
+    for (i = 0; i < iNumVar; ++i) {
+       pMachine->pArrPtrGlobalVars[i] = createNumericRtValue(0);
+    }
 
-    return machine;
+    return pMachine;
 }
 
-void machineDestroy(KbMachine* machine) {
+void KRuntime_DestroyMachine(KbVirtualMachine* pMachine) {
+    int i, iNumVar = pMachine->pBinHeader->dwNumVariables;
+    for (i = 0; i < iNumVar; ++i) {
+        destroyRtValue(pMachine->pArrPtrGlobalVars[i]);
+    }
+    free(pMachine->pArrPtrGlobalVars);
+    vlDestroy(pMachine->pStackOperand, destroyRtValueVoidPtr);
+    vlDestroy(pMachine->pStackCallEnv, destroyCallEnvVoidPtr);
+    free(pMachine);
+}
+
+static void machineOpCodePosReset(Machine* pMachine) {
+    pMachine->pOpCodeCur = (OpCode *)(pMachine->pByteRaw + pMachine->pBinHeader->dwOpCodeBlockStart);
+}
+
+static void cleanUpOperandsWithArraySize(RtValue** pArrPtrOperands, int iSize) {
     int i;
-    int numVar = machine->header->numVariables;
-    for (i = 0; i < numVar; ++i) {
-        rtvalueDestroy(machine->variables[i]);
-    }
-    free(machine->variables);
-    vlDestroy(machine->stack, rtvalueDestroyVoidPointer);
-    vlDestroy(machine->callEnvStack, callEnvDestroyVoidPtr);
-    free(machine);
-}
-
-int machineVarAssignNum(KbMachine* machine, int varIndex, KB_FLOAT num) {
-    KbRuntimeValue* varValue;
-    int numVar = machine->header->numVariables;
-
-    if (varIndex < 0 || varIndex >= numVar) {
-        return 0;
-    }
-
-    varValue = machine->variables[varIndex];
-    if (varValue->type == RVT_NUMBER) {
-        varValue->data.num = num;
-    }
-    else {
-        rtvalueDestroy(varValue);
-        machine->variables[varIndex] = rtvalueCreateNumber(num);
-    }
-
-    return 1;
-}
-
-const KbExportedFunction* machineGetFunctionByIndex(KbMachine* machine, int userFuncIndex) {
-    if (userFuncIndex < 0 || userFuncIndex >= machine->header->numFunc) {
-        return NULL;
-    }
-    return machine->pExportedFunc + userFuncIndex;
-}
-
-extern const char *_KOCODE_NAME[];
-
-#define formatExecErrorAppend(newPart) (p += StringCopy(p, sizeof(buf) - (p - buf), newPart))
-
-void formatExecError(const KbRuntimeError *errorRet, char *message, int messageLength) {
-    char buf[KB_ERROR_MESSAGE_MAX];
-    char *p = buf;
-
-    switch(errorRet->type) {
-    case KBRE_OPERAND_TYPE_MISMATCH:
-        formatExecErrorAppend("Type mismatch error occurred. The operand was a '");
-        formatExecErrorAppend(errorRet->message);
-        formatExecErrorAppend("' when performing ");
-        formatExecErrorAppend(_KOCODE_NAME[errorRet->cmdOp]);
-        break;
-    case KBRE_STACK_OVERFLOW:
-        formatExecErrorAppend("Stack overflow occurred. PTR = ");
-        formatExecErrorAppend(errorRet->message);
-        break;
-    case KBRE_UNKNOWN_BUILT_IN_FUNC:
-        formatExecErrorAppend("Unknown built function: ");
-        formatExecErrorAppend(errorRet->message);
-        break;
-    case KBRE_UNKNOWN_CMD:
-        formatExecErrorAppend("Unknown opcode: ");
-        formatExecErrorAppend(errorRet->message);
-        break;
-    case KBRE_ILLEGAL_RETURN:
-        formatExecErrorAppend("Invalid RETURN command. ");
-        formatExecErrorAppend(errorRet->message);
-        break;
-    case KBRE_NOT_IN_USER_FUNC:
-        formatExecErrorAppend("Cannot execute this command out of function.");
-        formatExecErrorAppend(errorRet->message);
-        break;
-    case KBRE_ARRAY_INVALID_SIZE:
-        formatExecErrorAppend("Invalid array size: ");
-        formatExecErrorAppend(errorRet->message);
-        break;
-    case KBRE_ARRAY_OUT_OF_BOUNDS:
-        formatExecErrorAppend("Array access out of bounds: ");
-        formatExecErrorAppend(errorRet->message);
-        break;
-    case KBRE_NOT_ARRAY:
-        formatExecErrorAppend("Attempt to access a subscript that is not an array: ");
-        formatExecErrorAppend(errorRet->message);
-        break;
-    default:
-        formatExecErrorAppend("Other problems occurred during runtime. ");
-        if (!StringEqual(errorRet->message, "")) {
-             formatExecErrorAppend(errorRet->message);
+    for (i = 0; i < iSize; ++i) {
+        if (pArrPtrOperands[i]) {
+            destroyRtValue(pArrPtrOperands[i]);
         }
-        break;
+        pArrPtrOperands[i] = NULL;
     }
-
-    StringCopy(message, messageLength, buf);
 }
 
-void dbgPrintContextCommand(const KbOpCommand *cmd);
+#define popRtValue(toStore) {                       \
+    (toStore) = NULL;                               \
+    if (pMachine->pStackOperand->size <= 0) {       \
+        returnExecError(RUNTIME_STACK_UNDERFLOW);   \
+    }                                               \
+    toStore = vlPopBack(pMachine->pStackOperand);   \
+} NULL
 
-#define machineCmdStartPointer(machine) ((const KbOpCommand *)((machine)->raw + (machine)->header->cmdBlockStart))
+#define checkRtValueTypeIs(pRtValue, iTypExptd) {   \
+    if (pRtValue->iType != iTypExptd) {             \
+        returnExecError(RUNTIME_TYPE_MISMATCH);     \
+    }                                               \
+} NULL
 
-#define execReturnErrorWithMessage(errorCode, msg) NULL;            \
-    errorRet->type = errorCode;                                     \
-    errorRet->cmdOp = machine->cmdPtr->op;                          \
-    StringCopy(errorRet->message, sizeof(errorRet->message), msg);  \
-    return 0
+#define pushNumericOperand(num) \
+    vlPushBack(pMachine->pStackOperand, createNumericRtValue(num));
 
-#define execReturnErrorWithInt(errorCode, intval) NULL;             \
-    errorRet->type = errorCode;                                     \
-    errorRet->cmdOp = machine->cmdPtr->op;                          \
-    kItoa(intval, errorRet->message, 10);                           \
-    return 0
+#define getCurrentCallEnv(pCallEnv)  {                          \
+    if (pMachine->pStackCallEnv->size <= 0) {                   \
+        returnExecError(RUNTIME_NOT_IN_USER_FUNC);              \
+    }                                                           \
+    pCallEnv = (KbCallEnv *)pMachine->pStackCallEnv->tail->data;\
+} NULL
 
-#define execPopAndCheckType(oprIndex, valType)  NULL;               \
-    operand[oprIndex] = (KbRuntimeValue *)vlPopBack(machine->stack);\
-    if (operand[oprIndex] == NULL) {                                \
-        execReturnErrorWithInt(                                     \
-            KBRE_STACK_OVERFLOW,                                    \
-            machine->cmdPtr - machineCmdStartPointer(machine)       \
-        );                                                          \
-    }                                                               \
-    if (operand[oprIndex]->type != valType) {                       \
-        execReturnErrorWithMessage(                                 \
-            KBRE_OPERAND_TYPE_MISMATCH,                             \
-            DBG_RT_VALUE_NAME[operand[oprIndex]->type]              \
-        );                                                          \
-    } NULL
+#define getVariable(pPtrVar) {                          \
+    if (pOpCode->uParam.sVarAccess.wIsLocal) {          \
+        CallEnv* pCallEnv;                              \
+        getCurrentCallEnv(pCallEnv);                    \
+        pPtrVar = (pCallEnv->pArrPtrLocalVars         \
+             + pOpCode->uParam.sVarAccess.wVarIndex);   \
+    } else {                                            \
+        pPtrVar = (pMachine->pArrPtrGlobalVars        \
+             + pOpCode->uParam.sVarAccess.wVarIndex);   \
+    }                                                   \
+} NULL
 
-#define execValidateArrayAccess(array, subscript)   NULL;           \
-    if ((array)->type != RVT_ARRAY) {                               \
-        execReturnErrorWithInt(KBRE_NOT_ARRAY, cmd->op);            \
-    }                                                               \
-    if ((subscript) < 0 || (subscript) >= (array)->data.arr.size) { \
-        execReturnErrorWithInt(KBRE_ARRAY_OUT_OF_BOUNDS, subscript);\
-    } NULL
+#define cleanUpOperands() (cleanUpOperandsWithArraySize(pArrPtrOperands, sizeof(pArrPtrOperands) / sizeof(pArrPtrOperands[0])))
+#define pRtOperandLeft      (pArrPtrOperands[0])
+#define pRtOperandRight     (pArrPtrOperands[1])
 
-#define execGetCurrentCallEnv() NULL;                               \
-    if (machine->callEnvStack->size <= 0) {                         \
-        execReturnErrorWithInt(KBRE_NOT_IN_USER_FUNC, cmd->op);     \
-    }                                                               \
-    pCallEnv = (KbCallEnv *)machine->callEnvStack->tail->data; NULL \
+#define callMathFunc(mathFunc) {                        \
+    popRtValue(pRtOperandLeft);                         \
+    fResult = mathFunc(pRtOperandLeft->uData.fNumber);  \
+    cleanUpOperands();                                  \
+    pushNumericOperand(fResult);                        \
+} NULL
 
-int machineExecCallBuiltInFunc(int funcId, KbMachine* machine, KbRuntimeError *errorRet, KbRuntimeValue ** operand);
+#define returnExecError(rtErrId) {                  \
+    *pIntRtErrId = (rtErrId);                       \
+    *ppStopOpCode = pOpCode;                        \
+    cleanUpOperands();                              \
+    return KB_FALSE;                                \
+} NULL
 
-int machineGetUserFuncIndex(KbMachine* machine, const char* funcName) {
-    int i = 0;
-    for (i = 0; i < machine->header->numFunc; ++i) {
-        const KbExportedFunction* pExpFunc = machine->pExportedFunc + i;
-        if (StringEqual(pExpFunc->funcName, funcName)) {
-            return i;
-        }
-    }
-    return -1;
-}
+KBool KRuntime_MachineExecute(
+    KbVirtualMachine*   pMachine,
+    int                 iStartPos,
+    RuntimeErrorId*     pIntRtErrId,
+    const OpCode**      ppStopOpCode
+) {
+    int             iNumOpCode          = pMachine->pBinHeader->dwNumOpCode;
+    const OpCode*   pOpCodeStart        = (OpCode *)(pMachine->pByteRaw + pMachine->pBinHeader->dwOpCodeBlockStart);
+    KFloat          fResult             = 0;
+    RtValue*        pArrPtrOperands[]   = { NULL, NULL };
 
-void machineMovePushValue(KbMachine* machine, KbRuntimeValue* pRtValue) {
-    vlPushBack(machine->stack, pRtValue);
-}
+    srand(time(NULL));
 
-int machineExecCallUserFuncByIndex(KbMachine* machine, int funcIndex, KbRuntimeError *errorRet) {
-    int currentPos = machine->header->numCmd;
-    int i;
-    const KbExportedFunction* pExpFunc = machineGetFunctionByIndex(machine, funcIndex);
-    KbCallEnv *pEnv = callEnvCreate(currentPos, pExpFunc);
-    for (i = 0; i < pEnv->numArg; ++i) {
-        pEnv->variables[pEnv->numArg - 1 - i] = (KbRuntimeValue *)vlPopBack(machine->stack);
-    }
-    vlPushBack(machine->callEnvStack, pEnv);
-    return machineExec(machine, pExpFunc->pos, errorRet);
-}
-
-int machineExec(KbMachine* machine, int startPos, KbRuntimeError *errorRet) {
-    const KbOpCommand*  cmdBlockPtr = machineCmdStartPointer(machine);
-    int                 numCmd = machine->header->numCmd;
-    KbRuntimeValue*     operand[10];
-    KB_FLOAT            numResult;
-    KbCallEnv*          pCallEnv;
-
-    errorRet->type = KBRE_NO_ERROR;
-    errorRet->message[0] = '\0';
-
-    machineCommandReset(machine);
-    machine->cmdPtr += startPos;
-
-    while (machine->cmdPtr - cmdBlockPtr < numCmd) {
-        const KbOpCommand* cmd = machine->cmdPtr;
-        
-        /* printf("        [%04d] ", machine->cmdPtr - cmdBlockPtr); dbgPrintContextCommand(cmd); printf("\n");*/
-
-        switch(cmd->op) {
-            case KBO_NOP: {
-	            break;
-            }
-            case KBO_PUSH_VAR: {
-                KbRuntimeValue *varValue = machine->variables[cmd->param.index];
-                vlPushBack(machine->stack, rtvalueDuplicate(varValue, KB_FALSE));
-	            break;
-            }
-            case KBO_PUSH_LOCAL: {
-                KbRuntimeValue* varValue;
-                /* 检查函数调用栈 */
-                execGetCurrentCallEnv();
-                varValue = pCallEnv->variables[cmd->param.index];
-                vlPushBack(machine->stack, rtvalueDuplicate(varValue, KB_FALSE));
-	            break;
-            }
-            case KBO_PUSH_NUM: {
-                numResult = cmd->param.number;
-                vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
-	            break;
-            }
-            case KBO_PUSH_STR: {
-                const char *sz = (const char *)(machine->raw + machine->header->stringBlockStart + cmd->param.index);
-                vlPushBack(machine->stack, rtvalueCreateString(sz, KB_TRUE));
-	            break;
-            }
-            case KBO_POP: {
-                KbRuntimeValue *popped = (KbRuntimeValue *)vlPopBack(machine->stack);
-                rtvalueDestroy(popped);
-	            break;
-            }
-            case KBO_OPR_NEG: {
-                execPopAndCheckType(0, RVT_NUMBER);
-
-                numResult = -operand[0]->data.num;
-
-                vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
-                rtvalueDestroy(operand[0]);
-	            break;
-            }
-            case KBO_OPR_CONCAT: {
-                char *concatLeft, *concatRight;
-
-                operand[1] = (KbRuntimeValue *)vlPopBack(machine->stack);
-                operand[0] = (KbRuntimeValue *)vlPopBack(machine->stack);
-
-                concatLeft = rtvalueStringify(operand[0]);
-                concatRight = rtvalueStringify(operand[1]);
-
-                rtvalueDestroy(operand[0]);
-                rtvalueDestroy(operand[1]);
-
-                vlPushBack(machine->stack, rtvalueCreateFromConcat(concatLeft, concatRight));
-
-                free(concatLeft);
-                free(concatRight);
-	            break;
-            }
-            case KBO_OPR_ADD: {
-                execPopAndCheckType(1, RVT_NUMBER);
-                execPopAndCheckType(0, RVT_NUMBER);
-
-                numResult = operand[0]->data.num + operand[1]->data.num;
-
-                vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
-                rtvalueDestroy(operand[0]);
-                rtvalueDestroy(operand[1]);
-	            break;
-            }
-            case KBO_OPR_SUB: {
-                execPopAndCheckType(1, RVT_NUMBER);
-                execPopAndCheckType(0, RVT_NUMBER);
-
-                numResult = operand[0]->data.num - operand[1]->data.num;
-
-                vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
-                rtvalueDestroy(operand[0]);
-                rtvalueDestroy(operand[1]);
-	            break;
-            }
-            case KBO_OPR_MUL: {
-                execPopAndCheckType(1, RVT_NUMBER);
-                execPopAndCheckType(0, RVT_NUMBER);
-
-                numResult = operand[0]->data.num * operand[1]->data.num;
-
-                vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
-                rtvalueDestroy(operand[0]);
-                rtvalueDestroy(operand[1]);
-	            break;
-            }
-            case KBO_OPR_DIV: {
-                execPopAndCheckType(1, RVT_NUMBER);
-                execPopAndCheckType(0, RVT_NUMBER);
-
-                numResult = operand[0]->data.num / operand[1]->data.num;
-                vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
-                rtvalueDestroy(operand[0]);
-                rtvalueDestroy(operand[1]);
-	            break;
-            }
-            case KBO_OPR_POW: {
-                execPopAndCheckType(1, RVT_NUMBER);
-                execPopAndCheckType(0, RVT_NUMBER);
-
-                numResult = pow(operand[0]->data.num, operand[1]->data.num);
-                vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
-                rtvalueDestroy(operand[0]);
-                rtvalueDestroy(operand[1]);
-	            break;
-            }
-            case KBO_OPR_INTDIV: {
-                execPopAndCheckType(1, RVT_NUMBER);
-                execPopAndCheckType(0, RVT_NUMBER);
-
-                numResult = (KB_FLOAT)((int)operand[0]->data.num / (int)operand[1]->data.num);
-
-                vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
-                rtvalueDestroy(operand[0]);
-                rtvalueDestroy(operand[1]);
-	            break;
-            }
-            case KBO_OPR_MOD: {
-                execPopAndCheckType(1, RVT_NUMBER);
-                execPopAndCheckType(0, RVT_NUMBER);
-
-                numResult = (KB_FLOAT)((int)operand[0]->data.num % (int)operand[1]->data.num);
-
-                vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
-                rtvalueDestroy(operand[0]);
-                rtvalueDestroy(operand[1]);
-	            break;
-            }
-            case KBO_OPR_NOT: {
-                /* 旧逻辑，只处理数字 */
-                /*
-                execPopAndCheckType(0, RVT_NUMBER);
-
-                numResult = (KB_FLOAT)(!(int)operand[0]->data.num);
-
-                vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
-                rtvalueDestroy(operand[0]);
-                */
-                /* 新逻辑，除了数字，增加了字符串的逻辑 */
-                KbRuntimeValue* popped = (KbRuntimeValue *)vlPopBack(machine->stack);
-                int isTrue = rtvalueIsTrue(popped);
-                rtvalueDestroy(popped);
-                /* 入栈一个相反的数字值 */
-                vlPushBack(machine->stack, rtvalueCreateNumber((KB_FLOAT)!isTrue));
-	            break;
-            }
-            case KBO_OPR_AND: {
-                execPopAndCheckType(1, RVT_NUMBER);
-                execPopAndCheckType(0, RVT_NUMBER);
-
-                numResult = (KB_FLOAT)((int)operand[0]->data.num && (int)operand[1]->data.num);
-
-                vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
-                rtvalueDestroy(operand[0]);
-                rtvalueDestroy(operand[1]);
-	            break;
-            }
-            case KBO_OPR_OR: {
-                execPopAndCheckType(1, RVT_NUMBER);
-                execPopAndCheckType(0, RVT_NUMBER);
-
-                numResult = (KB_FLOAT)((int)operand[0]->data.num || (int)operand[1]->data.num);
-
-                vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
-                rtvalueDestroy(operand[0]);
-                rtvalueDestroy(operand[1]);
-                break;
-            }
-            case KBO_OPR_EQUAL: {
-                /* 旧版本逻辑，只能比较数值 */
-                /*
-                execPopAndCheckType(1, RVT_NUMBER);
-                execPopAndCheckType(0, RVT_NUMBER);
-
-                numResult = (KB_FLOAT)(operand[0]->data.num == operand[1]->data.num);
-
-                vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
-                rtvalueDestroy(operand[0]);
-                rtvalueDestroy(operand[1]);
-                */
-                /* 新逻辑，可以比较字符串 */
-                numResult = 0;
-                operand[1] = (KbRuntimeValue *)vlPopBack(machine->stack);
-                operand[0] = (KbRuntimeValue *)vlPopBack(machine->stack);
-                /* 类型不同，直接不相等 */
-                if (operand[0]->type != operand[1]->type) {
-                    numResult = 0;
-                }
-                /* 比较字符串 */
-                else if (operand[0]->type == RVT_STRING) {
-                    numResult = StringEqual(operand[0]->data.str.ptr, operand[1]->data.str.ptr);
-                }
-                /* 比较数值 */
-                else if (operand[0]->type == RVT_NUMBER) {
-                    numResult = (KB_FLOAT)(operand[0]->data.num == operand[1]->data.num);
-                }
-                vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
-                rtvalueDestroy(operand[0]);
-                rtvalueDestroy(operand[1]);
-	            break;
-            }
-            case KBO_OPR_EQUAL_REL: {
-                execPopAndCheckType(1, RVT_NUMBER);
-                execPopAndCheckType(0, RVT_NUMBER);
-
-                numResult = (KB_FLOAT)kFloatEqualRel(operand[0]->data.num, operand[1]->data.num);
-
-                vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
-                rtvalueDestroy(operand[0]);
-                rtvalueDestroy(operand[1]);
-	            break;
-            }
-            case KBO_OPR_NEQ: {
-                execPopAndCheckType(1, RVT_NUMBER);
-                execPopAndCheckType(0, RVT_NUMBER);
-
-                numResult = (KB_FLOAT)(operand[0]->data.num != operand[1]->data.num);
-
-                vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
-                rtvalueDestroy(operand[0]);
-                rtvalueDestroy(operand[1]);
-                break;
-            }
-            case KBO_OPR_GT: {
-                execPopAndCheckType(1, RVT_NUMBER);
-                execPopAndCheckType(0, RVT_NUMBER);
-
-                numResult = (KB_FLOAT)(operand[0]->data.num > operand[1]->data.num);
-
-                vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
-                rtvalueDestroy(operand[0]);
-                rtvalueDestroy(operand[1]);
-	            break;
-            }
-            case KBO_OPR_LT: {
-                execPopAndCheckType(1, RVT_NUMBER);
-                execPopAndCheckType(0, RVT_NUMBER);
-
-                numResult = (KB_FLOAT)(operand[0]->data.num < operand[1]->data.num);
-
-                vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
-                rtvalueDestroy(operand[0]);
-                rtvalueDestroy(operand[1]);
-	            break;
-            }
-            case KBO_OPR_GTEQ: {
-                execPopAndCheckType(1, RVT_NUMBER);
-                execPopAndCheckType(0, RVT_NUMBER);
-
-                numResult = (KB_FLOAT)(operand[0]->data.num >= operand[1]->data.num);
-
-                vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
-                rtvalueDestroy(operand[0]);
-                rtvalueDestroy(operand[1]);
-	            break;
-            }
-            case KBO_OPR_LTEQ: {
-                execPopAndCheckType(1, RVT_NUMBER);
-                execPopAndCheckType(0, RVT_NUMBER);
-
-                numResult = (KB_FLOAT)(operand[0]->data.num <= operand[1]->data.num);
-                
-                vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
-                rtvalueDestroy(operand[0]);
-                rtvalueDestroy(operand[1]);
-	            break;
-            }
-            case KBO_CALL_BUILT_IN: {
-                int isCallSuccess = machineExecCallBuiltInFunc(cmd->param.index, machine, errorRet, operand);
-                if (!isCallSuccess) {
-                    return 0;
-                }
-	            break;
-            }
-            case KBO_CALL_USER: {
-                int i;
-                int currentPos = machine->cmdPtr - cmdBlockPtr;
-                const KbExportedFunction* pExpFunc = machineGetFunctionByIndex(machine, cmd->param.index);
-                KbCallEnv *pEnv = callEnvCreate(currentPos, pExpFunc);
-                for (i = 0; i < pEnv->numArg; ++i) {
-                    pEnv->variables[pEnv->numArg - 1 - i] = (KbRuntimeValue *)vlPopBack(machine->stack);
-                }
-                vlPushBack(machine->callEnvStack, pEnv);
-                machine->cmdPtr = cmdBlockPtr + pExpFunc->pos;
-                continue;
-            }
-            case KBO_ASSIGN_VAR: {
-                KbRuntimeValue *varValue = machine->variables[cmd->param.index];
-                KbRuntimeValue *popped = (KbRuntimeValue *)vlPopBack(machine->stack);
-                rtvalueDestroy(varValue);
-                machine->variables[cmd->param.index] = popped;
-	            break;
-            }
-            case KBO_ASSIGN_LOCAL: {
-                KbRuntimeValue *varValue;
-                KbRuntimeValue *popped;
-                /* 检查函数调用栈 */
-                execGetCurrentCallEnv();
-                varValue = pCallEnv->variables[cmd->param.index];
-                popped = (KbRuntimeValue *)vlPopBack(machine->stack);
-                rtvalueDestroy(varValue);
-                pCallEnv->variables[cmd->param.index] = popped;
-	            break;
-            }
-            case KBO_ARR_DIM: {
-                int             arraySize = 0;
-                KbRuntimeValue* oldValue;
-                KbRuntimeValue* newValue;
-                /* 获取数组大小 */
-                execPopAndCheckType(0, RVT_NUMBER);
-                arraySize = (int)operand[0]->data.num;
-                if (arraySize < 1 || arraySize > KRE_MAX_ARRAY_SIZE) {
-                    execReturnErrorWithInt(KBRE_ARRAY_INVALID_SIZE, arraySize);
-                }
-                /* 释放旧的变量内容，替换为新数组 */
-                oldValue = machine->variables[cmd->param.index];
-                newValue = rtvalueCreateArray(arraySize);
-                rtvalueMoveArrayContent(oldValue, newValue);
-                machine->variables[cmd->param.index] = newValue;
-                rtvalueDestroy(oldValue);
-	            break;
-            }
-            case KBO_ARR_DIM_LOCAL: {
-                int             arraySize = 0;
-                KbCallEnv*      pCallEnv;
-                KbRuntimeValue* oldValue;
-                KbRuntimeValue* newValue;
-                /* 检查函数调用栈 */
-                execGetCurrentCallEnv();
-                /* 获取数组大小 */
-                execPopAndCheckType(0, RVT_NUMBER);
-                arraySize = (int)operand[0]->data.num;
-                if (arraySize < 1 || arraySize > KRE_MAX_ARRAY_SIZE) {
-                    execReturnErrorWithInt(KBRE_ARRAY_INVALID_SIZE, arraySize);
-                }
-                /* 释放旧的变量内容，替换为新数组 */
-                oldValue = pCallEnv->variables[cmd->param.index];
-                newValue = rtvalueCreateArray(arraySize);
-                rtvalueMoveArrayContent(oldValue, newValue);
-                pCallEnv->variables[cmd->param.index] = newValue;
-                rtvalueDestroy(oldValue);
-	            break;
-            }
-            case KBO_ARR_GET: {
-                int             subscript;
-                KbRuntimeValue* array;
-                /* 获取下标 */
-                execPopAndCheckType(0, RVT_NUMBER);
-                subscript = (int)operand[0]->data.num;
-                /* 检查数组是否合法、是否越界 */
-                array = machine->variables[cmd->param.index];
-                execValidateArrayAccess(array, subscript);
-                /* 数组下标对应元素入栈 */
-                vlPushBack(machine->stack, rtvalueDuplicate(array->data.arr.el[subscript], KB_FALSE));
-	            break;
-            }
-            case KBO_ARR_GET_LOCAL: {
-                int             subscript;
-                KbRuntimeValue* array;
-                /* 检查函数调用栈 */
-                execGetCurrentCallEnv();
-                /* 获取下标 */
-                execPopAndCheckType(0, RVT_NUMBER);
-                subscript = (int)operand[0]->data.num;
-                /* 检查数组是否合法、是否越界 */
-                array = pCallEnv->variables[cmd->param.index];
-                execValidateArrayAccess(array, subscript);
-                /* 数组下标对应元素入栈 */
-                vlPushBack(machine->stack, rtvalueDuplicate(array->data.arr.el[subscript], KB_FALSE));
-	            break;
-            }
-            case KBO_ARR_SET: {
-                KbRuntimeValue* popped;
-                int             subscript;
-                KbRuntimeValue* array;
-                /* 获取将赋值的值 */
-                popped = (KbRuntimeValue *)vlPopBack(machine->stack);
-                /* 获取下标 */
-                execPopAndCheckType(0, RVT_NUMBER);
-                subscript = (int)operand[0]->data.num;
-                /* 检查数组是否合法、是否越界 */
-                array = machine->variables[cmd->param.index];
-                execValidateArrayAccess(array, subscript);
-                /* 释放旧值并赋新值 */
-                rtvalueDestroy(array->data.arr.el[subscript]);
-                array->data.arr.el[subscript] = popped;
-	            break;
-            }
-            case KBO_ARR_SET_LOCAL: {
-                KbRuntimeValue* popped;
-                int             subscript;
-                KbRuntimeValue* array;
-                /* 检查函数调用栈 */
-                execGetCurrentCallEnv();
-                /* 获取将赋值的值 */
-                popped = (KbRuntimeValue *)vlPopBack(machine->stack);
-                /* 获取下标 */
-                execPopAndCheckType(0, RVT_NUMBER);
-                subscript = (int)operand[0]->data.num;
-                /* 检查数组是否合法、是否越界 */
-                array = pCallEnv->variables[cmd->param.index];
-                execValidateArrayAccess(array, subscript);
-                /* 释放旧值并赋新值 */
-                rtvalueDestroy(array->data.arr.el[subscript]);
-                array->data.arr.el[subscript] = popped;
-	            break;
-            }
-            case KBO_GOTO: {
-                machine->cmdPtr = cmdBlockPtr + cmd->param.index;
-	            continue;
-            }
-            case KBO_IF_GOTO: {
-                KbRuntimeValue *popped = (KbRuntimeValue *)vlPopBack(machine->stack);
-                int isTrue = rtvalueIsTrue(popped);
-                rtvalueDestroy(popped);
-                if (isTrue) {
-                    machine->cmdPtr = cmdBlockPtr + cmd->param.index;
-                    continue;
-                }
-                break;
-            }
-            case KBO_UNLESS_GOTO: {
-                KbRuntimeValue *popped = (KbRuntimeValue *)vlPopBack(machine->stack);
-                int isTrue = rtvalueIsTrue(popped);
-                rtvalueDestroy(popped);
-                if (!isTrue) {
-                    machine->cmdPtr = cmdBlockPtr + cmd->param.index;
-                    continue;
-                }
-                break;
-            }
-            case KBO_RETURN: {
-                KbCallEnv* pCallEnv;
-                if (machine->callEnvStack->size <= 0) {
-                    execReturnErrorWithInt(KBRE_NOT_IN_USER_FUNC, cmd->op);
-                }
-                pCallEnv = (KbCallEnv *)vlPopBack(machine->callEnvStack);
-                machine->cmdPtr = cmdBlockPtr + pCallEnv->prevCmdPos + 1;
-                callEnvDestroy(pCallEnv);
-                continue;
-            }
-            case KBO_STOP: {
-	            goto stopExec;
-            }
+    *pIntRtErrId = RUNTIME_NONE;
+    pMachine->iStopValue = 0;
+    
+    machineOpCodePosReset(pMachine);
+    pMachine->pOpCodeCur += iStartPos;
+    
+    while (pMachine->pOpCodeCur - pOpCodeStart < iNumOpCode) {
+        const OpCode* pOpCode = pMachine->pOpCodeCur;
+        /* 
+        printf("%03d | %-18s \n", pMachine->pOpCodeCur - pOpCodeStart, getOpCodeName(pOpCode->dwOpCodeId));
+         */
+        switch(pOpCode->dwOpCodeId) {
             default: {
-                execReturnErrorWithInt(KBRE_UNKNOWN_CMD, cmd->op);
+                returnExecError(RUNTIME_UNKNOWN_OPCODE);
                 break;
             }
+            case K_OPCODE_PUSH_NUM: {
+                pushNumericOperand(pOpCode->uParam.fLiteral);
+                break;
+            }
+            case K_OPCODE_PUSH_STR: {
+                vlPushBack(
+                    pMachine->pStackOperand,
+                    createStringRefRtValue(
+                        (const char *)pMachine->pBinHeader + 
+                        pMachine->pBinHeader->dwStringPoolStart + 
+                        pOpCode->uParam.dwStringPoolPos
+                    )
+                );
+                break;
+            }
+            case K_OPCODE_BINARY_OPERATOR: {
+                popRtValue(pRtOperandRight);
+                popRtValue(pRtOperandLeft);
+
+                switch (pOpCode->uParam.dwOperatorId) {
+                    default: {
+                        returnExecError(RUNTIME_UNKNOWN_OPERATOR);
+                        break;
+                    }
+                    case OPR_CONCAT: {
+                        vlPushBack(pMachine->pStackOperand, createStringRtValueFromConcat(pRtOperandLeft, pRtOperandRight));
+                        break;
+                    }
+                    case OPR_ADD: {
+                        checkRtValueTypeIs(pRtOperandLeft, RT_VALUE_NUMBER);
+                        checkRtValueTypeIs(pRtOperandRight, RT_VALUE_NUMBER);
+                        fResult = pRtOperandLeft->uData.fNumber + pRtOperandRight->uData.fNumber;
+                        pushNumericOperand(fResult);
+                        break;
+                    }
+                    case OPR_SUB: {
+                        checkRtValueTypeIs(pRtOperandLeft, RT_VALUE_NUMBER);
+                        checkRtValueTypeIs(pRtOperandRight, RT_VALUE_NUMBER);
+                        fResult = pRtOperandLeft->uData.fNumber - pRtOperandRight->uData.fNumber;
+                        pushNumericOperand(fResult);
+                        break;
+                    }
+                    case OPR_MUL: {
+                        checkRtValueTypeIs(pRtOperandLeft, RT_VALUE_NUMBER);
+                        checkRtValueTypeIs(pRtOperandRight, RT_VALUE_NUMBER);
+                        fResult = pRtOperandLeft->uData.fNumber * pRtOperandRight->uData.fNumber;
+                        pushNumericOperand(fResult);
+                        break;
+                    }
+                    case OPR_DIV: {
+                        checkRtValueTypeIs(pRtOperandLeft, RT_VALUE_NUMBER);
+                        checkRtValueTypeIs(pRtOperandRight, RT_VALUE_NUMBER);
+
+                        if (pRtOperandRight->uData.fNumber == 0) {
+                            returnExecError(RUNTIME_DIVISION_BY_ZERO);
+                        }
+
+                        fResult = pRtOperandLeft->uData.fNumber / pRtOperandRight->uData.fNumber;
+                        pushNumericOperand(fResult);
+                        break;
+                    }
+                    case OPR_POW: {
+                        checkRtValueTypeIs(pRtOperandLeft, RT_VALUE_NUMBER);
+                        checkRtValueTypeIs(pRtOperandRight, RT_VALUE_NUMBER);
+                        fResult = pow(pRtOperandLeft->uData.fNumber, pRtOperandRight->uData.fNumber);
+                        pushNumericOperand(fResult);
+                        break;
+                    }
+                    case OPR_INTDIV: {
+                        checkRtValueTypeIs(pRtOperandLeft, RT_VALUE_NUMBER);
+                        checkRtValueTypeIs(pRtOperandRight, RT_VALUE_NUMBER);
+
+                        if (pRtOperandRight->uData.fNumber == 0) {
+                            returnExecError(RUNTIME_DIVISION_BY_ZERO);
+                        }
+
+                        fResult = (int)(pRtOperandLeft->uData.fNumber / pRtOperandRight->uData.fNumber);
+                        pushNumericOperand(fResult);
+                        break;
+                    }
+                    case OPR_MOD: {
+                        checkRtValueTypeIs(pRtOperandLeft, RT_VALUE_NUMBER);
+                        checkRtValueTypeIs(pRtOperandRight, RT_VALUE_NUMBER);
+                        fResult = ((int)pRtOperandLeft->uData.fNumber) % ((int)pRtOperandRight->uData.fNumber);
+                        pushNumericOperand(fResult);
+                        break;
+                    }
+                    case OPR_AND: {
+                        fResult = canBeConsideredAsTrue(pRtOperandLeft) && canBeConsideredAsTrue(pRtOperandRight);
+                        pushNumericOperand(fResult);
+                        break;
+                    }
+                    case OPR_OR: {
+                        fResult = canBeConsideredAsTrue(pRtOperandLeft) || canBeConsideredAsTrue(pRtOperandRight);
+                        pushNumericOperand(fResult);
+                        break;
+                    }
+                    case OPR_EQUAL: {
+                        fResult = canBeConsideredEqual(pRtOperandLeft, pRtOperandRight);
+                        pushNumericOperand(fResult);
+                        break;
+                    }
+                    case OPR_APPROX_EQ: {
+                        checkRtValueTypeIs(pRtOperandLeft, RT_VALUE_NUMBER);
+                        checkRtValueTypeIs(pRtOperandRight, RT_VALUE_NUMBER);
+                        fResult = FloatEqualRel(pRtOperandLeft->uData.fNumber, pRtOperandRight->uData.fNumber);
+                        pushNumericOperand(fResult);
+                        break;
+                    }
+                    case OPR_NEQ: {
+                        fResult = !canBeConsideredEqual(pRtOperandLeft, pRtOperandRight);
+                        pushNumericOperand(fResult);
+                        break;
+                    }
+                    case OPR_GT: {
+                        checkRtValueTypeIs(pRtOperandLeft, RT_VALUE_NUMBER);
+                        checkRtValueTypeIs(pRtOperandRight, RT_VALUE_NUMBER);
+                        fResult = pRtOperandLeft->uData.fNumber > pRtOperandRight->uData.fNumber;
+                        pushNumericOperand(fResult);
+                        break;
+                    }
+                    case OPR_LT: {
+                        checkRtValueTypeIs(pRtOperandLeft, RT_VALUE_NUMBER);
+                        checkRtValueTypeIs(pRtOperandRight, RT_VALUE_NUMBER);
+                        fResult = pRtOperandLeft->uData.fNumber < pRtOperandRight->uData.fNumber;
+                        pushNumericOperand(fResult);
+                        break;
+                    }
+                    case OPR_GTEQ: {
+                        checkRtValueTypeIs(pRtOperandLeft, RT_VALUE_NUMBER);
+                        checkRtValueTypeIs(pRtOperandRight, RT_VALUE_NUMBER);
+                        fResult = pRtOperandLeft->uData.fNumber >= pRtOperandRight->uData.fNumber;
+                        pushNumericOperand(fResult);
+                        break;
+                    }
+                    case OPR_LTEQ: {
+                        checkRtValueTypeIs(pRtOperandLeft, RT_VALUE_NUMBER);
+                        checkRtValueTypeIs(pRtOperandRight, RT_VALUE_NUMBER);
+                        fResult = pRtOperandLeft->uData.fNumber <= pRtOperandRight->uData.fNumber;
+                        pushNumericOperand(fResult);
+                        break;
+                    }
+                }
+
+                cleanUpOperands();
+                break;
+            }
+            case K_OPCODE_UNARY_OPERATOR: {
+                popRtValue(pRtOperandLeft);
+                
+                switch (pOpCode->uParam.dwOperatorId) {
+                    default: {
+                        returnExecError(RUNTIME_UNKNOWN_OPERATOR);
+                        break;
+                    }
+                    case OPR_NEG: {
+                        checkRtValueTypeIs(pRtOperandLeft, RT_VALUE_NUMBER);
+                        pushNumericOperand(-pRtOperandLeft->uData.fNumber);
+                        break;
+                    }
+                    case OPR_NOT: {
+                        pushNumericOperand(!canBeConsideredAsTrue(pRtOperandLeft));
+                        break;
+                    }
+                }
+
+                cleanUpOperands();
+                break;
+            }
+            case K_OPCODE_POP: {
+                if (pMachine->pStackOperand->size <= 0) {
+                    returnExecError(RUNTIME_STACK_UNDERFLOW);
+                }
+                destroyRtValue(vlPopBack(pMachine->pStackOperand));
+                break;
+            }
+            case K_OPCODE_PUSH_VAR: {
+                RtValue** pPtrVar = NULL;
+                getVariable(pPtrVar);
+                vlPushBack(pMachine->pStackOperand, createRefRtValue(*pPtrVar));
+                break;
+            }
+            case K_OPCODE_SET_VAR: {
+                RtValue** pPtrVar = NULL;
+                /* 获取变量指针 */
+                getVariable(pPtrVar);
+                /* 弹出栈顶的值 */
+                popRtValue(pRtOperandLeft);
+                /* 释放变量旧值 */
+                destroyRtValue(*pPtrVar);
+                /* 出栈的值写入变量位置 */
+                *pPtrVar = pRtOperandLeft;
+                /* 不释放弹出的值 */
+                pRtOperandLeft = NULL;
+                break;
+            }
+            case K_OPCODE_SET_VAR_AS_ARRAY: {
+                RtValue** pPtrVar = NULL;
+                int iArraySize = 0;
+                /* 获取变量指针 */
+                getVariable(pPtrVar);
+                /* 弹出数组尺寸 */
+                popRtValue(pRtOperandLeft);
+                /* 检查尺寸是否是数值 */
+                checkRtValueTypeIs(pRtOperandLeft, RT_VALUE_NUMBER);
+                /* 检查尺寸是否合法 */
+                iArraySize = (int)pRtOperandLeft->uData.fNumber;
+                if (iArraySize <= 0) {
+                    returnExecError(RUNTIME_ARRAY_INVALID_SIZE);
+                }
+                /* 释放弹出的值 */
+                cleanUpOperands();
+                /* 创建的数组写入变量 */
+                *pPtrVar = createArrayRtValue(iArraySize);
+                break;
+            }
+            case K_OPCODE_ARR_GET: {
+                RtValue** pPtrVar = NULL;
+                int iSubscript;
+                /* 获取变量指针 */
+                getVariable(pPtrVar);
+                /* 检查是不是数组 */
+                if ((*pPtrVar)->iType != RT_VALUE_ARRAY) {
+                    returnExecError(RUNTIME_NOT_ARRAY);
+                }
+                /* 弹出下标 */
+                popRtValue(pRtOperandLeft);
+                /* 检查下标是否是数值 */
+                checkRtValueTypeIs(pRtOperandLeft, RT_VALUE_NUMBER);
+                /* 检查下标是否合法 */
+                iSubscript = (int)pRtOperandLeft->uData.fNumber;
+                if (iSubscript < 0 || iSubscript >= (*pPtrVar)->uData.sArray.iSize) {
+                    returnExecError(RUNTIME_ARRAY_OUT_OF_BOUNDS);
+                }
+                /* 释放弹出的值 */
+                cleanUpOperands();
+                /* 数组元素入栈 */
+                vlPushBack(pMachine->pStackOperand, createRefRtValue((*pPtrVar)->uData.sArray.pArrPtrElements[iSubscript]));
+                break;
+            }
+            case K_OPCODE_ARR_SET: {
+                RtValue** pPtrVar = NULL;
+                int iSubscript;
+                /* 获取变量指针 */
+                getVariable(pPtrVar);
+                /* 检查是不是数组 */
+                if ((*pPtrVar)->iType != RT_VALUE_ARRAY) {
+                    returnExecError(RUNTIME_NOT_ARRAY);
+                }
+                /* 弹出右值 */
+                popRtValue(pRtOperandRight);
+                /* 弹出下标 */
+                popRtValue(pRtOperandLeft);
+                /* 检查下标是否是数值 */
+                checkRtValueTypeIs(pRtOperandLeft, RT_VALUE_NUMBER);
+                /* 检查下标是否合法 */
+                iSubscript = (int)pRtOperandLeft->uData.fNumber;
+                if (iSubscript < 0 || iSubscript >= (*pPtrVar)->uData.sArray.iSize) {
+                    returnExecError(RUNTIME_ARRAY_OUT_OF_BOUNDS);
+                }
+                /* 释放数组元素旧值 */
+                destroyRtValue((*pPtrVar)->uData.sArray.pArrPtrElements[iSubscript]);
+                /* 出栈的值赋值给数组元素 */
+                (*pPtrVar)->uData.sArray.pArrPtrElements[iSubscript] = pRtOperandRight;
+                /* 不释放右值，已经赋值给元素了 */
+                pRtOperandRight = NULL;
+                /* 释放弹出的值 */
+                cleanUpOperands();
+                break;
+            }
+            case K_OPCODE_CALL_BUILT_IN: {
+                switch (pOpCode->uParam.dwBuiltFuncId) {
+                    default: {
+                        returnExecError(RUNTIME_UNKNOWN_BUILT_IN_FUNC);
+                    }
+                    case KBUILT_IN_FUNC_P: {
+                        const char* szStringified;
+                        KBool bNeedDispose;
+                        /* 弹出要打印的值 */
+                        popRtValue(pRtOperandLeft);
+                        /* 字符串化 */
+                        szStringified = stringifyRtValue(pRtOperandLeft, &bNeedDispose);
+                        printf("%s", szStringified);
+                        /* 释放临时字符串 */
+                        if (bNeedDispose) free((void *)szStringified);
+                        /* 释放弹出的值 */
+                        cleanUpOperands();
+                        /* 添加返回值 0 */
+                        pushNumericOperand(0);
+                        break; 
+                    }
+                    case KBUILT_IN_FUNC_SIN: {
+                        callMathFunc(sinf);
+                        break;
+                    }
+                    case KBUILT_IN_FUNC_COS: {
+                        callMathFunc(cosf);
+                        break;
+                    }
+                    case KBUILT_IN_FUNC_TAN: {
+                        callMathFunc(tanf);
+                        break;
+                    }
+                    case KBUILT_IN_FUNC_SQRT: {
+                        callMathFunc(sqrtf);
+                        break;
+                    }
+                    case KBUILT_IN_FUNC_EXP: {
+                        callMathFunc(expf);
+                        break;
+                    }
+                    case KBUILT_IN_FUNC_ABS: {
+                        callMathFunc(fabsf);
+                        break;
+                    }
+                    case KBUILT_IN_FUNC_LOG: {
+                        callMathFunc(logf);
+                        break;
+                    }
+                    case KBUILT_IN_FUNC_FLOOR: {
+                        callMathFunc(floorf);
+                        break;
+                    }
+                    case KBUILT_IN_FUNC_CEIL: {
+                        callMathFunc(ceilf);
+                        break;
+                    }
+                    case KBUILT_IN_FUNC_RAND: {
+                        const int iMax = 10000;
+                        const int iRandVal = rand() % iMax;
+                        fResult = ((KFloat)iRandVal) / ((KFloat) iMax);
+                        pushNumericOperand(fResult);
+                        break;
+                    }
+                    case KBUILT_IN_FUNC_LEN: {
+                        int iLength = 0;
+                        /* 弹出需要求长度的值 */
+                        popRtValue(pRtOperandLeft);
+                        /* 根据不同类型计算长度 */
+                        switch (pRtOperandLeft->iType) {
+                            default:
+                                returnExecError(RUNTIME_TYPE_MISMATCH);
+                                break;
+                            case RT_VALUE_ARRAY:
+                                iLength = pRtOperandLeft->uData.sArray.iSize;
+                                break;
+                            case RT_VALUE_ARRAY_REF:
+                                iLength = pRtOperandLeft->uData.pArrRef->iSize;
+                                break;
+                            case RT_VALUE_STRING:
+                                iLength = strlen(pRtOperandLeft->uData.sString.uContent.pReadOnly);
+                                break;
+                        }
+                        /* 清理弹出的值 */
+                        cleanUpOperands(); 
+                        /* 长度入栈 */
+                        pushNumericOperand(iLength);
+                        break;
+                    }
+                    case KBUILT_IN_FUNC_VAL: {
+                        /* 弹出字符串 */
+                        popRtValue(pRtOperandLeft);
+                        /* 检查是不是字符串 */
+                        checkRtValueTypeIs(pRtOperandLeft, RT_VALUE_STRING);
+                        /* 转换为数值 */
+                        fResult = (KFloat)Atof(pRtOperandLeft->uData.sString.uContent.pReadOnly);
+                        /* 释放弹出的值 */
+                        cleanUpOperands();
+                        /* 转换的数值入栈 */
+                        pushNumericOperand(fResult);
+                        break;
+                    }
+                    case KBUILT_IN_FUNC_CHR: {
+                        char szAscStr[] = { 0, 0 };
+                        /* 弹出要要转为字符串的 ASCII 值 */
+                        popRtValue(pRtOperandLeft);
+                        /* 检查是否是数值 */
+                        checkRtValueTypeIs(pRtOperandLeft, RT_VALUE_NUMBER);
+                        /* 转为字符串 */
+                        szAscStr[0] = (int)pRtOperandLeft->uData.fNumber;
+                        /* 释放弹出的值 */
+                        cleanUpOperands();
+                        /* 生成的字符串作为返回值 */
+                        vlPushBack(pMachine->pStackOperand, createStringRtValue(StringDump(szAscStr)));
+                        break; 
+                    }
+                    case KBUILT_IN_FUNC_ASC: {
+                        /* 弹出字符串 */
+                        popRtValue(pRtOperandLeft);
+                        /* 检查是否是字符串 */
+                        checkRtValueTypeIs(pRtOperandLeft, RT_VALUE_STRING);
+                        /* 字符串第一个字符转数字 */
+                        fResult = pRtOperandLeft->uData.sString.uContent.pReadOnly[0];
+                        /* 释放弹出的值 */
+                        cleanUpOperands();
+                        /* 生成的字符串作为返回值 */
+                        pushNumericOperand(fResult);
+                        break; 
+                    }
+                }
+                break;
+            }
+            case K_OPCODE_GOTO: {
+                pMachine->pOpCodeCur = pOpCodeStart + pOpCode->uParam.dwOpCodePos;
+                continue;
+            }
+            case K_OPCODE_IF_GOTO: {
+                KBool bCondition = KB_FALSE;
+                /* 弹出条件值 */
+                popRtValue(pRtOperandLeft);
+                /* 条件值能否被视为 True */
+                bCondition = canBeConsideredAsTrue(pRtOperandLeft);
+                /* 释放条件值 */
+                cleanUpOperands();
+                /* 跳转 */
+                if (bCondition) {
+                    pMachine->pOpCodeCur = pOpCodeStart + pOpCode->uParam.dwOpCodePos;
+                    continue;
+                }
+                break;
+            }
+            case K_OPCODE_UNLESS_GOTO: {
+                KBool bCondition = KB_FALSE;
+                /* 弹出条件值 */
+                popRtValue(pRtOperandLeft);
+                /* 条件值能否被视为 True */
+                bCondition = canBeConsideredAsTrue(pRtOperandLeft);
+                /* 释放条件值 */
+                cleanUpOperands();
+                /* 跳转 */
+                if (!bCondition) {
+                    pMachine->pOpCodeCur = pOpCodeStart + pOpCode->uParam.dwOpCodePos;
+                    continue;
+                }
+                break;
+            }
+            case K_OPCODE_CALL_FUNC: {
+                int                 i;
+                int                 iCurrentPos = pMachine->pOpCodeCur - pOpCodeStart;
+                const BinFuncInfo*  pFuncInfo   = pMachine->pArrFuncInfo + pOpCode->uParam.dwFuncIndex;
+                CallEnv*            pCallEnv    = createCallEnv(iCurrentPos, pFuncInfo);
+                
+                /* 新调用环境入调用环境栈 */
+                vlPushBack(pMachine->pStackCallEnv, pCallEnv);
+                
+                /* 操作数出栈作为函数调用的参数 */
+                for (i = 0; i < pCallEnv->iNumParams; ++i) {
+                    RtValue* pRtValue;
+                    popRtValue(pRtValue);
+                    pCallEnv->pArrPtrLocalVars[pCallEnv->iNumParams - 1 - i] = pRtValue;
+                }
+                
+                /* opCode 跳转 */
+                pMachine->pOpCodeCur = pOpCodeStart + pFuncInfo->dwOpCodePos;
+                continue;
+            }
+            case K_OPCODE_RETURN: {
+                CallEnv* pCallEnv;
+                if (pMachine->pStackCallEnv->size <= 0) {
+                    returnExecError(RUNTIME_NOT_IN_USER_FUNC);
+                }
+                pCallEnv = (CallEnv *)vlPopBack(pMachine->pStackCallEnv);
+
+                /* 回去原来的位置 */
+                pMachine->pOpCodeCur = pOpCodeStart + pCallEnv->iPrevOpCodePos + 1;
+
+                /* 销毁调用环境 */
+                destroyCallEnv(pCallEnv);
+                continue;
+            }
+            case K_OPCODE_STOP: {
+                /* 弹出停止数值 */
+                popRtValue(pRtOperandLeft);
+                /* 检查类型是否是数字 */
+                checkRtValueTypeIs(pRtOperandLeft, RT_VALUE_NUMBER);
+                /* 停止数值写入机器 */
+                pMachine->iStopValue = (int)pRtOperandLeft->uData.fNumber;
+                /* 释放弹出的值 */
+                cleanUpOperands();
+                /* 结束运行 */
+                return KB_TRUE;
+            }
         }
-        ++machine->cmdPtr;
+        pMachine->pOpCodeCur++;
     }
 
-stopExec:
-
-    return 1;
-}
-
-#define machineExecCallBuiltInFuncSingleArg(mathFuncPtr) NULL;      \
-    execPopAndCheckType(0, RVT_NUMBER);                             \
-    numResult = (KB_FLOAT)mathFuncPtr(operand[0]->data.num);        \
-    vlPushBack(machine->stack, rtvalueCreateNumber(numResult));     \
-    rtvalueDestroy(operand[0])
-
-int machineExecCallBuiltInFunc (int funcId, KbMachine* machine, KbRuntimeError *errorRet, KbRuntimeValue ** operand) {
-    KB_FLOAT numResult;
-    switch (funcId) {
-        case KFID_P: {
-            KbRuntimeValue *popped = (KbRuntimeValue *)vlPopBack(machine->stack);
-#ifndef DISABLE_P_FUNCTION
-            char *sz = rtvalueStringify(popped);
-            printf("%s\n", sz);
-            free(sz);
-#endif
-            rtvalueDestroy(popped);
-            vlPushBack(machine->stack, rtvalueCreateNumber(0));
-            return 1;
-        }
-        case KFID_SIN: {
-            machineExecCallBuiltInFuncSingleArg(sin);
-            return 1;
-        }
-        case KFID_COS: {
-            machineExecCallBuiltInFuncSingleArg(cos);
-            return 1;
-        }
-        case KFID_TAN: {
-            machineExecCallBuiltInFuncSingleArg(tan);
-            return 1;
-        }
-        case KFID_SQRT: {
-            machineExecCallBuiltInFuncSingleArg(sqrt);
-            return 1;
-        }
-        case KFID_EXP: {
-            machineExecCallBuiltInFuncSingleArg(exp);
-            return 1;
-        }
-        case KFID_ABS: {
-            machineExecCallBuiltInFuncSingleArg(fabs);
-            return 1;
-        }
-        case KFID_LOG: {
-            machineExecCallBuiltInFuncSingleArg(log);
-            return 1;
-        }
-        case KFID_RAND: {
-            int randInt = rand() % 1000;
-            vlPushBack(machine->stack, rtvalueCreateNumber(1.0f * randInt / 1000));
-            return 1;
-        }
-        case KFID_LEN: {
-            execPopAndCheckType(0, RVT_STRING);
-            numResult = strlen(operand[0]->data.str.ptr);
-            vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
-            rtvalueDestroy(operand[0]);
-            return 1;
-        }
-        case KFID_VAL: {
-            execPopAndCheckType(0, RVT_STRING);
-            numResult = kAtof(operand[0]->data.str.ptr);
-            vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
-            rtvalueDestroy(operand[0]);
-            return 1;
-        }
-        case KFID_ASC: {
-            execPopAndCheckType(0, RVT_STRING);
-            if (strlen(operand[0]->data.str.ptr) <= 0) {
-                numResult = 0;
-            }
-            else {
-                numResult = (KB_FLOAT)operand[0]->data.str.ptr[0];
-            }
-            vlPushBack(machine->stack, rtvalueCreateNumber(numResult));
-            return 1;
-        }
-        case KFID_ZEROPAD: {
-            int digits;
-            int max = sizeof(stringifyBuf);
-            char *buf = stringifyBuf;
-            int oldLength;
-
-            execPopAndCheckType(1, RVT_NUMBER);
-            execPopAndCheckType(0, RVT_NUMBER);
-
-            digits = (int)operand[1]->data.num;
-            kFtoa(operand[0]->data.num, buf, max);
-            oldLength = strlen(buf);
-
-            if (digits < max - 1 && oldLength < digits) {
-                int i;
-                int needed = digits - oldLength;
-                for (i = 0; i < oldLength; ++i) {
-                    buf[i + needed] = buf[i];
-                }
-                buf[i + needed] = '\0';
-                for (i = 0; i < needed; ++i) {
-                    buf[i] = '0';
-                }
-            }
-
-            vlPushBack(machine->stack, rtvalueCreateString(buf, KB_FALSE));
-            rtvalueDestroy(operand[0]);
-            rtvalueDestroy(operand[1]);
-            
-            return 1;
-        }
-    }
-    execReturnErrorWithInt(KBRE_UNKNOWN_BUILT_IN_FUNC, funcId);
+    return KB_TRUE;
 }
