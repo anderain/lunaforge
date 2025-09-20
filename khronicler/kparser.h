@@ -62,6 +62,11 @@ typedef enum tagAstNodeType {
     AST_FUNCTION_CALL
 } AstNodeType;
 
+typedef struct tagKbAstFuncParam {
+    VarDeclTypeId   iType;
+    char            szName[1];
+} KbAstFuncParam;
+
 typedef struct tagAstNode {
     int                 iType;
     int                 iControlId;
@@ -74,7 +79,7 @@ typedef struct tagAstNode {
         } sProgram;
         struct {
             char* szFunction;
-            Vlist* pListParameters; /* <char *> */
+            Vlist* pListParameters; /* <AstFuncParam> */
             Vlist* pListStatements; /* <AstNode> */
         } sFunctionDeclare;
         struct {

@@ -31,6 +31,7 @@
 #define destroyAst          KAstNode_Destroy
 #define initParser          KSourceParser_Initialize
 #define parseAsAst          KSourceParser_Parse
+#define AstFuncParam        KbAstFuncParam
 #define AstNode             KbAstNode
 #define Parser              KbSourceParser
 
@@ -48,6 +49,7 @@
 #define getOpCodeName           Kommon_GetOpCodeName
 #define getOperatorPriorityById Kommon_GetOperatorPriorityById
 #define getOperatorNameById     Kommon_GetOperatorNameById
+#define getVarDeclTypeNameById  Kommon_GetVarDeclTypeName
 #define BinHeader               KbBinaryHeader
 #define BinFuncInfo             KbBinaryFunctionInfo
 
@@ -61,5 +63,6 @@
 #define Machine             KbVirtualMachine
 #define RtValue             KbRuntimeValue
 #define CallEnv             KbCallEnv
+#define RuntimeArray        KbRuntimeArray
 
 #endif

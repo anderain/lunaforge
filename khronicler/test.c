@@ -137,7 +137,8 @@ static void printAstNodeAsXml(FILE* fp, AstNode* pAstNode, int iTabLevel) {
             printTab(fp, iTabLevel + 1); fprintf(fp, "<Name> %s </Name>\n", pAstNode->uData.sFunctionDeclare.szFunction);
             printTab(fp, iTabLevel + 1); fprintf(fp, "<Parameters>\n");
             for (pVlNode = pAstNode->uData.sFunctionDeclare.pListParameters->head; pVlNode; pVlNode = pVlNode->next) {
-                printTab(fp, iTabLevel + 2); fprintf(fp, "<Parameter name=\"%s\" />\n", (char *)pVlNode->data);
+                AstFuncParam* pFuncParam = (AstFuncParam *)pVlNode->data;
+                printTab(fp, iTabLevel + 2); fprintf(fp, "<Parameter name=\"%s\" type=\"%s\" />\n", pFuncParam->szName, getVarDeclTypeNameById(pFuncParam->iType));
             }
             printTab(fp, iTabLevel + 1); fprintf(fp, "</Parameters>\n");
             printTab(fp, iTabLevel + 1); fprintf(fp, "<Statements>\n");
@@ -393,17 +394,19 @@ static void printAstNodeAsJson(FILE* fp, AstNode* pAstNode, int iTabLevel, KBool
         case AST_FUNCTION_DECLARE:
             printTab(fp, iTabLevel + 1); fprintf(fp, "\"controlId\": %d,\n", pAstNode->iControlId);
             printTab(fp, iTabLevel + 1); fprintf(fp, "\"name\": \"%s\",\n", pAstNode->uData.sFunctionDeclare.szFunction);
-            printTab(fp, iTabLevel + 1); fprintf(fp, "\"parameters\": [");
+            printTab(fp, iTabLevel + 1); fprintf(fp, "\"parameters\": [\n");
             for (pVlNode = pAstNode->uData.sFunctionDeclare.pListParameters->head; pVlNode; pVlNode = pVlNode->next) {
-                fprintf(fp, "\"%s\"", (const char *)pVlNode->data);
+                AstFuncParam* pFuncParam = (AstFuncParam *)pVlNode->data;
+                printTab(fp, iTabLevel + 2);
+                fprintf(fp, "{ \"name\": \"%s\", \"type\": \"%s\" }", pFuncParam->szName, getVarDeclTypeNameById(pFuncParam->iType));
                 if (pVlNode->next != NULL) {
-                    fprintf(fp, ", ");
+                    fprintf(fp, ",\n");
                 }
                 else {
-                    fprintf(fp, "");
+                    fprintf(fp, "\n");
                 }
             }
-            fprintf(fp, "],\n");
+            printTab(fp, iTabLevel + 1); fprintf(fp, "],\n");
             printTab(fp, iTabLevel + 1); fprintf(fp, "\"statements\": [\n");
             printAstNodeStatementsAsJson(fp, pAstNode->uData.sFunctionDeclare.pListStatements, iTabLevel + 1);
             printTab(fp, iTabLevel + 1); fprintf(fp, "]\n");

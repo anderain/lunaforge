@@ -57,3 +57,10 @@ int Kommon_GetOperatorPriorityById(OperatorId iOprId) {
 const char* Kommon_GetOperatorNameById(OperatorId iOprId) {
     return OperatorIdMetaMap[iOprId].szOperatorName;
 }
+
+const char* Kommon_GetVarDeclTypeName(VarDeclTypeId iTypeId) {
+    static const char* SZ_TYPE_NAME[] = {
+        "PRIMITIVE", "ARRAY"
+    };
+    return SZ_TYPE_NAME[iTypeId];
+}

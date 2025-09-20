@@ -60,6 +60,6 @@ void        KAnalyzer_ResetToken        (KbLineAnalyzer* pAnalyzer);
 void        KAnalyzer_Initialize        (KbLineAnalyzer* pAnalyzer, const char* szLineSource);
 const char* KAnalyzer_GetCurrentPtr     (KbLineAnalyzer* pAnalyzer);
 void        KAnalyzer_SetCurrentPtr     (KbLineAnalyzer* pAnalyzer, const char* pCurrent);
-const char* KToken_GetTypeName          (int iTokenType);
+const char* KToken_GetTypeName          (KbTokenType iTokenType);
 
 #endif

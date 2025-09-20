@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include "klexer.h"
 #include "kparser.h"
 #include "kalias.h"
@@ -863,12 +864,30 @@ static SyntaxErrorId parseLineAsAst(
         }
         /* 有参数列表 */
         else {
+            AstFuncParam*   pFuncParam;
+            int             iIdLength;
+        
             rewindToken(pAnalyzer);
             for(;;) {
                 /* 匹配一个参数名称 */
                 matchTokenType(TOKEN_IDENTIFIER, SYN_FUNC_INVALID_PARAMETERS, iStatement);
-                vlPushBack(pAstCurrentLine->uData.sFunctionDeclare.pListParameters, StringDump(pToken->szContent));
+                /* 创建新的 FuncParam 并加入到 AST */
+                iIdLength = StringLength(pToken->szContent);
+                pFuncParam = (AstFuncParam *)malloc(sizeof(AstFuncParam) + iIdLength);
+                pFuncParam->iType = VARDECL_PRIMITIVE;
+                StringCopy(pFuncParam->szName, iIdLength + 1, pToken->szContent);
+                vlPushBack(pAstCurrentLine->uData.sFunctionDeclare.pListParameters, pFuncParam);
+                /* 检查下一个token  */
                 nextToken(pAnalyzer);
+                /* 下一个 token 是 '[' */
+                if (tokenTypeIs(TOKEN_BRACKET_L)) {
+                    /* 变量设置为数组类型 */
+                    pFuncParam->iType = VARDECL_ARRAY;
+                    /* 匹配 ']' */
+                    matchTokenType(TOKEN_BRACKET_R, SYN_FUNC_INVALID_PARAMETERS, iStatement);
+                    /* 检查下一个token  */
+                    nextToken(pAnalyzer);
+                }
                 /* 下一个 token 是右括号，结束匹配 */
                 if (tokenTypeIs(TOKEN_PAREN_R)) {
                     break;

@@ -344,7 +344,7 @@ void KAnalyzer_Initialize(KbLineAnalyzer* pAnalyzer, const char* szLineSource) {
     resetToken(pAnalyzer);
 }
 
-const char* KToken_GetTypeName(int iTokenType) {
+const char* KToken_GetTypeName(KbTokenType iTokenType) {
     static const char* TokenName[] = {
         "Error",        "LineEnd",      "Numeric",
         "Identifier",   "Operator",     "ParenLeft",

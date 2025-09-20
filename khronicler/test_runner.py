@@ -40,6 +40,11 @@ SyntaxTestCases = [
     "expected": "SYN_FUNC_INVALID_PARAMETERS",
   },
   {
+    "caseId": "FuncDeclInvalidParam4",
+    "source": "func invalidList(a,b[)",
+    "expected": "SYN_FUNC_INVALID_PARAMETERS",
+  },
+  {
     "caseId": "FuncDeclLineNotEnd",
     "source": "func invalidList(a,b),",
     "expected": "SYN_EXPECT_LINE_END",
@@ -578,7 +583,7 @@ AstTestCases = [
   },
   {
     "caseId": "AstFuncDeclare",
-    "source": "func declare(a,b,c)\n  dim e = 0\n  p(e)\nend func",
+    "source": "func declare(a[],b,c)\n  dim e = 0\n  p(e)\nend func",
     "expected": {
       "astType": "Program",
       "numOfControl": 1,
@@ -589,9 +594,18 @@ AstTestCases = [
           "controlId": 1,
           "name": "declare",
           "parameters": [
-            "a",
-            "b",
-            "c"
+            {
+              "name": "a",
+              "type": "ARRAY"
+            },
+            {
+              "name": "b",
+              "type": "PRIMITIVE"
+            },
+            {
+              "name": "c",
+              "type": "PRIMITIVE"
+            }
           ],
           "statements": [
             {
@@ -803,9 +817,14 @@ RuntimeTestCases = [
     "expected": "RUNTIME_TYPE_MISMATCH",
   },
   {
-    "caseId": "TypeMismatch5",
-    "source": "chr(\"A\")",
-    "expected": "RUNTIME_TYPE_MISMATCH",
+     "caseId": "NotArray1",
+     "source": "func assignArrEl(a[])\n  a[0]=1\nend func\nassignArrEl(0)",
+     "expected": "RUNTIME_NOT_ARRAY",
+  },
+  {
+     "caseId": "NotArray2",
+     "source": "func accessArrEl(a[])\n  p(a[0])\nend func\naccessArrEl(0)",
+     "expected": "RUNTIME_NOT_ARRAY",
   },
 ]
 
@@ -897,30 +916,30 @@ end func
 
 SourceBubbleSort = """
 dim result = ""
-dim arr[5]
-dim size = len(arr)
-dim i
-for i = 0 to size - 1
-  arr[i] = 5 - i;
-next i
-func bubbleSort()
+func bubbleSort(a[])
   dim changeFlag
   dim i
+  dim size = len(a)
   do
     changeFlag = 0
     for i = 0 to size - 2
-      if arr[i] < arr[i + 1]
-        dim temp = arr[i]
-        arr[i] = arr[i + 1]
-        arr[i + 1] = temp
+      if a[i] < a[i + 1]
+        dim temp = a[i]
+        a[i] = a[i + 1]
+        a[i + 1] = temp
         changeFlag = 1
       end if
     next i
   while changeFlag
 end func
-bubbleSort()
-for i = 0 to size - 1
-  result = result & arr[i]
+dim array[5]
+dim i
+for i = 0 to len(array) - 1
+  array[i] = (i + 1) * 10;
+next i
+bubbleSort(array)
+for i = 0 to len(array) - 1
+  result = result & array[i]
 next i
 """
 
@@ -986,7 +1005,7 @@ ValueTestCases = [
     "source": SourceBubbleSort,
     "expected": {
       "type": "string",
-      "stringified": "54321"
+      "stringified": "5040302010"
     }
   },
 ]

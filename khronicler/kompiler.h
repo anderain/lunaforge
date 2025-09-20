@@ -3,11 +3,6 @@
 
 #include "kparser.h"
 
-typedef enum tagVarDeclTypeId {
-    VARDECL_PRIMITIVE = 0,
-    VARDECL_ARRAY
-} VarDeclTypeId;
-
 typedef struct tagKbVariableDeclaration {
     char            szVarName[KB_IDENTIFIER_LEN_MAX + 1];
     int             iIndex;

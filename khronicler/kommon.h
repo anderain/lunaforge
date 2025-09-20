@@ -2,8 +2,8 @@
 #define _KOMMON_H_
 
 #define isDigit(c)      ((c) >= '0' && (c) <= '9')
-#define isUppercase(c)  ((c) >= 'a' && (c) <= 'z')
-#define isLowercase(c)  ((c) >= 'A' && (c) <= 'Z')
+#define isUppercase(c)  ((c) >= 'A' && (c) <= 'Z')
+#define isLowercase(c)  ((c) >= 'a' && (c) <= 'z')
 #define isHexAlphaU(c)  ((c) >= 'A' && (c) <= 'F')
 #define isHexAlphaL(c)  ((c) >= 'a' && (c) <= 'f')
 #define isHexDigit(c)   (isDigit(c) || isHexAlphaU(c) || isHexAlphaL(c))
@@ -48,6 +48,11 @@ typedef int             KLabelOpCodePos;
 
 /* 数字格式化为字符串的缓冲区大小 */
 #define K_NUMERIC_STRINGIFY_BUF_MAX     40
+
+typedef enum tagVarDeclTypeId {
+    VARDECL_PRIMITIVE = 0,
+    VARDECL_ARRAY
+} VarDeclTypeId;
 
 typedef enum {
     OPR_NONE = 0,
@@ -170,5 +175,6 @@ typedef struct tagKbBinaryHeader {
 const char* Kommon_GetOpCodeName            (OpCodeId iOpCodeId);
 int         Kommon_GetOperatorPriorityById  (OperatorId iOprId);
 const char* Kommon_GetOperatorNameById      (OperatorId iOprId);
+const char* Kommon_GetVarDeclTypeName       (VarDeclTypeId iTypeId);
 
 #endif

@@ -152,7 +152,7 @@ KBool buildFromScript(const char* szSource, Context** pPtrContext) {
     /* 有语法错误 */
     if (iSyntaxErrorId != SYN_NO_ERROR) {
         formatSyntaxErrorMessage(szErrorMessage, iStopLineNumber, iStopStatement, iSyntaxErrorId);
-        fputs(szErrorMessage, stderr);
+        fprintf(stderr, "[Line %d]\n%s\n", iStopLineNumber, szErrorMessage);
         return KB_FALSE;
     }
 
@@ -161,7 +161,7 @@ KBool buildFromScript(const char* szSource, Context** pPtrContext) {
     /* 有语义错误 */
     if (iSemanticErrorId != SEM_NO_ERROR) {
         formatSemanticErrorMessage(szErrorMessage, pAstSemStop, iSemanticErrorId);
-        fputs(szErrorMessage, stderr);
+        fprintf(stderr, "[Line %d]\n%s\n", pAstSemStop->iLineNumber, szErrorMessage);
         destroyAst(pAstProgram);
         destroyContext(pContext);
         return KB_FALSE;

@@ -586,12 +586,21 @@ KBool KRuntime_MachineExecute(
                 break;
             }
             case K_OPCODE_ARR_GET: {
-                RtValue** pPtrVar = NULL;
-                int iSubscript;
+                RtValue**       pPtrVar = NULL;
+                int             iSubscript;
+                RuntimeArray*   pArray;
                 /* 获取变量指针 */
                 getVariable(pPtrVar);
-                /* 检查是不是数组 */
-                if ((*pPtrVar)->iType != RT_VALUE_ARRAY) {
+                /* 变量是数组 */
+                if ((*pPtrVar)->iType == RT_VALUE_ARRAY) {
+                    pArray = &(*pPtrVar)->uData.sArray;
+                }
+                /* 变量是数组引用 */
+                else if ((*pPtrVar)->iType == RT_VALUE_ARRAY_REF) {
+                    pArray = (*pPtrVar)->uData.pArrRef;
+                }
+                /* 变量不是数组 */
+                else {
                     returnExecError(RUNTIME_NOT_ARRAY);
                 }
                 /* 弹出下标 */
@@ -600,22 +609,31 @@ KBool KRuntime_MachineExecute(
                 checkRtValueTypeIs(pRtOperandLeft, RT_VALUE_NUMBER);
                 /* 检查下标是否合法 */
                 iSubscript = (int)pRtOperandLeft->uData.fNumber;
-                if (iSubscript < 0 || iSubscript >= (*pPtrVar)->uData.sArray.iSize) {
+                if (iSubscript < 0 || iSubscript >= pArray->iSize) {
                     returnExecError(RUNTIME_ARRAY_OUT_OF_BOUNDS);
                 }
                 /* 释放弹出的值 */
                 cleanUpOperands();
                 /* 数组元素入栈 */
-                vlPushBack(pMachine->pStackOperand, createRefRtValue((*pPtrVar)->uData.sArray.pArrPtrElements[iSubscript]));
+                vlPushBack(pMachine->pStackOperand, createRefRtValue(pArray->pArrPtrElements[iSubscript]));
                 break;
             }
             case K_OPCODE_ARR_SET: {
-                RtValue** pPtrVar = NULL;
-                int iSubscript;
+                RtValue**       pPtrVar = NULL;
+                int             iSubscript;
+                RuntimeArray*   pArray;
                 /* 获取变量指针 */
                 getVariable(pPtrVar);
-                /* 检查是不是数组 */
-                if ((*pPtrVar)->iType != RT_VALUE_ARRAY) {
+                /* 变量是数组 */
+                if ((*pPtrVar)->iType == RT_VALUE_ARRAY) {
+                    pArray = &(*pPtrVar)->uData.sArray;
+                }
+                /* 变量是数组引用 */
+                else if ((*pPtrVar)->iType == RT_VALUE_ARRAY_REF) {
+                    pArray = (*pPtrVar)->uData.pArrRef;
+                }
+                /* 变量不是数组 */
+                else {
                     returnExecError(RUNTIME_NOT_ARRAY);
                 }
                 /* 弹出右值 */
@@ -626,13 +644,13 @@ KBool KRuntime_MachineExecute(
                 checkRtValueTypeIs(pRtOperandLeft, RT_VALUE_NUMBER);
                 /* 检查下标是否合法 */
                 iSubscript = (int)pRtOperandLeft->uData.fNumber;
-                if (iSubscript < 0 || iSubscript >= (*pPtrVar)->uData.sArray.iSize) {
+                if (iSubscript < 0 || iSubscript >= pArray->iSize) {
                     returnExecError(RUNTIME_ARRAY_OUT_OF_BOUNDS);
                 }
                 /* 释放数组元素旧值 */
-                destroyRtValue((*pPtrVar)->uData.sArray.pArrPtrElements[iSubscript]);
+                destroyRtValue(pArray->pArrPtrElements[iSubscript]);
                 /* 出栈的值赋值给数组元素 */
-                (*pPtrVar)->uData.sArray.pArrPtrElements[iSubscript] = pRtOperandRight;
+                pArray->pArrPtrElements[iSubscript] = pRtOperandRight;
                 /* 不释放右值，已经赋值给元素了 */
                 pRtOperandRight = NULL;
                 /* 释放弹出的值 */

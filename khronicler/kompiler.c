@@ -551,17 +551,17 @@ KBool buildStatements(
                     pListVarNode != NULL;
                     pListVarNode = pListVarNode->next
                 ) {
-                    const char* szParamName = (const char *)pListVarNode->data;
+                    const AstFuncParam* pFuncParam = (AstFuncParam *)pListVarNode->data;
                     /* 检查参数名字长度 */
-                    if (StringLength(szParamName) > KB_IDENTIFIER_LEN_MAX) {
+                    if (StringLength(pFuncParam->szName) > KB_IDENTIFIER_LEN_MAX) {
                         returnStatementError(SEM_VAR_NAME_TOO_LONG, pAstNode);
                     }
                     /* 检查变量是否名称重复 */
-                    if (findVar(pContext, KB_TRUE, szParamName)) {
+                    if (findVar(pContext, KB_TRUE, pFuncParam->szName)) {
                         returnStatementError(SEM_VAR_DUPLICATED, pAstNode);
                     }
                     /* 参数作为变量加入函数的局部变量列表 */
-                    appendVar(pContext, KB_TRUE, szParamName, VARDECL_PRIMITIVE);
+                    appendVar(pContext, KB_TRUE, pFuncParam->szName, pFuncParam->iType);
                 }
                 /* 编译函数的所有语句 */
                 bSuccess = buildStatements(
