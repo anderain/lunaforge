@@ -25,7 +25,7 @@ class Token:
         self.value = value
     
     def __repr__(self):
-        return f"Token({self.type}, '{self.value}')"
+        return "Token({type}, '{value}')".format(type=self.type, value=self.value)
 
 class Lexer:
     def __init__(self, source):
@@ -46,7 +46,7 @@ class Lexer:
             ';', '&', '+', '-', '*', '/', '^', '\\', '%', '!', '=', '>', '<'
         ]
     
-    def next_token(self):
+    def nextToken(self):
         if self.position >= self.length:
             return None
             
@@ -61,11 +61,11 @@ class Lexer:
         
         # 检查注释
         if self.source[self.position] == '#':
-            return self.read_comment()
+            return self.readComment()
         
         # 检查字符串
         if self.source[self.position] == '"':
-            return self.read_string()
+            return self.readString()
         
         # 检查数字
         if self.source[self.position].isdigit() or (
@@ -73,25 +73,25 @@ class Lexer:
             self.position + 1 < self.length and 
             self.source[self.position + 1].isdigit()
         ):
-            return self.read_number()
+            return self.readNumber()
         
         # 检查标识符和关键字
         if self.source[self.position].isalpha() or self.source[self.position] == '_':
-            return self.read_identifier_or_keyword()
+            return self.readIdentifierOrKeyword()
         
         # 检查符号
         for symbol in self.symbols:
-            symbol_len = len(symbol)
-            if (self.position + symbol_len <= self.length and 
-                self.source[self.position:self.position + symbol_len] == symbol):
-                self.position += symbol_len
+            symbolLen = len(symbol)
+            if (self.position + symbolLen <= self.length and 
+                self.source[self.position:self.position + symbolLen] == symbol):
+                self.position += symbolLen
                 return Token(TokenType.SYMBOL, symbol)
         
         # 其他字符
         self.position += 1
         return Token(TokenType.OTHER, self.source[start:self.position])
     
-    def read_comment(self):
+    def readComment(self):
         start = self.position
         self.position += 1  # 跳过 #
         
@@ -103,7 +103,7 @@ class Lexer:
         
         return Token(TokenType.COMMENT, self.source[start:self.position])
     
-    def read_string(self):
+    def readString(self):
         start = self.position
         self.position += 1  # 跳过开始的引号
         
@@ -121,7 +121,7 @@ class Lexer:
         # 如果没有找到结束引号，返回整个字符串
         return Token(TokenType.STRING, self.source[start:self.position])
     
-    def read_number(self):
+    def readNumber(self):
         start = self.position
         
         # 读取整数部分
@@ -137,7 +137,7 @@ class Lexer:
         
         return Token(TokenType.NUMBER, self.source[start:self.position])
     
-    def read_identifier_or_keyword(self):
+    def readIdentifierOrKeyword(self):
         start = self.position
         
         # 第一个字符是字母或下划线
@@ -159,7 +159,7 @@ class Lexer:
     def tokenize(self):
         tokens = []
         while True:
-            token = self.next_token()
+            token = self.nextToken()
             if token is None:
                 break
             tokens.append(token)
@@ -178,8 +178,8 @@ def renderSource(source):
             buffer.append(html.escape(token.value))
         else:
             # 其他 token 用 span 包装
-            escaped_value = html.escape(token.value)
-            buffer.append(f'<span class="{token.type}">{escaped_value}</span>')
+            escapedValue = html.escape(token.value)
+            buffer.append('<span class="{type}">{value}</span>'.format(type=token.type, value=escapedValue))
     
     # 打印 HTML 结果
     htmlOutput = ''.join(buffer)
@@ -1198,11 +1198,12 @@ def runErrorCheckingCase(cases):
   global numPassed
   for testCase in cases:
     # 进行测试
-    result = subprocess.run(
-        [TestProgram, "check", testCase["source"]], capture_output=True, text=True
+    result = subprocess.check_output(
+        [TestProgram, "check", testCase["source"]],
+        stderr=subprocess.STDOUT
     )
     # 解析获得的 JSON 格式的命令行输出
-    output = json.loads(result.stdout)
+    output = json.loads(result.decode("utf-8"))
     # 是否通过测试
     isPassed = output["error"] and output["errorId"] == testCase["expected"]
     numCases = numCases + 1
@@ -1226,11 +1227,12 @@ def runAstCheckingCase(cases):
   global numPassed
   for testCase in cases:
     # 进行测试
-    result = subprocess.run(
-        [TestProgram, "ast", testCase["source"]], capture_output=True, text=True
+    result = subprocess.check_output(
+        [TestProgram, "ast", testCase["source"]],
+        stderr=subprocess.STDOUT
     )
     # 解析获得的 JSON 格式的命令行 AST 输出
-    output = json.loads(result.stdout)
+    output = json.loads(result.decode("utf-8"))
     # 是否通过测试
     isPassed = output == testCase["expected"]
     numCases = numCases + 1
@@ -1260,11 +1262,12 @@ def runValueCheckingCase(cases):
   global numPassed
   for testCase in cases:
     # 进行测试
-    result = subprocess.run(
-        [TestProgram, "check", testCase["source"]], capture_output=True, text=True
+    result = subprocess.check_output(
+        [TestProgram, "check", testCase["source"]],
+        stderr=subprocess.STDOUT
     )
     # 解析获得的 JSON 格式的命令行输出
-    output = json.loads(result.stdout)
+    output = json.loads(result.decode("utf-8"))
     # 是否通过测试
     isPassed = output["target"] and output["target"] == testCase["expected"]
     numCases = numCases + 1
