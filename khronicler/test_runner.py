@@ -2,10 +2,188 @@ import subprocess
 import json
 from datetime import date
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+import html
 
 # 配置
 TestProgram = "./ktest.exe"
 TestReportFile = "test_report.html"
+
+# Token 类型定义
+class TokenType:
+    WHITESPACE = "ws"
+    SYMBOL = "sym"
+    KEYWORD = "kw"
+    IDENTIFIER = "id"
+    STRING = "str"
+    NUMBER = "num"
+    COMMENT = "rmk"
+    OTHER = "o"
+
+class Token:
+    def __init__(self, type, value):
+        self.type = type
+        self.value = value
+    
+    def __repr__(self):
+        return f"Token({self.type}, '{self.value}')"
+
+class Lexer:
+    def __init__(self, source):
+        self.source = source
+        self.position = 0
+        self.length = len(source)
+        
+        # 关键字列表
+        self.keywords = {
+            'dim', 'redim', 'goto', 'if', 'elseif', 'else', 'while', 
+            'do', 'for', 'to', 'step', 'next', 'continue', 'break', 
+            'end', 'return', 'func', 'exit'
+        }
+        
+        # 符号列表（多字符符号在前，单字符在后）
+        self.symbols = [
+            '&&', '||', '~=', '<>', '>=', '<=', 
+            ';', '&', '+', '-', '*', '/', '^', '\\', '%', '!', '=', '>', '<'
+        ]
+    
+    def next_token(self):
+        if self.position >= self.length:
+            return None
+            
+        # 跳过空白字符（但我们会返回它们作为token）
+        start = self.position
+        
+        # 检查空白字符
+        if self.source[self.position] in ' \t\r\n':
+            while self.position < self.length and self.source[self.position] in ' \t\r\n':
+                self.position += 1
+            return Token(TokenType.WHITESPACE, self.source[start:self.position])
+        
+        # 检查注释
+        if self.source[self.position] == '#':
+            return self.read_comment()
+        
+        # 检查字符串
+        if self.source[self.position] == '"':
+            return self.read_string()
+        
+        # 检查数字
+        if self.source[self.position].isdigit() or (
+            self.source[self.position] == '.' and 
+            self.position + 1 < self.length and 
+            self.source[self.position + 1].isdigit()
+        ):
+            return self.read_number()
+        
+        # 检查标识符和关键字
+        if self.source[self.position].isalpha() or self.source[self.position] == '_':
+            return self.read_identifier_or_keyword()
+        
+        # 检查符号
+        for symbol in self.symbols:
+            symbol_len = len(symbol)
+            if (self.position + symbol_len <= self.length and 
+                self.source[self.position:self.position + symbol_len] == symbol):
+                self.position += symbol_len
+                return Token(TokenType.SYMBOL, symbol)
+        
+        # 其他字符
+        self.position += 1
+        return Token(TokenType.OTHER, self.source[start:self.position])
+    
+    def read_comment(self):
+        start = self.position
+        self.position += 1  # 跳过 #
+        
+        # 读取直到换行符或源结束
+        while (self.position < self.length and 
+               self.source[self.position] != '\n' and 
+               self.source[self.position] != '\r'):
+            self.position += 1
+        
+        return Token(TokenType.COMMENT, self.source[start:self.position])
+    
+    def read_string(self):
+        start = self.position
+        self.position += 1  # 跳过开始的引号
+        
+        while self.position < self.length:
+            if self.source[self.position] == '"':
+                # 找到结束引号
+                self.position += 1
+                return Token(TokenType.STRING, self.source[start:self.position])
+            elif self.source[self.position] == '\\' and self.position + 1 < self.length:
+                # 处理转义字符
+                self.position += 2
+            else:
+                self.position += 1
+        
+        # 如果没有找到结束引号，返回整个字符串
+        return Token(TokenType.STRING, self.source[start:self.position])
+    
+    def read_number(self):
+        start = self.position
+        
+        # 读取整数部分
+        while self.position < self.length and self.source[self.position].isdigit():
+            self.position += 1
+        
+        # 检查小数点
+        if self.position < self.length and self.source[self.position] == '.':
+            self.position += 1
+            # 读取小数部分
+            while self.position < self.length and self.source[self.position].isdigit():
+                self.position += 1
+        
+        return Token(TokenType.NUMBER, self.source[start:self.position])
+    
+    def read_identifier_or_keyword(self):
+        start = self.position
+        
+        # 第一个字符是字母或下划线
+        self.position += 1
+        
+        # 后续字符可以是字母、数字或下划线
+        while (self.position < self.length and 
+               (self.source[self.position].isalnum() or self.source[self.position] == '_')):
+            self.position += 1
+        
+        identifier = self.source[start:self.position]
+        
+        # 检查是否是关键字
+        if identifier in self.keywords:
+            return Token(TokenType.KEYWORD, identifier)
+        else:
+            return Token(TokenType.IDENTIFIER, identifier)
+    
+    def tokenize(self):
+        tokens = []
+        while True:
+            token = self.next_token()
+            if token is None:
+                break
+            tokens.append(token)
+        return tokens
+
+def renderSource(source):    
+    # 创建 lexer 并分词
+    lexer = Lexer(source)
+    tokens = lexer.tokenize()
+    
+    # 生成 HTML 输出
+    buffer = []
+    for token in tokens:
+        if token.type == TokenType.WHITESPACE:
+            # 空白字符直接输出
+            buffer.append(html.escape(token.value))
+        else:
+            # 其他 token 用 span 包装
+            escaped_value = html.escape(token.value)
+            buffer.append(f'<span class="{token.type}">{escaped_value}</span>')
+    
+    # 打印 HTML 结果
+    htmlOutput = ''.join(buffer)
+    return htmlOutput
 
 # 语法测试用例
 SyntaxTestCases = [
@@ -1036,7 +1214,7 @@ def runErrorCheckingCase(cases):
     testResults.append(
       {
         "caseId": testCase["caseId"],
-        "source": testCase["source"],
+        "source": renderSource(testCase["source"]),
         "passed": isPassed,
         "expected": testCase["expected"],
         "actualGot": output["errorId"]
@@ -1064,7 +1242,7 @@ def runAstCheckingCase(cases):
     testResults.append(
       {
         "caseId": testCase["caseId"],
-        "source": testCase["source"],
+        "source": renderSource(testCase["source"]),
         "passed": isPassed,
         "expected": {
           "isJson": True,
@@ -1098,7 +1276,7 @@ def runValueCheckingCase(cases):
     testResults.append(
       {
         "caseId": testCase["caseId"],
-        "source": testCase["source"],
+        "source": renderSource(testCase["source"]),
         "passed": isPassed,
         "expected": testCase["expected"],
         "actualGot": output["target"]
@@ -1149,6 +1327,12 @@ htmlTemplate = """
     .report-footer h4 { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #ddd; }
     .report-footer p { margin: 0; }
     .type-badge { text-transform: capitalize; transform: scale(0.8);font-size: 12px; line-height: 1; padding: 4px 8px; border-radius: 2px; color: white; background: #999; margin-right: 4px; display: inline-block; }
+    pre .num {color:#098658}
+    pre .id  {color:#495057}
+    pre .sym {color:#9D7E14}
+    pre .str {color:#A31515}
+    pre .kw  {color:#0000FF}
+    pre .rmk {color:#008000}
   </style>
 </head>
 <body>
@@ -1172,7 +1356,7 @@ htmlTemplate = """
                 {{ "PASSED" if case.passed else "FAILED" }}
               </span>
             </td>
-            <td class="col-source"><pre>{{ case.source }}</pre></td>
+            <td class="col-source"><pre>{{ case.source | safe }}</pre></td>
             <td class="col-expected">
               {% if case.expected is string %}
                 {{ case.expected }}
