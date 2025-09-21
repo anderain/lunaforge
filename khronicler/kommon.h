@@ -49,6 +49,28 @@ typedef int             KLabelOpCodePos;
 /* 数字格式化为字符串的缓冲区大小 */
 #define K_NUMERIC_STRINGIFY_BUF_MAX     40
 
+typedef enum {
+    EXT_NO_ERROR,
+    EXT_ID_SYNTAX_ERROR,
+    EXT_ID_DUPLICATED,
+    EXT_ID_TOO_LONG,
+    EXT_ID_NOT_FOUND,
+    EXT_FUNC_MISSING_ID,
+    EXT_FUNC_MISSING_ARROW,
+    EXT_FUNC_MISSING_NAME,
+    EXT_FUNC_INVALID_PARAMS,
+    EXT_FUNC_MISSING_RETURN,
+    EXT_FUNC_MISSING_TYPE,
+    EXT_EXPECT_LINE_END,
+    EXT_UNRECOGNIZED
+} ExtensionErrorId;
+
+typedef struct tagKbExtensionFunction {
+    char    szFuncName[KB_IDENTIFIER_LEN_MAX + 1];
+    int     iNumParams;
+    int     iCallId;
+} KbExtensionFunction;
+
 typedef enum tagVarDeclTypeId {
     VARDECL_PRIMITIVE = 0,
     VARDECL_ARRAY

@@ -1,0 +1,28 @@
+# KBasic Extension Script
+# Comments start with '#' and must be at the beginning of a line
+
+# Extension identifier declaration (required)
+extension = "canvas001"
+
+# Function declarations
+# Format: func <call_id> -> <function_name> (<parameter_list>) return "<type>"
+#
+# Where:
+#   <call_id>        - Unique numeric identifier for VM dispatch
+#   <function_name>  - Valid function identifier
+#   <parameter_list> - Comma-separated parameter names (optional)
+#   <type>           - Return type ("num" or "str")
+
+# * Graphic
+func 1001 -> getscrw        ()                  return "num"
+func 1002 -> getscrh        ()                  return "num"
+func 1003 -> setpixel       (x, y, c)           return "num"
+func 1004 -> line           (xa, ya, xb, yb, c) return "num"
+func 1005 -> clr            ()                  return "num"
+func 1006 -> blt            (x, y, spr)         return "num"
+
+# * Input
+func 2001 -> chkkey         (keycode)           return "num"
+
+# CALL_ID range: 1000-1999 for graphics API
+#                2000-2999 for input API

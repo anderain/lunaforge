@@ -29,7 +29,6 @@
 #define getStatementName    KStatement_GetNameById
 #define getAstTypeNameById  KAst_GetNameById
 #define destroyAst          KAstNode_Destroy
-#define initParser          KSourceParser_Initialize
 #define parseAsAst          KSourceParser_Parse
 #define AstFuncParam        KbAstFuncParam
 #define AstNode             KbAstNode
@@ -37,6 +36,7 @@
 
 #define getSemanticErrMsg   KSemanticError_GetMessageById
 #define getSemanticErrName  KSemanticError_GetNameById
+#define createContext       KompilerContext_Create
 #define destroyContext      KompilerContext_Destroy
 #define buildContext        KompilerContext_Build
 #define serializeContext    KompilerContext_Serialize
@@ -45,11 +45,13 @@
 #define VarDecl             KbVariableDeclaration
 #define GotoLabel           KbGotoLabel
 #define CtrlFlowLabel       KbControlFlowLabel
+#define ExtFunc             KbExtensionFunction
 
 #define getOpCodeName           Kommon_GetOpCodeName
 #define getOperatorPriorityById Kommon_GetOperatorPriorityById
 #define getOperatorNameById     Kommon_GetOperatorNameById
 #define getVarDeclTypeNameById  Kommon_GetVarDeclTypeName
+#define getExtErrMsg            KExtensionError_GetMessageById
 #define BinHeader               KbBinaryHeader
 #define BinFuncInfo             KbBinaryFunctionInfo
 

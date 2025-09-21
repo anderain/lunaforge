@@ -2,9 +2,11 @@
 *.kbn
 *.o
 *.exe
-*.kbs
+./*.kbs
+./*.kxt
 *.html
 *.json
 *.xml
 .vscode
 salvia89
+samples/test*

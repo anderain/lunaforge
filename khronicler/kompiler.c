@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "kompiler.h"
+#include "klexer.h"
 #include "kalias.h"
 
 typedef struct {
@@ -31,10 +32,23 @@ static const BuiltInFunc BuiltInFunctions[] = {
 static const BuiltInFunc* findBuiltInFunc(const char* szName) {
     static const int size = sizeof(BuiltInFunctions) / sizeof(BuiltInFunctions[0]);
     int i;
+    /* 寻找硬编码的库函数 */
     for (i = 0; i < size; ++i) {
         const BuiltInFunc* pBuiltInFunc = BuiltInFunctions + i;
         if (IsStringEqual(pBuiltInFunc->szName, szName)) {
             return pBuiltInFunc;
+        }
+    }
+    return NULL;
+}
+
+static const ExtFunc* findExtFunc(Context* pContext, const char* szName) {
+    VlistNode* pNode;
+    /* 寻找拓展函数 */
+    for (pNode = pContext->pListExtFuncs->head; pNode; pNode = pNode->next) {
+        ExtFunc* pExtFunc = (ExtFunc *)pNode->data;
+        if (IsStringEqual(pExtFunc->szFuncName, szName)) {
+            return pExtFunc;
         }
     }
     return NULL;
@@ -165,7 +179,7 @@ static void cleanUpControlFlowLabel(CtrlFlowLabel* pCtrlLabel) {
     }
 }
 
-static Context* initContext(const AstNode* pAstProgram) {
+KbCompilerContext* KompilerContext_Create(const KbAstNode* pAstProgram) {
     Context* pContext = (Context *)malloc(sizeof(Context));
 
     pContext->pListGlobalVariables  = vlNewList();
@@ -180,6 +194,9 @@ static Context* initContext(const AstNode* pAstProgram) {
     } else {
         pContext->pCtrlFlowLabels = NULL;
     }
+    memset(pContext->szExtensionId, 0, sizeof(pContext->szExtensionId));
+    pContext->pListExtFuncs         = vlNewList();
+
     return pContext;
 }
 
@@ -195,6 +212,7 @@ void KompilerContext_Destroy(KbCompilerContext* pContext) {
         }
         free(pContext->pCtrlFlowLabels);
     }
+    vlDestroy(pContext->pListExtFuncs, free);
     free(pContext);
 }
 
@@ -458,6 +476,7 @@ static SemanticErrorId buildExpression(
             const char*         szFuncName  = pAstNode->uData.sFunctionCall.szFunction;
             int                 iNumArg     = pAstNode->uData.sFunctionCall.pListArguments->size;
             const BuiltInFunc*  pBuiltFunc  = NULL;
+            const ExtFunc*      pExtFunc    = NULL;
             FuncDecl*           pFuncDecl   = NULL;
             VlistNode*          pListNode   = NULL;
             /* 先查找是否为用户定义的函数 */
@@ -468,15 +487,24 @@ static SemanticErrorId buildExpression(
                     return SEM_FUNC_ARG_LIST_MISMATCH;
                 }
             }
-            /* 查找是否为系统函数 */
+            /* 查找是否是拓展函数 */
             else {
-                pBuiltFunc = findBuiltInFunc(szFuncName);
+                pExtFunc = findExtFunc(pContext, szFuncName);
                 /* 找不到 */
-                if (!pBuiltFunc) {
-                    return SEM_FUNC_NOT_FOUND;
+                if (!pExtFunc) {
+                    /* 查找是否是硬编码内建函数 */
+                    pBuiltFunc = findBuiltInFunc(szFuncName);
+                    /* 找不到 */
+                    if (!pBuiltFunc) {
+                        return SEM_FUNC_NOT_FOUND;
+                    }
+                    /* 参数数量不匹配 */
+                    if (iNumArg != pBuiltFunc->iNumParams) {
+                        return SEM_FUNC_ARG_LIST_MISMATCH;
+                    }
                 }
                 /* 参数数量不匹配 */
-                if (iNumArg != pBuiltFunc->iNumParams) {
+                else if (iNumArg != pExtFunc->iNumParams) {
                     return SEM_FUNC_ARG_LIST_MISMATCH;
                 }
             }
@@ -495,6 +523,9 @@ static SemanticErrorId buildExpression(
             /* 创建函数调用 opCode */
             if (pFuncDecl) {
                 appendOpCodeCallFunction(pContext, pFuncDecl->iIndex);
+            }
+            else if (pExtFunc) {
+                appendOpCodeCallBuiltIn(pContext, pExtFunc->iCallId);
             }
             else {
                 appendOpCodeCallBuiltIn(pContext, pBuiltFunc->iFuncId);
@@ -1213,15 +1244,16 @@ static KBool scanLabel(
 #define returnProgramError(semErrId, pAstStop) {\
     *pPtrAstStop = (pAstStop);                  \
     *pIntSemanticError = (semErrId);            \
-    return pContext;                            \
+    return KB_FALSE;                            \
 } NULL
 
-KbCompilerContext* KompilerContext_Build(
+KBool KompilerContext_Build(
+    KbCompilerContext*  pContext,
     const KbAstNode*    pAstProgram,
     SemanticErrorId*    pIntSemanticError,
     const KbAstNode**   pPtrAstStop
 ) {
-    Context*            pContext    = NULL;
+    
     const VlistNode*    pListNode   = NULL;
     VlistNode*          pListNodeOp = NULL;
     KBool               bSuccess    = KB_TRUE;
@@ -1231,8 +1263,6 @@ KbCompilerContext* KompilerContext_Build(
     if (pAstProgram->iType != AST_PROGRAM) {
         returnProgramError(SEM_NOT_A_PROGRAM, pAstProgram);
     }
-
-    pContext = initContext(pAstProgram);
 
     /* 扫描全部函数声明 */
     for (pListNode = pAstProgram->uData.sProgram.pListStatements->head; pListNode; pListNode = pListNode->next) {
@@ -1262,7 +1292,7 @@ KbCompilerContext* KompilerContext_Build(
         pIntSemanticError,
         pPtrAstStop
     );
-    if (!bSuccess) return pContext;
+    if (!bSuccess) return KB_FALSE;
 
     /* 编译所有语句 */
     bSuccess = buildStatements(
@@ -1271,7 +1301,7 @@ KbCompilerContext* KompilerContext_Build(
         pIntSemanticError,
         pPtrAstStop
     );
-    if (!bSuccess) return pContext;
+    if (!bSuccess) return KB_FALSE;
 
     /* 手动添加一个 STOP 命令 */
     appendOpCodePushNum(pContext, 0);
@@ -1291,7 +1321,7 @@ KbCompilerContext* KompilerContext_Build(
         }
     }
 
-    return pContext;
+    return KB_TRUE;
 }
 
 KBool KompilerContext_Serialize(

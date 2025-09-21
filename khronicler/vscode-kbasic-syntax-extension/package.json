@@ -13,7 +13,7 @@
     "languages": [{
       "id": "kbasic",
       "aliases": ["KBasic", "kbasic"],
-      "extensions": [".kbs"],
+      "extensions": [".kbs", ".kxt"],
       "configuration": "./language-configuration.json"
     }],
     "grammars": [{

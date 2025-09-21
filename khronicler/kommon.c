@@ -64,3 +64,23 @@ const char* Kommon_GetVarDeclTypeName(VarDeclTypeId iTypeId) {
     };
     return SZ_TYPE_NAME[iTypeId];
 }
+
+const char* KExtensionError_GetMessageById(ExtensionErrorId iExtErrorId) {
+    static const char* EXTENSION_ERROR_MSG[] = {
+        "No errors detected in extension script",
+        "Syntax error in extension identifier declaration",
+        "Duplicate extension identifier found",
+        "Extension identifier exceeds maximum length",
+        "Missing extension identifier",
+        "Function declaration missing call ID",
+        "Function declaration missing required arrow (->) symbol",
+        "Function declaration missing function name",
+        "Invalid parameter list in function declaration",
+        "Function declaration missing 'return' keyword",
+        "Function declaration missing return type specification",
+        "Expected end of line in extension script",
+        "Unrecognized statement in extension script"
+    };
+    if (iExtErrorId < 0 || iExtErrorId > EXT_UNRECOGNIZED) return "N/A";
+    return EXTENSION_ERROR_MSG[iExtErrorId];
+}

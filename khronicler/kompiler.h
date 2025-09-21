@@ -70,6 +70,8 @@ typedef struct tagKbCompilerContext {
     KbFunctionDeclaration* pCurrentFunc;
     int     iNumCtrlFlowLabels;
     KbControlFlowLabel* pCtrlFlowLabels;
+    char    szExtensionId[KB_IDENTIFIER_LEN_MAX + 1];
+    Vlist*  pListExtFuncs;          /* <KbExtensionFunction> */
 } KbCompilerContext;
 
 typedef enum {
@@ -94,8 +96,10 @@ typedef enum {
 
 const char*         KSemanticError_GetNameById      (SemanticErrorId iSemanticErrorId);
 const char*         KSemanticError_GetMessageById   (SemanticErrorId iSemanticErrorId);
+const char*         KExtensionError_GetMessageById  (ExtensionErrorId iExtErrorId);
 void                KompilerContext_Destroy         (KbCompilerContext* pContext);
-KbCompilerContext*  KompilerContext_Build           (const KbAstNode* pAstProgram, SemanticErrorId* pIntSemanticError, const KbAstNode** pPtrAstStop);
+KbCompilerContext*  KompilerContext_Create          (const KbAstNode* pAstProgram);
+KBool               KompilerContext_Build           (KbCompilerContext* pContext, const KbAstNode* pAstProgram, SemanticErrorId* pIntSemanticError, const KbAstNode** pPtrAstStop);
 KBool               KompilerContext_Serialize       (const KbCompilerContext* pContext, KByte** pPtrByteRaw, KDword* pDwRawLength);
 
 #endif

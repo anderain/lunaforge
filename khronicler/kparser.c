@@ -1541,3 +1541,159 @@ KbAstNode* KSourceParser_Parse(
 
     return pAstProgram;
 }
+
+#define extReturnError(iExtErr) {       \
+    *pIntExtErrorId = (iExtErr);        \
+    return KB_FALSE;                    \
+} NULL
+
+#define extTokenTypeIs(t)    (pToken->iType == (t))
+
+#define extTokenIs(t, str)    (pToken->iType == (t) && IsStringEqual(pToken->szContent, (str)))
+
+#define extMatchType(iType, iExtErr) {  \
+    nextToken(pAnalyzer);               \
+    if (!extTokenTypeIs(iType)) {        \
+        extReturnError(iExtErr);        \
+    }                                   \
+} NULL
+
+#define extMatch(iType, str, iExtErr) { \
+    nextToken(pAnalyzer);               \
+    if (!extTokenIs(iType, str)) {      \
+        extReturnError(iExtErr);        \
+    }                                   \
+} NULL
+
+KBool KExtension_Parse(
+    char*               szExtensionId,
+    Vlist*              pListExtFuncs,
+    const char*         szSource,
+    ExtensionErrorId*   pIntExtErrorId,
+    int*                pIntStopLineNumber
+) {
+    Parser      parser;
+    char        szLineBuf[KB_PARSER_LINE_MAX];
+    int         iCharRead;
+
+    *pIntExtErrorId  = EXT_NO_ERROR;
+    *pIntStopLineNumber = 0;
+
+    initParser(&parser, szSource);
+
+    while(parser.pSourceCurrent[0]) {
+        Analyzer    analyzer;
+        Analyzer*   pAnalyzer = &analyzer;
+        Token*      pToken = &analyzer.token;
+        KBool       bContinueParseLine = KB_FALSE;
+        const char* szLineContinuePtr;
+    
+        /* 从源代码中读取一行 */
+        *pIntStopLineNumber = ++parser.iLineNumber;
+        iCharRead = fetchLine(parser.pSourceCurrent, szLineBuf);
+        parser.pSourceCurrent += iCharRead;
+    
+        /* 解析本行内容 */
+        szLineContinuePtr = szLineBuf;
+        do {
+            initAnalyzer(&analyzer, szLineContinuePtr);
+            /* 获取第一个 token，解析行内容 */
+            nextToken(pAnalyzer);
+            /* 定义 extension 名字 */
+            if (extTokenIs(TOKEN_IDENTIFIER, "extension")) {
+                /* 重复定义 extension id */
+                if (StringLength(szExtensionId) > 0) {
+                    extReturnError(EXT_ID_DUPLICATED);
+                }
+                /* 匹配 '=' */
+                extMatch(TOKEN_OPERATOR, "=", EXT_ID_SYNTAX_ERROR);
+                /* 匹配字符串 */
+                extMatchType(TOKEN_STRING, EXT_ID_SYNTAX_ERROR);
+                /* ExtensionId 字符串过长 */
+                if (StringLength(pToken->szContent) > KB_IDENTIFIER_LEN_MAX) {
+                    extReturnError(EXT_ID_TOO_LONG);
+                }
+                StringCopy(szExtensionId, sizeof(szExtensionId), pToken->szContent);
+                /* 匹配行结束 */
+                extMatchType(TOKEN_LINE_END, EXT_EXPECT_LINE_END);
+            }
+            /* 定义函数 */
+            else if (extTokenIs(TOKEN_KEYWORD, KB_KEYWORD_FUNC)) {
+                /* 创建拓展函数并且添加到上下文 */
+                ExtFunc* pExtFunc = (ExtFunc *)malloc(sizeof(ExtFunc));
+                memset(pExtFunc, 0, sizeof(ExtFunc));
+                vlPushBack(pListExtFuncs, pExtFunc);
+                /* 匹配 callId */
+                extMatchType(TOKEN_NUMERIC, EXT_FUNC_MISSING_ID);
+                pExtFunc->iCallId = (int)Atof(pToken->szContent);
+                /* 匹配箭头 */
+                extMatch(TOKEN_OPERATOR, "-", EXT_FUNC_MISSING_ARROW);
+                extMatch(TOKEN_OPERATOR, ">", EXT_FUNC_MISSING_ARROW);
+                /* 匹配函数名称 */
+                extMatchType(TOKEN_IDENTIFIER, EXT_FUNC_MISSING_NAME);
+                /* 函数名过长 */
+                if (StringLength(pToken->szContent) > KB_IDENTIFIER_LEN_MAX) {
+                    extReturnError(EXT_ID_TOO_LONG);
+                }
+                StringCopy(pExtFunc->szFuncName, sizeof(pExtFunc->szFuncName), pToken->szContent);
+                /* 匹配括号 '(' */
+                extMatchType(TOKEN_PAREN_L, EXT_FUNC_INVALID_PARAMS);
+                /* 匹配参数列表 */
+                nextToken(pAnalyzer);
+                if (!extTokenTypeIs(TOKEN_PAREN_R)) {
+                    rewindToken(pAnalyzer);
+                    for (;;) {
+                        /* 匹配函数参数 */
+                        extMatchType(TOKEN_IDENTIFIER, EXT_FUNC_INVALID_PARAMS);
+                        pExtFunc->iNumParams++;
+                        /* 检查下一个token */
+                        nextToken(pAnalyzer);
+                        /* 逗号，继续匹配下一个参数 */
+                        if (extTokenTypeIs(TOKEN_COMMA)) {
+                            continue;
+                        }
+                        /* 右括号 ')'，匹配结束 */
+                        else if (extTokenTypeIs(TOKEN_PAREN_R)) {
+                            break;
+                        }
+                        /* 其他，错误 */
+                        else {
+                            extReturnError(EXT_FUNC_INVALID_PARAMS);
+                        }
+                    }
+                }
+                /* 匹配 return  */
+                extMatch(TOKEN_KEYWORD, KB_KEYWORD_RETURN, EXT_FUNC_MISSING_RETURN);
+                /* 匹配类型字符串，暂时只是读入，不处理*/
+                extMatchType(TOKEN_STRING, EXT_FUNC_MISSING_TYPE);
+                /* 匹配行结束 */
+                extMatchType(TOKEN_LINE_END, EXT_EXPECT_LINE_END);
+            }
+            /* 空行 */
+            else if (extTokenTypeIs(TOKEN_LINE_END)) {
+                /* 什么也不做 */
+            }
+            /* 其他，无法识别 */
+            else {
+                extReturnError(EXT_UNRECOGNIZED);
+            }
+            /* 检查一下是读到 ';' 结束，还是一行真的结束 */
+            if (*(pAnalyzer->pCurrent) == ';') {
+                /* 跳过 ';' 继续解析本行 */
+                szLineContinuePtr = analyzer.pCurrent + 1;
+                bContinueParseLine = KB_TRUE;
+                continue;
+            }
+            /* 其他情况，遇到了 '\0' 或者 '#' 注释，结束本行解析 */
+            else {
+                bContinueParseLine = KB_FALSE;
+            }
+        } while(bContinueParseLine);
+    }
+
+    if (StringLength(szExtensionId) <= 0) {
+        extReturnError(EXT_ID_NOT_FOUND);
+    }
+
+    return KB_TRUE;
+}

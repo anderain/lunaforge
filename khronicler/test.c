@@ -736,7 +736,8 @@ int testMain(int argc, char** argv) {
                 return 0;
             }
             /* 编译 AST 为上下文 */
-            pContext = buildContext(pAstProgram, &iSemanticErrorId, &pAstSemStop);
+            pContext = createContext(pAstProgram);
+            buildContext(pContext, pAstProgram, &iSemanticErrorId, &pAstSemStop);
             /* 有语义错误 */
             if (iSemanticErrorId != SEM_NO_ERROR) {
                 formatSemanticErrorMessage(szErrorMessage, pAstSemStop, iSemanticErrorId);

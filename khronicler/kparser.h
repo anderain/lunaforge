@@ -230,5 +230,5 @@ const char* KAst_GetNameById            (AstNodeType iType);
 void        KAstNode_Destroy            (KbAstNode* pAstNode);
 KbAstNode*  KAstNode_Create             (AstNodeType iAstType, KbAstNode* pAstParent);
 KbAstNode*  KSourceParser_Parse         (const char* szSource, SyntaxErrorId* pIntSyntaxErrorId, StatementId* pIntStopStatement, int* pIntStopLineNumber);
-
+KBool       KExtension_Parse            (char* szExtensionId, Vlist* pListExtFuncs, const char* szSource, ExtensionErrorId* pIntExtErrorId, int* pIntStopLineNumber);
 #endif
